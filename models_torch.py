@@ -3,16 +3,6 @@
 """
 Created on Mon May 15 13:02:16 2023
 
-File containing the different models currently in use (older models in models_torch_archive.py)
-
-Models:
-    - vbm
-    - vbm_B(vbm)
-    - vbm_B_onlydual
-    - vbm_B_2
-    - vbm_B_3
-    - vbm_F
-
 @author: sascha
 """
 
@@ -32,22 +22,14 @@ device = torch.device("cpu")
 
 torch.set_default_tensor_type(torch.DoubleTensor)
 
-class Vbm():
+class vbm():
     def __init__(self, omega, dectemp, lr, k, Q_init, num_blocks = 14):
-        '''
-        Initializes the model.
-    
-                Parameters:
-                        All model parameters must be torch tensors with the shape [num_particles, num_agents]
-                    
-                        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
-                        dectemp (between 0 & inf): decision temperature β
-                        lr (between 0 & 1) : learning rate
-                        Q_init : (list of floats) initial Q-Values
-    
-                Returns:
-                        None
-        '''
+        """ 
+        --- Parameters ---
+        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+        dectemp (between 0 & inf): decision temperature β
+        lr (between 0 & 1) : learning rate
+        Q_init : (list of floats) initial Q-Values"""
         
         assert(omega.ndim == 2)
         assert(dectemp.ndim == 2)
@@ -58,8 +40,6 @@ class Vbm():
         if num_blocks != 1:
             if num_blocks%2 != 0:
                 raise Exception("num_blocks must be an even value.")
-        
-        self.errorrate = 0.0
         
         "Setup"
         self.param_names = ["omega", "dectemp", "lr"]
@@ -91,23 +71,19 @@ class Vbm():
         
         self.V = [torch.stack((V0,V1,V2,V3), 2)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
-        
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+
     def locs_to_pars(self, locs):
         par_dict = {"omega": torch.sigmoid(locs[..., 0]),
                     "dectemp": torch.exp(locs[..., 1]),
@@ -116,7 +92,7 @@ class Vbm():
         return par_dict
     
     def compute_probs(self, trial, day):
-        option1, option2 = self.find_resp_options(trial)
+        option1, option2 = self.find_resp_options([trial])
         
         _, mask = self.Qoutcomp(self.V[-1], option1)
         Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
@@ -147,15 +123,12 @@ class Vbm():
             raise Exception("Fehla, digga!")
         
         try:
-            ipdb.set_trace()
             no_error_mask = [1 if ch != -10 else 0 for ch in choices]
         except:
             ipdb.set_trace()
             
         "Replace error choices by the number one"
-        choices_noerrors = torch.where(torch.tensor(no_error_mask).type(torch.bool), 
-                                       choices, 
-                                       torch.ones(choices.shape)).type(torch.int)
+        choices_noerrors = torch.where(torch.tensor(no_error_mask).type(torch.bool), choices, torch.ones(choices.shape)).type(torch.int)
     
         Qout = torch.zeros(Qin.shape).double()
         choicemask = torch.zeros(Qin.shape, dtype = int)
@@ -190,82 +163,54 @@ class Vbm():
         INPUT: stimulus in MATLAB notation (1-indexed) (simple list of stimuli)
         OUTPUT: response options in python notation (0-indexed)
         """
-        
-        cond = stimulus_mat > 10
-        
-        option2_python = ((stimulus_mat % 10) - 1).type(torch.int)
-        option1_python = (((stimulus_mat - (stimulus_mat % 10)) / 10) -1).type(torch.int)
+        option2_python = ((torch.tensor(stimulus_mat) % 10) - 1).type(torch.int)
+        option1_python = (((torch.tensor(stimulus_mat) - (torch.tensor(stimulus_mat) % 10)) / 10) -1).type(torch.int)
         
         if option2_python.ndim == 2 and option2_python.shape[0] == 1:
             option1_python = torch.squeeze(option1_python)
             option2_python = torch.squeeze(option2_python)
-                    
-        "-2 for 'bad choice' if cond == 0, otherwise the response options"
-        option1_python = -2 + (2 + option1_python) * cond
-        option2_python = -2 + (2 + option2_python) * cond
+            
         return option1_python, option2_python
 
     def choose_action(self, trial, day):
         "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
         "OUTPUT: choice response digit (in 0-indexing notation)"
         
+        if trial < 10:
+            "Single-target trial"
+            choice_python = torch.tensor(trial-1)
         
-        sampled = torch.rand(1)
-        cond_error = sampled > self.errorrate
-        cond_trial = trial < 10
-        "Dual-target trial"
-        option1, option2 = self.find_resp_options(trial)
-        probs = self.compute_probs(trial, day)
-        choice_sample = torch.distributions.categorical.Categorical(probs=probs).sample()
+        elif trial > 10:
+            # torch.manual_seed(123)
+            
+            "Dual-target trial"
+            option1, option2 = self.find_resp_options([trial])
+            
+            # shape of softmax argument should be (n_particles, n_subjects, 2)
+            # p_actions = self.softmax(torch.cat((self.V[-1][..., option1], self.V[-1][..., option2]), dim = -1))
+            # p_actions comes out as shape [1, 1, 2]
+            # choice_sample = torch.multinomial(torch.squeeze(p_actions), 1)[0]
+            
+            choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()
 
-        choice_python = option2 * choice_sample + \
-            option1 * (1-choice_sample)
-        if_noerror = (trial - 1) * cond_trial + \
-            choice_python * ~cond_trial
+            choice_python = option2*choice_sample + option1*(1-choice_sample)
             
-        "-2 stands for 'bad choice'"
-        to_return = -2 * \
-            ~cond_error + if_noerror * cond_error
-            
-        return to_return
-        
-        # if trial < 10:
-        #     "Single-target trial"
-        #     choice_python = torch.tensor(trial-1)
-        
-        # elif trial > 10:
-        #     # torch.manual_seed(123)
-            
-        #     "Dual-target trial"
-        #     option1, option2 = self.find_resp_options([trial])
-            
-        #     # shape of softmax argument should be (n_particles, n_subjects, 2)
-        #     # p_actions = self.softmax(torch.cat((self.V[-1][..., option1], self.V[-1][..., option2]), dim = -1))
-        #     # p_actions comes out as shape [1, 1, 2]
-        #     # choice_sample = torch.multinomial(torch.squeeze(p_actions), 1)[0]
-            
-        #     choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()
-
-        #     choice_python = option2*choice_sample + option1*(1-choice_sample)
-            
-        # "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
-        # return torch.squeeze(choice_python).type('torch.LongTensor')
+        "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
+        return torch.squeeze(choice_python).type('torch.LongTensor')
 
     def update(self, choices, outcome, blocktype, **kwargs):
-        '''
-        Is called after a dual-target choice and updates Q-values, 
-        sequence counters, habit values (i.e. repetition values), and V-Values.
-    
-                Parameters:
-                        choices (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
-                                                     -10 : error
-                        outcome (0 or 1) : no reward (0) or reward (1)
-                        blocktype : 's' (sequential blocks) or 'r' (random blocks)
-                                    Important for updating of sequence counters.
-    
-                Returns:
-                        None
-        '''
+        """
+        Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        
+        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)"
+        
+        --- Parameters ---
+        choice (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
+                                     -10 : error
+        outcome (0 or 1) : no reward (0) or reward (1)
+        blocktype : 's' (sequential blocks) or 'r' (random blocks)
+                    Important for updating of sequence counters.
+        """
         
         if all([ch == -1 for ch in choices]) and all([out == -1 for out in outcome]) and all([bb == -1 for bb in blocktype]):
             "Set previous actions to -1 because it's the beginning of a new block"
@@ -374,9 +319,19 @@ class Vbm():
         V3 = (1-self.omega)*self.rep[-1][..., 3] + self.omega*self.Q[-1][..., 3]
         self.V.append(torch.stack((V0,V1,V2,V3), 2))
         
-        self.seq_counter = self.init_seq_counter.copy()
+        "Sequence Counters"
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
 
-class Vbm_b(Vbm):
+class vbm_B(vbm):
     
     def __init__(self, \
                  lr_day1, \
@@ -403,13 +358,12 @@ class Vbm_b(Vbm):
         assert(lr_day2.ndim == 2)
         assert(theta_Q_day2.ndim == 2)
         assert(theta_rep_day2.ndim == 2)
+        
         assert(Q_init.ndim == 3)
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
                 raise Exception("num_blocks must be an even value.")
-
-        self.errorrate = 0.0
 
         "Setup"
         self.param_names = ["lr_day1", "theta_Q_day1", "theta_rep_day1", "lr_day2", "theta_Q_day2", "theta_rep_day2"]
@@ -417,7 +371,7 @@ class Vbm_b(Vbm):
         self.num_particles = lr_day1.shape[0]
         self.num_agents = lr_day1.shape[1]
         self.dectemp = torch.tensor([[1.]]) # For softmax function
-                
+        
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
@@ -446,23 +400,19 @@ class Vbm_b(Vbm):
         
         self.V = [torch.stack((V0,V1,V2,V3), 2)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
-        
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+    
     def locs_to_pars(self, locs):
         par_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
                     "theta_Q_day1": torch.exp(locs[..., 1]),
@@ -545,7 +495,7 @@ class Vbm_b(Vbm):
             theta_Q = self.theta_Q_day2
             theta_rep = self.theta_rep_day2
 
-        if all([ch == -1 for ch in choices[0,:]]) and all([out == -1 for out in outcome[0,:]]) and all([bb == -1 for bb in blocktype]):
+        if all([ch == -1 for ch in choices]) and all([out == -1 for out in outcome]) and all([bb == -1 for bb in blocktype]):
             "Set previous actions to -1 because it's the beginning of a new block"
             self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
             self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
@@ -702,21 +652,55 @@ class Vbm_b(Vbm):
         self.V.append(torch.stack((V0,V1,V2,V3), 2))
         
         "Sequence Counters"
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
 
-class Vbm_b_onlydual():
+class testmodel(vbm):
+    def __init__(self, prob1, prob2):
+
+        # assert(prob <= 1 and prob >= 0)    
+        self.prob1 = prob1
+        self.prob2 = prob2
+        self.num_blocks = 14
+        self.trials = 480*self.num_blocks
+        self.param_names = ['prob']
+        
+    def locs_to_pars(self, locs):
+        par_dict = {"prob1": torch.sigmoid(locs[..., 0]),
+                    "prob2": torch.sigmoid(locs[..., 1])}
+
+        return par_dict
+    
+    def update(self, choices, outcome, blocktype, **kwargs):
+        
+        pass
+    
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        ipdb.set_trace()
+        return torch.distributions.categorical.Categorical(probs=self.compute_probs(1,1)).sample()
+
+    def reset(self, locs):
+        par_dict = self.locs_to_pars(locs)  
+        
+        self.prob = par_dict["prob"]
+        
+    def compute_probs(self, trial, day):
+        ipdb.set_trace()
+        probs = torch.stack((self.prob1, 1-self.prob1), dim = -1)
+                
+        return probs
+
+class vbm_B_onlydual():
     
     def __init__(self, \
                  lr_day1, \
@@ -735,8 +719,6 @@ class Vbm_b_onlydual():
         lr (between 0 & 1) : learning rate
         Q_init : (list of floats) initial Q-Values"""
         self.na = 4 # no. of possible actions
-        self.num_particles = lr_day1.shape[0]
-        self.num_agents = lr_day1.shape[1] # number of agents
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
@@ -766,29 +748,25 @@ class Vbm_b_onlydual():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
     def softmax(self, z):
         sm = torch.nn.Softmax(dim=1)
         p_actions = sm(z)
         return p_actions
         
-    def update(self, choice, outcome, blocktype, day, trialstimulus, **kwargs):
+    def update(self, choice, outcome, blocktype, **kwargs):
         """
         Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
         
@@ -802,12 +780,12 @@ class Vbm_b_onlydual():
                     Important for updating of sequence counters.
         """
 
-        if day == 1:
+        if kwargs['day'] == 1:
             lr = self.lr_day1
             theta_Q = self.theta_Q_day1
             theta_rep = self.theta_rep_day1
             
-        elif day == 2:
+        elif kwargs['day'] == 2:
             lr = self.lr_day2
             theta_Q = self.theta_Q_day2
             theta_rep = self.theta_rep_day2
@@ -838,7 +816,7 @@ class Vbm_b_onlydual():
             # Outcome is either 0 or 1
             if ch > -1:
                 "No error"
-                if trialstimulus > 10:
+                if kwargs['trialstimulus'] > 10:
                     "Q-learning update only after dual-target trial!"
                     Qchoice = (self.Q[-1][..., ch][:,None] + lr*(outcome-self.Q[-1][..., ch][:,None])) * torch.eye(self.na)[ch, :]
                     mask = torch.eye(self.na, dtype=bool)[ch, :]
@@ -860,7 +838,6 @@ class Vbm_b_onlydual():
                                  str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
                     
             else:
-                ipdb.set_trace()
                 raise Exception("Da isch a Fehla aba ganz a gwaldiga!")
             
             "----- Update repetition values self.rep -----"
@@ -931,12 +908,8 @@ class Vbm_b_onlydual():
             choice_sample = torch.multinomial(p_actions, 1)[0]
 
             choice_python = option2*choice_sample + option1*(1-choice_sample)
-            
-        print(type(choice_python))
-            
-        return torch.squeeze(torch.tensor(choice_python)).type('torch.LongTensor')
-        
-        # return torch.squeeze(choice_python).type('torch.LongTensor')
+
+        return torch.squeeze(choice_python).type('torch.LongTensor')
     
     def reset(self, **kwargs):
         self.lr_day1 = kwargs["lr_day1"]
@@ -963,9 +936,18 @@ class Vbm_b_onlydual():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        self.seq_counter = self.init_seq_counter.copy()
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
-class Vbm_b_2():
+class vbm_B_2():
     "Like model B, but with separate parameters for the first two blocks"
     
     def __init__(self, \
@@ -1022,22 +1004,18 @@ class Vbm_b_2():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
     def softmax(self, z):
         sm = torch.nn.Softmax(dim=1)
@@ -1223,9 +1201,19 @@ class Vbm_b_2():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        self.seq_counter = self.init_seq_counter.copy()
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         
-class Vbm_b_3():
+                        
+class vbm_B_3():
     "Like model B, but with separate parameters for the first two blocks"
     
     def __init__(self, \
@@ -1276,22 +1264,18 @@ class Vbm_b_3():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
     def softmax(self, z):
         sm = torch.nn.Softmax(dim=1)
@@ -1460,9 +1444,18 @@ class Vbm_b_3():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        self.seq_counter = self.init_seq_counter.copy()
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
-class Vbm_f():
+class vbm_F():
     "Fixed Q-values, but theta_rep and theta_Q develop linearly"
     def __init__(self, \
                  theta_Q0_day1, \
@@ -1523,22 +1516,18 @@ class Vbm_f():
         
         self.V = [torch.cat((V0.transpose(0,1), V1.transpose(0,1), V2.transpose(0,1), V3.transpose(0,1)),1)]
         
-        "----- Set sequence counter -----"
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
         # Compute prior over sequences of length 4
-        self.init_seq_counter = {}
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-10 in seq_counter for errors)"
-        """ seq_counter dims: 
-           Dim 0 : random or sequential (0 = sequential, 1 = random)
-           Dim 1 : pppchoice 
-           Dim 2 : ppchoice
-           Dim 3 : pchoice
-           Dim 4 : choice
-           Dim 5 : idx of agent"""
-        self.init_seq_counter = self.k / 4 * np.ones((2, 6, 6, 6, 6,
-                                                       self.num_agents))
-        self.seq_counter = self.init_seq_counter.copy()
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
     def softmax(self, z):
         sm = torch.nn.Softmax(dim=1)
@@ -1721,6 +1710,15 @@ class Vbm_f():
         
         self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
         
-        self.seq_counter = self.init_seq_counter.copy()
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
 pyro.clear_param_store()

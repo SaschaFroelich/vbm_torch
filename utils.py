@@ -167,32 +167,16 @@ def get_trialseq(group, block_no, remote = 0, published_results = 0):
              ["s", "r", "s", "r", "s", "r", "r", "s", "r", "s", "r", "s", "r", "s"],\
               ["r", "s", "r", "s", "r", "s", "s", "r", "s", "r", "s", "r", "s", "r"],\
               ["s", "r", "s", "r", "s", "r", "r", "s", "r", "s", "r", "s", "r", "s"]]    
-
+    
     return torch.tensor(numpy.squeeze(mat["sequence"])), types[group][block_no], \
         torch.tensor(numpy.squeeze(mat["sequence_without_jokers"]))
 
 def replace_single_element_lists(value):
-    "Replaces lists of length 1 with their content (function for panda DF cells)"
-    
     if len(value) == 1:
         return value[0]
-    
     return value
 
 def arrange_data_for_plot(i, df, **kwargs):        
-    """
-    Parameters
-    ----------
-
-    df : DataFrame with data to be arranged.
-        'Jokertypes' : 
-        'Choices' :
-        'Blockidx' :
-        'Blocktype' :
-        
-
-    """
-    
     df = df.applymap(replace_single_element_lists)
     
     "Only retain rows pertaining to joker trial"
@@ -299,8 +283,6 @@ def plot_results(data_sim, *args, **kwargs):
     
     Jokertypes : -1 no joker, 0 random , 1 congruent, 2 incongruent
     """
-
-    ipdb.set_trace()
 
     if args:
         datas = (data_sim, args[0])

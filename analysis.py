@@ -14,7 +14,6 @@ import glob
 
 import numpy
 import scipy
-import torch
 
 import utils
 import models_torch as models
@@ -99,7 +98,7 @@ def violin(df, with_colbar = 1, sharey = False):
                 g2.set(ylabel=None)
             ax[par].legend([],[], frameon=False)
         
-    # plt.savefig('/home/sascha/Desktop/presentations/AST/June_21_23/modelB.svg')
+    plt.savefig('/home/sascha/Desktop/presentations/AST/June_21_23/modelB.svg')
     
     # "ax[1]"
     # sns.violinplot(ax=ax[1], x="parameter", y="inferred", data=df[df["parameter"]=="omega"], color=".8")
@@ -196,24 +195,14 @@ def param_corr(df):
     # r,p = scipy.stats.pearsonr(df_inf["omega"], df_inf["Decision Temp"])
 
 def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plot_Qdiff = 0):
-    '''
-    Generate simulations based on inferred values and compare real/ simulated data.
-
-            Parameters:
-                    data_dir : Directory of behavioural (mat)-files to iterate over
-                    df : dataframe of all inferred parameters for all participants
-                    model : which model to use for simulation
-
-            Returns:
-                    None
-    '''
+    """Generate data based on inferred values and compare real/ simulated data
+    data_dir : Directory of behavioural (mat)-files to iterate over
+    df : dataframe of all inferred parameters for all participants
+    model : which model to use for simulation
+    """
 
     df_group_sim = pd.DataFrame()
     df_group_true = pd.DataFrame()
-    
-    Q_inits = []
-    block_orders = []
-    seqtypes = []
 
     pb = -1
     for group in range(4):
@@ -228,40 +217,28 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
             data, prolific_ID = utils.get_participant_data(file1, group, data_dir, published_results = published_results)
         
             if group == 0:
-                Q_inits.append(Q_init)
-                # agent_Q_init = Q_init
+                agent_Q_init = Q_init
                 env_rewprobs = [0.8, 0.2, 0.2, 0.8]
-                # block_order = 1
-                # seqtype = 1
-                block_orders.append(1)
-                seqtypes.append(1)
+                block_order = 1
+                seqtype = 1
                 
             elif group == 1:
-                Q_inits.append(Q_init)
-                # agent_Q_init = Q_init
+                agent_Q_init = Q_init
                 env_rewprobs = [0.8, 0.2, 0.2, 0.8]
-                # block_order = 2
-                # seqtype = 1
-                block_orders.append(2)
-                seqtypes.append(1)
+                block_order = 2
+                seqtype = 1
                 
             elif group == 2:
-                Q_inits.append([Q_init[2], Q_init[3], Q_init[0], Q_init[1]])
-                # agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
+                agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
                 env_rewprobs = [0.2, 0.8, 0.8, 0.2]
-                # block_order = 1
-                # seqtype = 2
-                block_orders.append(1)
-                seqtypes.append(2)
+                block_order = 1
+                seqtype = 2
                 
             elif group == 3:
-                Q_inits.append([Q_init[2], Q_init[3], Q_init[0], Q_init[1]])
-                # agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
+                agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
                 env_rewprobs = [0.2, 0.8, 0.8, 0.2]
-                # block_order = 2
-                # seqtype = 2
-                block_orders.append(2)
-                seqtypes.append(2)
+                block_order = 2
+                seqtype = 2
                 
             else:
                 raise Exception("Da isch a Fehla!")
@@ -271,11 +248,9 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 dectemp_inf = df[df["participant"]==prolific_ID]["inf_dectemp"].item()
                 lr_inf = df[df["participant"]==prolific_ID]["inf_lr"].item()
                     
-                newagent = models.Vbm(omega = omega_inf,
-                                      dectemp = dectemp_inf,
-                                      lr = lr_inf, 
-                                      k=k, 
-                                      Q_init = agent_Q_init)
+                newagent = models.vbm(omega = omega_inf, \
+                                      dectemp = dectemp_inf, \
+                                      lr = lr_inf, k=k, Q_init = agent_Q_init)
             
             elif model == 'A':
                 inf_dectemp_day1 = df[df["participant"]==prolific_ID]["inf_dectemp_day1"].item()
@@ -286,34 +261,30 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
                 inf_omega_day2 = df[df["participant"]==prolific_ID]["inf_omega_day2"].item()
                                 
-                newagent = models.vbm_A(dectemp_day1 = inf_dectemp_day1,
-                                        lr_day1 = inf_lr_day1,
-                                        omega_day1 = inf_omega_day1,
-                                        dectemp_day2 = inf_dectemp_day2,
-                                        lr_day2 = inf_lr_day2,
-                                        omega_day2 = inf_omega_day2,
-                                        k=k, 
-                                        Q_init = agent_Q_init)
+                newagent = models.vbm_A(dectemp_day1 = inf_dectemp_day1, \
+                                        lr_day1 = inf_lr_day1, \
+                                        omega_day1 = inf_omega_day1, \
+                                        dectemp_day2 = inf_dectemp_day2, \
+                                        lr_day2 = inf_lr_day2, \
+                                        omega_day2 = inf_omega_day2, \
+                                        k=k, Q_init = agent_Q_init)
             
             elif model == 'B':
-                # inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
-                # inf_theta_Q_day1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1"].item()
-                # inf_theta_rep_day1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1"].item()
+                inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
+                inf_theta_Q_day1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1"].item()
+                inf_theta_rep_day1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1"].item()
                 
-                # inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
-                # inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
-                # inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
+                inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
+                inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
+                inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                pass
-                
-                # newagent = models.Vbm_b(lr_day1 = torch.tensor([df["inf_lr_day1"]]),
-                #                         theta_Q_day1 = torch.tensor([df["inf_theta_Q_day1"]]),
-                #                         theta_rep_day1 = torch.tensor([df["inf_theta_rep_day1"]]),
-                #                         lr_day2 = torch.tensor([df["inf_lr_day2"]]),
-                #                         theta_Q_day2 = torch.tensor([df["inf_theta_Q_day2"]]),
-                #                         theta_rep_day2 = torch.tensor([df["inf_theta_rep_day2"]]),
-                #                         k=k, 
-                #                         Q_init = torch.tensor(Q_inits))
+                newagent = models.vbm_B(lr_day1 = inf_lr_day1, \
+                                        theta_Q_day1 = inf_theta_Q_day1, \
+                                        theta_rep_day1 = inf_theta_rep_day1, \
+                                        lr_day2 = inf_lr_day2, \
+                                        theta_Q_day2 = inf_theta_Q_day2, \
+                                        theta_rep_day2 = inf_theta_rep_day2, \
+                                        k=k, Q_init = agent_Q_init)
                     
             elif model == 'B_onlydual':
                 inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
@@ -324,14 +295,13 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_onlydual(lr_day1 = inf_lr_day1,
-                                        theta_Q_day1 = inf_theta_Q_day1,
-                                        theta_rep_day1 = inf_theta_rep_day1,
-                                        lr_day2 = inf_lr_day2,
-                                        theta_Q_day2 = inf_theta_Q_day2,
-                                        theta_rep_day2 = inf_theta_rep_day2,
-                                        k=k, 
-                                        Q_init = agent_Q_init)
+                newagent = models.vbm_B_onlydual(lr_day1 = inf_lr_day1, \
+                                        theta_Q_day1 = inf_theta_Q_day1, \
+                                        theta_rep_day1 = inf_theta_rep_day1, \
+                                        lr_day2 = inf_lr_day2, \
+                                        theta_Q_day2 = inf_theta_Q_day2, \
+                                        theta_rep_day2 = inf_theta_rep_day2, \
+                                        k=k, Q_init = agent_Q_init)
                 
                     
             elif model == 'B_2':
@@ -347,19 +317,18 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_2(lr_day1_1 = inf_lr_day1_1,
-                                        theta_Q_day1_1 = inf_theta_Q_day1_1,
-                                        theta_rep_day1_1 = inf_theta_rep_day1_1,
+                newagent = models.vbm_B_2(lr_day1_1 = inf_lr_day1_1, \
+                                        theta_Q_day1_1 = inf_theta_Q_day1_1, \
+                                        theta_rep_day1_1 = inf_theta_rep_day1_1, \
                                             
-                                        lr_day1_2 = inf_lr_day1_2,
-                                        theta_Q_day1_2 = inf_theta_Q_day1_2,
-                                        theta_rep_day1_2 = inf_theta_rep_day1_2,
+                                        lr_day1_2 = inf_lr_day1_2, \
+                                        theta_Q_day1_2 = inf_theta_Q_day1_2, \
+                                        theta_rep_day1_2 = inf_theta_rep_day1_2, \
                                             
-                                        lr_day2 = inf_lr_day2,
-                                        theta_Q_day2 = inf_theta_Q_day2,
-                                        theta_rep_day2 = inf_theta_rep_day2,
-                                        k=k, 
-                                        Q_init = agent_Q_init)
+                                        lr_day2 = inf_lr_day2, \
+                                        theta_Q_day2 = inf_theta_Q_day2, \
+                                        theta_rep_day2 = inf_theta_rep_day2, \
+                                        k=k, Q_init = agent_Q_init)
                     
             elif model == 'B_3':
                 inf_theta_Q_day1_1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1_1"].item()
@@ -371,100 +340,87 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1,
-                                        theta_rep_day1_1 = inf_theta_rep_day1_1,
+                newagent = models.vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1, \
+                                        theta_rep_day1_1 = inf_theta_rep_day1_1, \
                                             
-                                        theta_Q_day1_2 = inf_theta_Q_day1_2,
-                                        theta_rep_day1_2 = inf_theta_rep_day1_2,
+                                        theta_Q_day1_2 = inf_theta_Q_day1_2, \
+                                        theta_rep_day1_2 = inf_theta_rep_day1_2, \
                                             
-                                        theta_Q_day2 = inf_theta_Q_day2,
-                                        theta_rep_day2 = inf_theta_rep_day2,
-                                        k=k, 
-                                        Q_init = agent_Q_init)
+                                        theta_Q_day2 = inf_theta_Q_day2, \
+                                        theta_rep_day2 = inf_theta_rep_day2, \
+                                        k=k, Q_init = agent_Q_init)
 
-    if model == 'B':
-        newagent = models.Vbm_b(lr_day1 = torch.tensor([df["inf_lr_day1"]]),
-                                theta_Q_day1 = torch.tensor([df["inf_theta_Q_day1"]]),
-                                theta_rep_day1 = torch.tensor([df["inf_theta_rep_day1"]]),
-                                lr_day2 = torch.tensor([df["inf_lr_day2"]]),
-                                theta_Q_day2 = torch.tensor([df["inf_theta_Q_day2"]]),
-                                theta_rep_day2 = torch.tensor([df["inf_theta_rep_day2"]]),
-                                k=k, 
-                                Q_init = torch.tensor([Q_inits]))
 
-    print("Group %d"%group)
+            print("Group %d"%group)
 
-    "--- Simulate ---"
-    if published_results:
-        newenv = env.Env(newagent, 
-                         rewprobs=env_rewprobs, 
-                         matfile_dir = './matlabcode/published/')
-    else:
-        newenv = env.Env(newagent, 
-                         rewprobs=env_rewprobs, 
-                         matfile_dir = './matlabcode/clipre/')
-        
-    newenv.run(block_order = block_orders, sequence = seqtypes)
-    
-    "--- --- ---"
-        
-    if model == 'B_3':
-        data_inf = {"Choices": newenv.choices, \
-                    "Outcomes": newenv.outcomes, \
-                    "Trialsequence": newenv.data["trialsequence"], \
-                    "Blocktype": newenv.data["blocktype"],\
-                    "Jokertypes": newenv.data["jokertypes"], \
-                    "Blockidx": newenv.data["blockidx"], \
-                    "Participant": pb}
-            
-    else:
-        data_inf = {"Choices": newenv.choices, \
-                    "Outcomes": newenv.outcomes, \
-                    "Trialsequence": newenv.data["trialsequence"], \
-                    "Blocktype": newenv.data["blocktype"],\
-                    "Jokertypes": newenv.data["jokertypes"], \
-                    "Blockidx": newenv.data["blockidx"], \
-                    "Participant": pb}
-                    # "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-            
-            
-    assert(data["Blocktype"] == data_inf["Blocktype"])
-    
-    if not data["Trialsequence"] == data_inf["Trialsequence"]:
-        ipdb.set_trace()
-    
-    assert(data["Trialsequence"] == data_inf["Trialsequence"])
-    
-    data["Jokertypes"] = data_inf["Jokertypes"]
-    data["Blockidx"] = data_inf["Blockidx"]
+            "--- Simulate ---"
+            if published_results:
+                newenv = env.env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/published/')
+            else:
+                newenv = env.env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/clipre/')
                 
-    if model == 'original':
-        df_sim, df_true = utils.plot_results(data, \
-                           data_inf, \
-                           omega_inf=omega_inf, \
-                           dectemp_inf=dectemp_inf,\
-                           lr_inf=lr_inf, \
-                           ymin=0.3, \
-                           group = group)
-                           #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
-                           #plotname = prolific_ID)
+            
+            newenv.run(block_order = block_order, sequence = seqtype)
+            
+            "--- --- ---"
+                
+            if model == 'B_3':
+                data_inf = {"Choices": newenv.choices, \
+                            "Outcomes": newenv.outcomes, \
+                            "Trialsequence": newenv.data["trialsequence"], \
+                            "Blocktype": newenv.data["blocktype"],\
+                            "Jokertypes": newenv.data["jokertypes"], \
+                            "Blockidx": newenv.data["blockidx"], \
+                            "Participant": pb}
+                    
+            else:
+                data_inf = {"Choices": newenv.choices, \
+                            "Outcomes": newenv.outcomes, \
+                            "Trialsequence": newenv.data["trialsequence"], \
+                            "Blocktype": newenv.data["blocktype"],\
+                            "Jokertypes": newenv.data["jokertypes"], \
+                            "Blockidx": newenv.data["blockidx"], \
+                            "Participant": pb}
+                            # "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
+                    
+                    
+            assert(data["Blocktype"] == data_inf["Blocktype"])
+            
+            if not data["Trialsequence"] == data_inf["Trialsequence"]:
+                ipdb.set_trace()
+            
+            assert(data["Trialsequence"] == data_inf["Trialsequence"])
+            
+            data["Jokertypes"] = data_inf["Jokertypes"]
+            data["Blockidx"] = data_inf["Blockidx"]
+                        
+            if model == 'original':
+                df_sim, df_true = utils.plot_results(data, \
+                                   data_inf, \
+                                   omega_inf=omega_inf, \
+                                   dectemp_inf=dectemp_inf,\
+                                   lr_inf=lr_inf, \
+                                   ymin=0.3, \
+                                   group = group)
+                                   #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
+                                   #plotname = prolific_ID)
 
-    else:
-        df_sim, df_true = utils.plot_results(data, \
-                           data_inf, \
-                           ymin=0.3, \
-                           group = group)
-                           #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
-                           #plotname = prolific_ID)
+            else:
+                df_sim, df_true = utils.plot_results(data, \
+                                   data_inf, \
+                                   ymin=0.3, \
+                                   group = group)
+                                   #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
+                                   #plotname = prolific_ID)
 
-    df_sim["Group"] = group
-    df_sim["Participant"] = prolific_ID
-    
-    df_true["Group"] = group
-    df_true["Participant"] = prolific_ID
-    
-    df_group_sim = pd.concat((df_group_sim, df_sim))
-    df_group_true = pd.concat((df_group_true, df_true))
+            df_sim["Group"] = group
+            df_sim["Participant"] = prolific_ID
+            
+            df_true["Group"] = group
+            df_true["Participant"] = prolific_ID
+            
+            df_group_sim = pd.concat((df_group_sim, df_sim))
+            df_group_true = pd.concat((df_group_true, df_true))
                         
     "Groups 0 and 2 saw the same block order, groups 1 and 3 saw the same block order"
     "Change Blockidx -> Blockno, so that Block no 0 is the random block for each participant"
