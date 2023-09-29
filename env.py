@@ -6,6 +6,7 @@ Created on Fri May 19 10:16:01 2023
 @author: sascha
 """
 
+import pandas as pd
 import torch
 import ipdb
 import scipy
@@ -17,8 +18,9 @@ class Env():
         self.rewprobs = torch.tensor(rewprobs)
         self.matfile_dir = matfile_dir
         
-        self.choices = []
-        self.outcomes = []
+        self.data = {}
+        self.data["choices"] = []
+        self.data["outcomes"] = []
         
     def load_matfiles(self, matfile_dir, blocktype, sequence = [1]):
         '''
@@ -115,6 +117,7 @@ class Env():
                 self.data["jokertypes"][trial].append(jokertypes_all[agent][trial])
                 self.data["blockidx"][trial].append(blockidx_all[agent][trial])
                 self.data["blocktype"][trial].append(blocktype_all[agent][trial])
+                
 
     def run(self, block_order = [1], sequence = [1]):
         '''
@@ -196,12 +199,11 @@ class Env():
     
         tb_block = torch.zeros(num_agents)
         random_block = torch.zeros(num_agents)   
-        self.data = {"trialsequence": [], 
-                     "blocktype": [], 
-                     "jokertypes": [], 
-                     "blockidx": []}
+        self.data["trialsequence"] = []
+        self.data["blocktype"] = []
+        self.data["jokertypes"] = []
+        self.data["blockidx"] = []
         
-        # ipdb.set_trace()
         self.load_matfiles(self.matfile_dir, 
                            blocktype, 
                            sequence = torch.tensor(sequence))
@@ -254,7 +256,6 @@ class Env():
         t_day1 = -1
         t_day2 = -1
         for tau in range(len(self.data["trialsequence"])):
-            ipdb.set_trace()
             trial = self.data["trialsequence"][tau]
             blocktype = self.data["blocktype"][tau]
                       
@@ -281,43 +282,84 @@ class Env():
             
             if trial[0] == -1:
                 "Beginning of a new block"
-                self.agent.update(torch.tensor([-1]), 
-                                  torch.tensor([-1]), 
-                                  torch.tensor([-1]), 
+                self.agent.update(torch.tensor([[-1]]), 
+                                  torch.tensor([[-1]]), 
+                                  torch.tensor([[-1]]), 
                                   day=day, 
                                   trialstimulus = trial, 
                                   t = 0, 
                                   exp_part = exp_part)
                 
-                self.choices.append(torch.tensor([-1]*num_agents))
-                self.outcomes.append(torch.tensor([-1]*num_agents))
+                self.data["choices"].append(torch.tensor([-1]*num_agents))
+                self.data["outcomes"].append(torch.tensor([-1]*num_agents))
                 
             else:
                 current_choice = self.agent.choose_action(torch.tensor(trial), torch.tensor(day))
-                outcome = torch.bernoulli(self.rewprobs[current_choice])
+                print(current_choice)
                 ipdb.set_trace()
-                self.choices.append(torch.tensor([current_choice.item()]))
-                self.outcomes.append(torch.tensor([outcome.item()]))
+                outcome = torch.bernoulli(self.rewprobs[current_choice])
+                self.data["choices"].append([current_choice])
+                self.data["outcomes"].append([outcome])
                     
                 if day == 1:
-                    if trial > 10:
-                        t_day1 += 1
-                    self.agent.update(torch.tensor([current_choice]), 
-                                      torch.tensor([outcome]), 
-                                      [blocktype], 
+                    t_day1 += 1
+                    self.agent.update(current_choice, 
+                                      outcome, 
+                                      blocktype, 
                                       day=day, 
                                       trialstimulus = trial, 
                                       t = t_day1, 
                                       exp_part = exp_part)
-                    
+
                 elif day == 2:
-                    if trial > 10:
-                        t_day2 += 1
-                    self.agent.update(torch.tensor([current_choice]), 
-                                      torch.tensor([outcome]), 
-                                      [blocktype], 
+                    t_day2 += 1
+                    self.agent.update(current_choice, 
+                                      outcome, 
+                                      blocktype, 
                                       day=day, 
                                       trialstimulus = trial, 
                                       t = t_day2, 
                                       exp_part = exp_part)
+        
+        self.res_to_df()
+        
+    def res_to_df(self):
+        self.sim_df = pd.DataFrame(data = {
+            "participant": [],
+            "trialsequence": [], 
+            "trialidx": [],
+            "blocktype": [], 
+            "jokertypes": [], 
+            "blockidx": [],
+            "choices": [],
+            "outcomes": []
+            })
+        
+        num_agents = self.agent.num_agents
+
+        if len(self.data["choices"][0]) != num_agents:
+            raise Exception("Somewhere the number of agents got messed UP!")
+        
+        num_entries = len(self.data["choices"])
+        for tt in range(num_entries):
+        
+            trialidx = 0 # trialidx in the experiment (thus per participant)
+            for ag in range(num_agents):
+                "Define the new row for the dataframe if not dealing with new block trial"
                 
+                if self.data["choices"][tt][0] != -1:
+                
+                    new_row = pd.DataFrame({
+                        "participant": ag,
+                        "trialsequence": self.data["trialsequence"][tt][ag], 
+                        "trialidx": trialidx,
+                        "blocktype": self.data["blocktype"][tt][ag], 
+                        "jokertypes": self.data["jokertypes"][tt][ag],
+                        "blockidx": [],
+                        "choices": self.data["choices"][tt][ag],
+                        "outcomes": self.data["outcomes"][tt][ag]
+                        })
+                    
+                    self.sim_df = pd.concat([self.sim_df, new_row], ignore_index = True)
+                    
+                    trialidx += 1

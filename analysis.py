@@ -371,15 +371,16 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1, \
-                                        theta_rep_day1_1 = inf_theta_rep_day1_1, \
+                newagent = models.vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1,
+                                        theta_rep_day1_1 = inf_theta_rep_day1_1,
                                             
-                                        theta_Q_day1_2 = inf_theta_Q_day1_2, \
-                                        theta_rep_day1_2 = inf_theta_rep_day1_2, \
+                                        theta_Q_day1_2 = inf_theta_Q_day1_2,
+                                        theta_rep_day1_2 = inf_theta_rep_day1_2,
                                             
-                                        theta_Q_day2 = inf_theta_Q_day2, \
-                                        theta_rep_day2 = inf_theta_rep_day2, \
-                                        k=k, Q_init = agent_Q_init)
+                                        theta_Q_day2 = inf_theta_Q_day2,
+                                        theta_rep_day2 = inf_theta_rep_day2,
+                                        k=k, 
+                                        Q_init = agent_Q_init)
 
     if model == 'B':
         newagent = models.Vbm_b(lr_day1 = torch.tensor([df["inf_lr_day1"]]),

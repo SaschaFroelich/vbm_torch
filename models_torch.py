@@ -147,12 +147,15 @@ class Vbm():
             raise Exception("Fehla, digga!")
         
         try:
+            ipdb.set_trace()
             no_error_mask = [1 if ch != -10 else 0 for ch in choices]
         except:
             ipdb.set_trace()
             
         "Replace error choices by the number one"
-        choices_noerrors = torch.where(torch.tensor(no_error_mask).type(torch.bool), choices, torch.ones(choices.shape)).type(torch.int)
+        choices_noerrors = torch.where(torch.tensor(no_error_mask).type(torch.bool), 
+                                       choices, 
+                                       torch.ones(choices.shape)).type(torch.int)
     
         Qout = torch.zeros(Qin.shape).double()
         choicemask = torch.zeros(Qin.shape, dtype = int)
@@ -224,7 +227,6 @@ class Vbm():
         to_return = -2 * \
             ~cond_error + if_noerror * cond_error
             
-        ipdb.set_trace()
         return to_return
         
         # if trial < 10:
@@ -543,7 +545,7 @@ class Vbm_b(Vbm):
             theta_Q = self.theta_Q_day2
             theta_rep = self.theta_rep_day2
 
-        if all([ch == -1 for ch in choices]) and all([out == -1 for out in outcome]) and all([bb == -1 for bb in blocktype]):
+        if all([ch == -1 for ch in choices[0,:]]) and all([out == -1 for out in outcome[0,:]]) and all([bb == -1 for bb in blocktype]):
             "Set previous actions to -1 because it's the beginning of a new block"
             self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
             self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)

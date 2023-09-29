@@ -235,12 +235,15 @@ if published:
 else:
     data_dir = "/home/sascha/1TB/TRR/AST_repo/Analyses/clipre/Data/Online_Erhebung/"
 
+Q_init = [0., 0.2, 0.2, 0.]
+
 anal.simulate_inferred(data_dir = data_dir, 
                        df = df, 
                        model = model, 
                        k=k, 
                        published_results = published, 
-                       Q_init = prior_df.Q_init.item())
+                       # Q_init = prior_df.Q_init.item(),
+                       Q_init = Q_init)
 
 #%%
 "Compute log likelihood and ELPD and WAIC (https://docs.pyro.ai/en/stable/_modules/pyro/ops/stats.html)"
