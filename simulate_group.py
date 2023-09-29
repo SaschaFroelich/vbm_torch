@@ -65,7 +65,7 @@ if model == 'original':
         lr_true.append(lr)
         omega_true.append(omega)
     
-        newagent = models.vbm(dectemp = dectemp, \
+        newagent = models.Vbm(dectemp = dectemp, \
                               lr = lr, \
                               omega = omega, \
                               k=k,\
@@ -73,7 +73,7 @@ if model == 'original':
 
         agents.append(newagent)
         
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -122,7 +122,7 @@ elif model == 'B':
         theta_Q_day2_true.append(theta_Q_day2)
         theta_rep_day2_true.append(theta_rep_day2)
 
-        newagent = models.vbm_B(lr_day1 = lr_day1, \
+        newagent = models.Vbm_B(lr_day1 = lr_day1, \
                               theta_Q_day1 = theta_Q_day1, \
                               theta_rep_day1 = theta_rep_day1, \
                                   
@@ -134,7 +134,7 @@ elif model == 'B':
 
         agents.append(newagent)
         
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

@@ -30,7 +30,7 @@ dectemp_day2 = 0
 lr_day2 = 0.1
 omega_day2 = 0.1
 
-newagent = models.vbm_A_Bayesian(omega_day1 = omega_day1, \
+newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
                       omega_day2 = omega_day2, \
                       lr_day1 = lr_day1, \
                       lr_day2 = lr_day2, \
@@ -39,7 +39,7 @@ newagent = models.vbm_A_Bayesian(omega_day1 = omega_day1, \
                       k=4,\
                       Q_init=[0.4, 0., 0., 0.4])
     
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -58,7 +58,7 @@ dectemp_day2 = 0
 lr_day2 = 0.1
 omega_day2 = 3
 
-newagent = models.vbm_A_Bayesian(omega_day1 = omega_day1, \
+newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
                       omega_day2 = omega_day2, \
                       lr_day1 = lr_day1, \
                       lr_day2 = lr_day2, \
@@ -66,7 +66,7 @@ newagent = models.vbm_A_Bayesian(omega_day1 = omega_day1, \
                       dectemp_day2 = dectemp_day2, \
                       k=4,\
                       Q_init=[0.4, 0., 0., 0.4])
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -91,7 +91,7 @@ lr_lambda_day2 = 0.01
 theta_Q_day2 = 2
 theta_rep_day2 = 1.5
 
-newagent = models.vbm_C(theta_rep_day1 = theta_rep_day1, \
+newagent = models.Vbm_C(theta_rep_day1 = theta_rep_day1, \
                       theta_rep_day2 = theta_rep_day2, \
                       lr0_day1 = lr0_day1, \
                       lr0_day2 = lr0_day2, \
@@ -102,7 +102,7 @@ newagent = models.vbm_C(theta_rep_day1 = theta_rep_day1, \
                       k=4,\
                       Q_init=[0.4, 0., 0., 0.4])
     
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -122,7 +122,7 @@ lr_lambda_day2 = 0.0
 theta_Q_day2 = 2
 theta_rep_day2 = 1.5
 
-newagent = models.vbm_C(theta_rep_day1 = theta_rep_day1, \
+newagent = models.Vbm_C(theta_rep_day1 = theta_rep_day1, \
                       theta_rep_day2 = theta_rep_day2, \
                       lr0_day1 = lr0_day1, \
                       lr0_day2 = lr0_day2, \
@@ -133,7 +133,7 @@ newagent = models.vbm_C(theta_rep_day1 = theta_rep_day1, \
                       k=4,\
                       Q_init=[0.4, 0., 0., 0.4])
     
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -155,7 +155,7 @@ theta_Q_day2 = 3.
 lr_day1 = 0.005
 lr_day2 = 0.
 
-newagent = models.vbm_B(theta_rep_day1 = theta_rep_day1, \
+newagent = models.Vbm_B(theta_rep_day1 = theta_rep_day1, \
               theta_rep_day2 = theta_rep_day2, \
               lr_day1 = lr_day1, \
               lr_day2 = lr_day2, \
@@ -164,7 +164,7 @@ newagent = models.vbm_B(theta_rep_day1 = theta_rep_day1, \
               k=4,\
               Q_init=[0.2, 0., 0., 0.2])
     
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -193,7 +193,7 @@ theta_Q0_day2 = 432*theta_Qlambda_day1 + theta_Q0_day1
 theta_Qlambda_day2 = 0.0
 
 
-newagent = models.vbm_F(theta_rep0_day1 = theta_rep0_day1, \
+newagent = models.Vbm_F(theta_rep0_day1 = theta_rep0_day1, \
                       theta_replambda_day1 = theta_replambda_day1, \
                       theta_Q0_day1 = theta_Q0_day1, \
                       theta_Qlambda_day1 = theta_Qlambda_day1, \
@@ -204,7 +204,7 @@ newagent = models.vbm_F(theta_rep0_day1 = theta_rep0_day1, \
                       k=4,\
                       Q_init=[0.8, 0.2, 0.2, 0.8])
 
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

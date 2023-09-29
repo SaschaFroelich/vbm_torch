@@ -88,10 +88,10 @@ elif group == 2 or group == 3:
     Qinit = torch.tensor([[[0., 0.2, 0.2, 0.]]])
     
 if model == 'original':
-    newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=k, Q_init=Qinit)
+    newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=k, Q_init=Qinit)
     
 elif model == 'B':
-    newagent = models.vbm_B(lr_day1 = torch.tensor([[0.5]]), \
+    newagent = models.Vbm_B(lr_day1 = torch.tensor([[0.5]]), \
     theta_Q_day1 = torch.tensor([[2.]]), \
     theta_rep_day1 = torch.tensor([[2.]]), \
     lr_day2 = torch.tensor([[0.5]]), \
@@ -101,7 +101,7 @@ elif model == 'B':
     Q_init = Qinit)
         
 elif model == 'B_2':
-    newagent = models.vbm_B_2(lr_day1_1=0.5, \
+    newagent = models.Vbm_B_2(lr_day1_1=0.5, \
                               lr_day1_2=0.5, \
                                   
     theta_Q_day1_1=2., \
@@ -122,7 +122,7 @@ elif model == 'B_3':
     elif group == 2 or group == 3:
         Qinit = [0., 0.8, 0.8, 0.]
 
-    newagent = models.vbm_B_3(theta_Q_day1_1=2., \
+    newagent = models.Vbm_B_3(theta_Q_day1_1=2., \
         theta_Q_day1_2=2., \
         theta_rep_day1_1=2., \
         theta_rep_day1_2=2., \
@@ -132,7 +132,7 @@ elif model == 'B_3':
         Q_init=Qinit)
             
 elif model == 'B_onlydual':
-    newagent = models.vbm_B_onlydual(lr_day1=0.5, \
+    newagent = models.Vbm_B_onlydual(lr_day1=0.5, \
     theta_Q_day1=2., \
     theta_rep_day1=2., \
     lr_day2=0.5, \

@@ -10,7 +10,7 @@ import torch
 import ipdb
 import scipy
 
-class env():
+class Env():
     
     def __init__(self, agent, rewprobs, matfile_dir):
         self.agent = agent

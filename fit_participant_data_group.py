@@ -82,7 +82,7 @@ if model == 'B':
             theta_Q_day2 = parameter[1]*6
             theta_rep_day2 = parameter[2]*6
         
-            newagent = models.vbm_B(lr_day1 = lr_day1, \
+            newagent = models.Vbm_B(lr_day1 = lr_day1, \
                                   theta_Q_day1 = theta_Q_day1, \
                                   theta_rep_day1 = theta_rep_day1, \
                                   lr_day2 = lr_day2, \

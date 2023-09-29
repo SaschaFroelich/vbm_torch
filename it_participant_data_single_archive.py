@@ -55,10 +55,10 @@ elif group == 2 or group == 3:
     Qinit = [0., 0.2, 0.2, 0.]
     
 if model == 'original':
-    newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=k, Q_init=Qinit, num_blocks=14)
+    newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=k, Q_init=Qinit, num_blocks=14)
     
 elif model == 'A':
-    newagent = models.vbm_A(omega_day1=0.5, \
+    newagent = models.Vbm_A(omega_day1=0.5, \
                             omega_day2=0.5, \
                             dectemp_day1=2., \
                             dectemp_day2=2., \
@@ -69,7 +69,7 @@ elif model == 'A':
                             num_blocks=14)
     
 elif model == 'B':
-    newagent = models.vbm_B(lr_day1=0.5, \
+    newagent = models.Vbm_B(lr_day1=0.5, \
     theta_Q_day1=2., \
     theta_rep_day1=2., \
     lr_day2=0.5, \
@@ -80,7 +80,7 @@ elif model == 'B':
     num_blocks=14)
     
 elif model == 'C':
-    newagent = models.vbm_C(lr0_day1=0.5, \
+    newagent = models.Vbm_C(lr0_day1=0.5, \
     lr_lambda_day1=0.5, \
     theta_Q_day1=2., \
     theta_rep_day1=2., \
@@ -93,7 +93,7 @@ elif model == 'C':
     num_blocks=14)
 
 elif model == 'Bayesianprior':
-    newagent = models.vbm_A_Bayesian(omega_day1=1.5, \
+    newagent = models.Vbm_A_Bayesian(omega_day1=1.5, \
                             omega_day2=1.5, \
                             dectemp_day1=2., \
                             dectemp_day2=2., \

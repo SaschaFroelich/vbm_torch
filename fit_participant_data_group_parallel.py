@@ -85,7 +85,7 @@ if model == 'B':
     theta_Q_day2 = parameter[:, 4][None, :]*6
     theta_rep_day2 = parameter[:, 5][None, :]*6
 
-    newagent = models.vbm_B(lr_day1 = torch.tensor(lr_day1), \
+    newagent = models.Vbm_B(lr_day1 = torch.tensor(lr_day1), \
                           theta_Q_day1 = torch.tensor(theta_Q_day1), \
                           theta_rep_day1 = torch.tensor(theta_rep_day1), \
                           lr_day2 = torch.tensor(lr_day2), \

@@ -248,7 +248,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 dectemp_inf = df[df["participant"]==prolific_ID]["inf_dectemp"].item()
                 lr_inf = df[df["participant"]==prolific_ID]["inf_lr"].item()
                     
-                newagent = models.vbm(omega = omega_inf, \
+                newagent = models.Vbm(omega = omega_inf, \
                                       dectemp = dectemp_inf, \
                                       lr = lr_inf, k=k, Q_init = agent_Q_init)
             
@@ -261,7 +261,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
                 inf_omega_day2 = df[df["participant"]==prolific_ID]["inf_omega_day2"].item()
                                 
-                newagent = models.vbm_A(dectemp_day1 = inf_dectemp_day1, \
+                newagent = models.Vbm_A(dectemp_day1 = inf_dectemp_day1, \
                                         lr_day1 = inf_lr_day1, \
                                         omega_day1 = inf_omega_day1, \
                                         dectemp_day2 = inf_dectemp_day2, \
@@ -278,7 +278,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B(lr_day1 = inf_lr_day1, \
+                newagent = models.Vbm_B(lr_day1 = inf_lr_day1, \
                                         theta_Q_day1 = inf_theta_Q_day1, \
                                         theta_rep_day1 = inf_theta_rep_day1, \
                                         lr_day2 = inf_lr_day2, \
@@ -295,7 +295,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_onlydual(lr_day1 = inf_lr_day1, \
+                newagent = models.Vbm_B_onlydual(lr_day1 = inf_lr_day1, \
                                         theta_Q_day1 = inf_theta_Q_day1, \
                                         theta_rep_day1 = inf_theta_rep_day1, \
                                         lr_day2 = inf_lr_day2, \
@@ -317,7 +317,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_2(lr_day1_1 = inf_lr_day1_1, \
+                newagent = models.Vbm_B_2(lr_day1_1 = inf_lr_day1_1, \
                                         theta_Q_day1_1 = inf_theta_Q_day1_1, \
                                         theta_rep_day1_1 = inf_theta_rep_day1_1, \
                                             
@@ -340,7 +340,7 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
                 
-                newagent = models.vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1, \
+                newagent = models.Vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1, \
                                         theta_rep_day1_1 = inf_theta_rep_day1_1, \
                                             
                                         theta_Q_day1_2 = inf_theta_Q_day1_2, \
@@ -355,9 +355,9 @@ def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plo
 
             "--- Simulate ---"
             if published_results:
-                newenv = env.env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/published/')
+                newenv = env.Env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/published/')
             else:
-                newenv = env.env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/clipre/')
+                newenv = env.Env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/clipre/')
                 
             
             newenv.run(block_order = block_order, sequence = seqtype)

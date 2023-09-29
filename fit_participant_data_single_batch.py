@@ -49,10 +49,10 @@ for group in range(4):
         data, _ = utils.get_participant_data(file1, group, data_dir)
                 
         if group == 0 or group == 1:
-            newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
+            newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
             
         elif group == 2 or group == 3:
-            newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0., 0.4, 0.4, 0.], num_blocks=14)
+            newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0., 0.4, 0.4, 0.], num_blocks=14)
         
         """ Single Inference"""
         infer = models.SingleInference(newagent, data)
@@ -123,10 +123,10 @@ for group in range(4):
         group_data.append(data)
         
         if group == 0 or group == 1:
-            newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
+            newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
             
         elif group == 2 or group == 3:
-            newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0., 0.4, 0.4, 0.], num_blocks=14)
+            newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0., 0.4, 0.4, 0.], num_blocks=14)
         
         agents.append(newagent)
         
@@ -369,8 +369,8 @@ for group in range(4):
         else:
             raise Exception("Da isch a Fehla!")
             
-        newagent = models.vbm(omega = omega_inf, dectemp = dectemp_inf, lr=lr_inf, k=4, Q_init = agent_Q_init, num_blocks = 14)
-        newenv = env.env(newagent, rewprobs=env_rewprobs)
+        newagent = models.Vbm(omega = omega_inf, dectemp = dectemp_inf, lr=lr_inf, k=4, Q_init = agent_Q_init, num_blocks = 14)
+        newenv = env.Env(newagent, rewprobs=env_rewprobs)
         newenv.run(block_order = block_order, sequence = seqtype)
             
         data_inf = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

@@ -77,7 +77,7 @@ if model == 'original':
         lr = parameter[1]
         omega = parameter[2]
     
-    newagent = models.vbm(dectemp = dectemp, \
+    newagent = models.Vbm(dectemp = dectemp, \
                           lr = lr, \
                           omega = omega, \
                           k=k,\
@@ -105,7 +105,7 @@ elif model == 'B' or model == 'B_onlydual':
         lr_day2 = parameter[5]*0.1
 
     if model == 'B':
-        newagent = models.vbm_B(theta_rep_day1 = theta_rep_day1, \
+        newagent = models.Vbm_B(theta_rep_day1 = theta_rep_day1, \
                               theta_rep_day2 = theta_rep_day2, \
                               lr_day1 = lr_day1, \
                               lr_day2 = lr_day2, \
@@ -115,7 +115,7 @@ elif model == 'B' or model == 'B_onlydual':
                               Q_init=[0.2, 0., 0., 0.2])
             
     elif model == 'B_onlydual':
-        newagent = models.vbm_B_onlydual(theta_rep_day1 = theta_rep_day1, \
+        newagent = models.Vbm_B_onlydual(theta_rep_day1 = theta_rep_day1, \
                               theta_rep_day2 = theta_rep_day2, \
                               lr_day1 = lr_day1, \
                               lr_day2 = lr_day2, \
@@ -143,7 +143,7 @@ elif model == 'B_2':
         lr_day1_2 = parameter[7]*0.1
         lr_day2 = parameter[8]*0.1
 
-    newagent = models.vbm_B_2(theta_rep_day1_1 = theta_rep_day1_1, \
+    newagent = models.Vbm_B_2(theta_rep_day1_1 = theta_rep_day1_1, \
                             theta_rep_day1_2 = theta_rep_day1_2, \
                           theta_rep_day2 = theta_rep_day2, \
                           lr_day1_1 = lr_day1_1, \
@@ -172,7 +172,7 @@ elif model == 'B_3':
         theta_Q_day2 = parameter[5]*6
 
 
-    newagent = models.vbm_B_3(theta_rep_day1_1 = theta_rep_day1_1, \
+    newagent = models.Vbm_B_3(theta_rep_day1_1 = theta_rep_day1_1, \
                             theta_rep_day1_2 = theta_rep_day1_2, \
                           theta_rep_day2 = theta_rep_day2, \
                           theta_Q_day1_1 = theta_Q_day1_1, \
@@ -198,7 +198,7 @@ elif model == 'F':
     theta_Q0_day2 = parameter[6]*6
     theta_Qlambda_day2 = (parameter[7]-0.5)*0.02
 
-    newagent = models.vbm_F(theta_rep0_day1 = theta_rep0_day1, \
+    newagent = models.Vbm_F(theta_rep0_day1 = theta_rep0_day1, \
                           theta_replambda_day1 = theta_replambda_day1, \
                           theta_Q0_day1 = theta_Q0_day1, \
                           theta_Qlambda_day1 = theta_Qlambda_day1, \
@@ -211,7 +211,7 @@ elif model == 'F':
 
 #%%
 
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

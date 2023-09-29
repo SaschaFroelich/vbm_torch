@@ -59,8 +59,8 @@ for i in range(40):
     true_lrs.append(lr)
     true_dectemps.append(dectemp)
     
-    newagent = models.vbm(omega=omega, dectemp=dectemp, lr=lr, k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=num_blocks) # change per console
-    newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8])
+    newagent = models.Vbm(omega=omega, dectemp=dectemp, lr=lr, k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=num_blocks) # change per console
+    newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8])
     
     newenv.run()
     data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -118,8 +118,8 @@ for i in range(40):
     true_lrs.append(lr)
     true_dectemps.append(dectemp)
     
-    newagent = models.vbm(omega=omega, dectemp=dectemp, lr=lr, k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=num_blocks) # change per console
-    newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8])
+    newagent = models.Vbm(omega=omega, dectemp=dectemp, lr=lr, k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=num_blocks) # change per console
+    newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8])
     
     newenv.run()
     data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
@@ -388,8 +388,8 @@ for sim in range(len(true_omegas)):
     data_sim = all_datas["sim_%d"%sim]
     
     "--- Inferred data simulation ---"
-    newagent = models.vbm(omega=omega_inf, dectemp=dectemp_inf, lr=lr_inf, k=4, Q_init=[0., 0., 0., 0.], num_blocks=num_blocks) # change per console
-    newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8]) 
+    newagent = models.Vbm(omega=omega_inf, dectemp=dectemp_inf, lr=lr_inf, k=4, Q_init=[0., 0., 0., 0.], num_blocks=num_blocks) # change per console
+    newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8]) 
     
     newenv.run()
     data_inf = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

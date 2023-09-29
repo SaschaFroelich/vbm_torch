@@ -79,13 +79,13 @@ if model == 'original':
         
         Q_init = [0.2, 0., 0., 0.2]
         Q_init_group.append(Q_init)
-        newagent = models.vbm(omega = torch.tensor([[omega]]), \
+        newagent = models.Vbm(omega = torch.tensor([[omega]]), \
                               dectemp = torch.tensor([[dectemp]]), \
                               lr = torch.tensor([[lr]]), \
                               k=torch.tensor([k]),\
                               Q_init=torch.tensor([[Q_init]]))
             
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
@@ -135,7 +135,7 @@ elif model == 'B':
 
         Q_init = [0.2, 0., 0., 0.2]
         Q_init_group.append(Q_init)
-        newagent = models.vbm_B(lr_day1 = torch.tensor([[lr_day1]]), \
+        newagent = models.Vbm_B(lr_day1 = torch.tensor([[lr_day1]]), \
                               theta_Q_day1 = torch.tensor([[theta_Q_day1]]), \
                               theta_rep_day1 = torch.tensor([[theta_rep_day1]]), \
                                   
@@ -145,7 +145,7 @@ elif model == 'B':
                               k=torch.tensor([k]),\
                               Q_init=torch.tensor([[Q_init]]))
             
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
@@ -178,7 +178,7 @@ elif model == 'testmodel':
 
         newagent = models.testmodel(prob1 = torch.tensor([[prob1]]), prob2 = torch.tensor([[prob2]]))
             
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
@@ -193,14 +193,14 @@ elif model == 'testmodel':
 newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
 
 if model == 'original':
-    agent = models.vbm(omega = torch.tensor([omega_true]), \
+    agent = models.Vbm(omega = torch.tensor([omega_true]), \
                        dectemp = torch.tensor([dectemp_true]), \
                        lr = torch.tensor([lr_true]), \
                        k = torch.tensor(k), \
                        Q_init = torch.tensor([Q_init_group]))
 
 elif model == 'B':
-    agent = models.vbm_B(lr_day1 = torch.tensor([lr_day1_true]), \
+    agent = models.Vbm_B(lr_day1 = torch.tensor([lr_day1_true]), \
                           theta_Q_day1 = torch.tensor([theta_Q_day1_true]), \
                           theta_rep_day1 = torch.tensor([theta_rep_day1_true]), \
 

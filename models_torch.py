@@ -22,7 +22,7 @@ device = torch.device("cpu")
 
 torch.set_default_tensor_type(torch.DoubleTensor)
 
-class vbm():
+class Vbm():
     def __init__(self, omega, dectemp, lr, k, Q_init, num_blocks = 14):
         """ 
         --- Parameters ---
@@ -331,7 +331,7 @@ class vbm():
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
 
-class vbm_B(vbm):
+class Vbm_B(Vbm):
     
     def __init__(self, \
                  lr_day1, \
@@ -663,7 +663,7 @@ class vbm_B(vbm):
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = [self.k.item()/4 for _ in range(self.num_agents)]
 
-class testmodel(vbm):
+class Testmodel(Vbm):
     def __init__(self, prob1, prob2):
 
         # assert(prob <= 1 and prob >= 0)    
@@ -700,7 +700,7 @@ class testmodel(vbm):
                 
         return probs
 
-class vbm_B_onlydual():
+class Vbm_B_onlydual():
     
     def __init__(self, \
                  lr_day1, \
@@ -947,7 +947,7 @@ class vbm_B_onlydual():
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
-class vbm_B_2():
+class Vbm_B_2():
     "Like model B, but with separate parameters for the first two blocks"
     
     def __init__(self, \
@@ -1213,7 +1213,7 @@ class vbm_B_2():
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         
                         
-class vbm_B_3():
+class Vbm_B_3():
     "Like model B, but with separate parameters for the first two blocks"
     
     def __init__(self, \
@@ -1455,7 +1455,7 @@ class vbm_B_3():
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
 
-class vbm_F():
+class Vbm_F():
     "Fixed Q-values, but theta_rep and theta_Q develop linearly"
     def __init__(self, \
                  theta_Q0_day1, \

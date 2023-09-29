@@ -166,7 +166,7 @@ def prepare_ddm_data(data_dir, file_day1, group, pb, kk):
     data["repvals"] = repvals
     
     "--- Test repvals ---"
-    newagent = models.vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
+    newagent = models.Vbm(omega=0.5, dectemp=2., lr=0., k=4, Q_init=[0.4, 0., 0., 0.4], num_blocks=14)
     infer = models.SingleInference(newagent, data)
     loss, params = infer.infer_posterior(iter_steps=1, num_particles = 1)
     

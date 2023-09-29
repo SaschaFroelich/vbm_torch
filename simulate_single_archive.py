@@ -55,7 +55,7 @@ if model == 'A':
         dectemp_day1 = parameter[4]*6
         dectemp_day2 = parameter[5]*6
 
-    newagent = models.vbm_A(omega_day1 = omega_day1, \
+    newagent = models.Vbm_A(omega_day1 = omega_day1, \
                           omega_day2 = omega_day2, \
                           lr_day1 = lr_day1, \
                           lr_day2 = lr_day2, \
@@ -77,7 +77,7 @@ elif model == 'C':
     lr_lambda_day1 = parameter[6]*0.1
     lr_lambda_day2 = parameter[7]*0.1
 
-    newagent = models.vbm_C(theta_rep_day1 = theta_rep_day1, \
+    newagent = models.Vbm_C(theta_rep_day1 = theta_rep_day1, \
                           theta_rep_day2 = theta_rep_day2, \
                           lr0_day1 = lr0_day1, \
                           lr0_day2 = lr0_day2, \
@@ -110,7 +110,7 @@ elif model == 'Bayesianprior':
         dectemp_day1 = parameter[4]*6
         dectemp_day2 = parameter[5]*6
 
-    newagent = models.vbm_A_Bayesian(omega_day1 = omega_day1, \
+    newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
                           omega_day2 = omega_day2, \
                           lr_day1 = lr_day1, \
                           lr_day2 = lr_day2, \
@@ -134,7 +134,7 @@ elif model == 'D':
     theta_Qlambda_day2 = parameter[7]*0.1
 
 
-    newagent = models.vbm_D(theta_rep0_day1 = theta_rep0_day1, \
+    newagent = models.Vbm_D(theta_rep0_day1 = theta_rep0_day1, \
                           theta_replambda_day1 = theta_replambda_day1, \
                           theta_Q0_day1 = theta_Q0_day1, \
                           theta_Qlambda_day1 = theta_Qlambda_day1, \
@@ -154,14 +154,14 @@ elif model == 'D_simple':
     theta_Qlambda_day2 = parameter[1]*0.1
 
 
-    newagent = models.vbm_D_simple(theta_Qlambda_day1 = theta_Qlambda_day1, \
+    newagent = models.Vbm_D_simple(theta_Qlambda_day1 = theta_Qlambda_day1, \
                           theta_Qlambda_day2 = theta_Qlambda_day2, \
                           k=k,\
                           Q_init=[0.8, 0.2, 0.2, 0.8])
         
 #%%
 
-newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
 newenv.run()
 data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\

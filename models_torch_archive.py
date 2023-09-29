@@ -20,7 +20,7 @@ gamma_variance = lambda conc, rate: conc/(rate**2)
 
 device = torch.device("cpu")
 
-class vbm_A():
+class Vbm_A():
     def __init__(self, dectemp_day1, lr_day1, omega_day1, dectemp_day2, lr_day2, omega_day2, k, Q_init, num_blocks = 14):
         """ 
         --- Parameters ---
@@ -499,7 +499,7 @@ class SingleInference_modelA(object):
 
         return self.loss, param_dict
     
-class vbm_C():
+class Vbm_C():
     "Model with exponentially decaying learning rate"
     def __init__(self, \
                  lr0_day1, \
@@ -779,7 +779,7 @@ class vbm_C():
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         
-class vbm_D():
+class Vbm_D():
     "Fixed Q-values, but theta_rep and theta_Q develop like exponential function (update only per dualtarget trial)"
     def __init__(self, \
                  theta_Q0_day1, \
@@ -1057,7 +1057,7 @@ class vbm_D():
                         self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
                         
-class vbm_D_simple():
+class Vbm_D_simple():
     "Fixed Q-values, but theta_rep and theta_Q develop like exponential function (update only per dualtarget trial)"
     def __init__(self, \
                  theta_Qlambda_day1, \
@@ -1602,7 +1602,7 @@ class SingleInference_modelD_simple(object):
 
         return self.loss, param_dict
                         
-class vbm_A_Bayesian(vbm_A):
+class Vbm_A_Bayesian(Vbm_A):
     
     def __init__(self, dectemp_day1, lr_day1, omega_day1, dectemp_day2, lr_day2, omega_day2, k, Q_init, num_blocks = 14):
         super().__init__(dectemp_day1, lr_day1, omega_day1, dectemp_day2, lr_day2, omega_day2, k, Q_init, num_blocks = 14)

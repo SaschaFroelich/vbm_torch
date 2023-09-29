@@ -369,7 +369,7 @@ def simulate_model_behaviour(num_agents, model, **kwargs):
 
     for agent in range(num_agents):
         print("Simulating agent no. %d"%agent)
-        newagent = models.vbm_B(theta_rep_day1 = kwargs['theta_rep_day1'], \
+        newagent = models.Vbm_B(theta_rep_day1 = kwargs['theta_rep_day1'], \
                       theta_rep_day2 = kwargs['theta_rep_day2'], \
                       lr_day1 = kwargs['lr_day1'], \
                       lr_day2 = kwargs['lr_day2'], \
@@ -378,7 +378,7 @@ def simulate_model_behaviour(num_agents, model, **kwargs):
                       k=k,\
                       Q_init=[0.2, 0., 0., 0.2])
 
-        newenv = env.env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
         newenv.run()
         data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
