@@ -9,6 +9,7 @@ Created on Wed Jun  7 10:17:20 2023
 # SuperFastPython.com
 # example of parallel map() with the process pool
 import numpy as np
+import torch
 
 import utils
 import models_torch as models
@@ -16,8 +17,49 @@ import env
 import utils
 
 import pandas as pd
- 
+
 matfile_dir = './matlabcode/clipre/'
+
+#%% 
+"Model B"
+
+npar = 6
+# parameter = np.random.uniform(0,1, npar)
+theta_rep_day1 = 0.8
+theta_rep_day2 = 0.8
+theta_Q_day1 = 3.
+theta_Q_day2 = 3.
+lr_day1 = 0.005
+lr_day2 = 0.
+
+newagent = models.Vbm_B(theta_rep_day1 = torch.tensor([[theta_rep_day1]]),
+              theta_rep_day2 = torch.tensor([[theta_rep_day2]]),
+              lr_day1 = torch.tensor([[lr_day1]]),
+              lr_day2 = torch.tensor([[lr_day2]]),
+              theta_Q_day1 = torch.tensor([[theta_Q_day1]]),
+              theta_Q_day2 = torch.tensor([[theta_Q_day2]]),
+              k=torch.tensor(4.),
+              Q_init=torch.tensor([[[0.2, 0., 0., 0.2]]]))
+    
+newenv = env.Env(newagent, 
+                 rewprobs=[0.8, 0.2, 0.2, 0.8], 
+                 matfile_dir = './matlabcode/clipre/')
+
+newenv.run()
+data = {"Choices": newenv.choices, 
+        "Outcomes": newenv.outcomes,
+        "Trialsequence": newenv.data["trialsequence"], 
+        "Blocktype": newenv.data["blocktype"],
+        "Jokertypes": newenv.data["jokertypes"], 
+        "Blockidx": newenv.data["blockidx"],
+        # "Qdiff": [(newenv.agent.Q[i][...,0] + \
+        #            newenv.agent.Q[i][...,3])/2 - \
+        #           (newenv.agent.Q[i][...,1] + \
+        #            newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]
+        }
+    
+df = pd.DataFrame(data)
+utils.plot_results(df, group = 0)
 
 #%%
 "Bayesian Prior Model"
@@ -42,10 +84,16 @@ newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
 newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-            "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
-        "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
+data = {"Choices": newenv.choices, 
+        "Outcomes": newenv.outcomes,
+        "Trialsequence": newenv.data["trialsequence"], 
+        "Blocktype": newenv.data["blocktype"],
+        "Jokertypes": newenv.data["jokertypes"], 
+        "Blockidx": newenv.data["blockidx"],
+        "Qdiff": [(newenv.agent.Q[i][...,0] + \
+                   newenv.agent.Q[i][...,3])/2 - \
+                  (newenv.agent.Q[i][...,1] + \
+                   newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
 
 df = pd.DataFrame(data)
 utils.plot_results(df, group = 0)
@@ -58,21 +106,26 @@ dectemp_day2 = 0
 lr_day2 = 0.1
 omega_day2 = 3
 
-newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
-                      omega_day2 = omega_day2, \
-                      lr_day1 = lr_day1, \
-                      lr_day2 = lr_day2, \
-                      dectemp_day1 = dectemp_day1, \
-                      dectemp_day2 = dectemp_day2, \
-                      k=4,\
+newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1,
+                      omega_day2 = omega_day2,
+                      lr_day1 = lr_day1,
+                      lr_day2 = lr_day2,
+                      dectemp_day1 = dectemp_day1,
+                      dectemp_day2 = dectemp_day2,
+                      k=4,
                       Q_init=[0.4, 0., 0., 0.4])
 newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
 
 newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-            "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
-        "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
+data = {"Choices": newenv.choices, 
+        "Outcomes": newenv.outcomes,
+        "Trialsequence": newenv.data["trialsequence"],
+        "Blocktype": newenv.data["blocktype"],
+        "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
+        "Qdiff": [(newenv.agent.Q[i][...,0] + \
+                   newenv.agent.Q[i][...,3])/2 - \
+                  (newenv.agent.Q[i][...,1] + \
+                   newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
 
 df = pd.DataFrame(data)
 utils.plot_results(df, group = 0)
@@ -140,38 +193,6 @@ data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
         "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
             "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
 
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-#%% 
-"Model B"
-
-npar = 6
-parameter = np.random.uniform(0,1, npar)
-theta_rep_day1 = 0.8
-theta_rep_day2 = 0.8
-theta_Q_day1 = 3.
-theta_Q_day2 = 3.
-lr_day1 = 0.005
-lr_day2 = 0.
-
-newagent = models.Vbm_B(theta_rep_day1 = theta_rep_day1, \
-              theta_rep_day2 = theta_rep_day2, \
-              lr_day1 = lr_day1, \
-              lr_day2 = lr_day2, \
-              theta_Q_day1 = theta_Q_day1, \
-              theta_Q_day2 = theta_Q_day2, \
-              k=4,\
-              Q_init=[0.2, 0., 0., 0.2])
-    
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
-
-newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-        "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
-        "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-    
 df = pd.DataFrame(data)
 utils.plot_results(df, group = 0)
 

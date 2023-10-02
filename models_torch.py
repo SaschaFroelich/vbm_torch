@@ -333,15 +333,15 @@ class Vbm():
 
 class Vbm_B(Vbm):
     
-    def __init__(self, \
-                 lr_day1, \
-                 theta_Q_day1, \
-                 theta_rep_day1, \
-                 lr_day2, \
-                 theta_Q_day2, \
-                 theta_rep_day2, \
-                 k, \
-                 Q_init, \
+    def __init__(self,
+                 lr_day1,
+                 theta_Q_day1,
+                 theta_rep_day1,
+                 lr_day2,
+                 theta_Q_day2,
+                 theta_rep_day2,
+                 k,
+                 Q_init,
                  num_blocks = 14):
         """ 
         --- Parameters ---
@@ -366,7 +366,13 @@ class Vbm_B(Vbm):
                 raise Exception("num_blocks must be an even value.")
 
         "Setup"
-        self.param_names = ["lr_day1", "theta_Q_day1", "theta_rep_day1", "lr_day2", "theta_Q_day2", "theta_rep_day2"]
+        self.param_names = ["lr_day1", 
+                            "theta_Q_day1", 
+                            "theta_rep_day1", 
+                            "lr_day2", 
+                            "theta_Q_day2", 
+                            "theta_rep_day2"]
+        
         self.na = 4 # no. of possible actions
         self.num_particles = lr_day1.shape[0]
         self.num_agents = lr_day1.shape[1]
