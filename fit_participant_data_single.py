@@ -43,10 +43,7 @@ else:
 if published_results:
     data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/published/"
 else:
-    if remote:
-        data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/"
-    else:
-        data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
+    data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
 
 if published_results:
     "Published"
@@ -79,7 +76,10 @@ assert(num_reps == 0)
 
 "Fit participants (single inference)"
 
-data, prolific_ID = utils.get_participant_data(file_day1, group, data_dir, remote = remote, published_results = published_results)
+data, prolific_ID = utils.get_participant_data(file_day1, 
+                                               group, 
+                                               data_dir, 
+                                               published_results = published_results)
 
 if group == 0 or group == 1:
     Qinit = torch.tensor([[[0.2, 0., 0., 0.2]]])

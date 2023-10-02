@@ -46,7 +46,10 @@ else:
 
 "Fit participants (single inference)"
 
-data, prolific_ID = utils.get_participant_data(file_day1, group, data_dir, remote = remote, published_results = published_results)
+data, prolific_ID = utils.get_participant_data(file_day1, 
+                                               group, 
+                                               data_dir, 
+                                               published_results = published_results)
 
 if group == 0 or group == 1:
     Qinit = [0.2, 0., 0., 0.2]

@@ -23,11 +23,11 @@ import models_torch as models
 import inferencemodels
 import utils
 
+device = torch.device("cpu")
+
 remote = 0
 k = 4.
 num_agents = 36
-
-# assert(remote)
 
 if remote:
     model = sys.argv[1]
@@ -43,15 +43,10 @@ else:
     published_results = 0
     
 if published_results:
-    if remote:
-        data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/published/"
-    else: 
-        data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/published/"
+    data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/published/"
+    
 else:
-    if remote:
-        data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/"
-    else:
-        data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
+    data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
         
 if model == 'B':
     npar = 6 # num of particles
@@ -67,7 +62,11 @@ if model == 'B':
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
-            data, _ = utils.get_participant_data(file1, group, data_dir, remote = remote, published_results = published_results)
+            data, _ = utils.get_participant_data(file1, 
+                                                 group, 
+                                                 data_dir, 
+                                                 published_results = published_results)
+            
             groupdata.append(data)
 
             if group == 0 or group == 1:

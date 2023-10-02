@@ -24,8 +24,6 @@ import utils
 remote = 0
 k = 4.
 
-# assert(remote)
-
 if remote:
     model = sys.argv[1]
     num_reps = int(sys.argv[2]) # How often to repeat the parameter inference per participant (0 to infer just once)
@@ -40,15 +38,10 @@ else:
     published_results = 0
     
 if published_results:
-    if remote:
-        data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/published/"
-    else: 
-        data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/published/"
+    data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/published/"
+    
 else:
-    if remote:
-        data_dir = "/home/sascha/Desktop/vb_model/torch/behav_data/"
-    else:
-        data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
+    data_dir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_data/"
         
 if model == 'B':
     npar = 6
@@ -63,7 +56,11 @@ if model == 'B':
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
-            data, _ = utils.get_participant_data(file1, group, data_dir, remote = remote, published_results = published_results)
+            data, _ = utils.get_participant_data(file1, 
+                                                 group, 
+                                                 data_dir, 
+                                                 published_results = published_results)
+            
             groupdata.append(data)
 
             if group == 0 or group == 1:
