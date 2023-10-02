@@ -3,7 +3,7 @@
 """
 Created on Tue Jul 25 16:09:51 2023
 
-Script for inferring experimental data on group level with vectorized group inference
+Script for inferring experimental data on group level with vectorized group inference.
 
 @author: sascha
 """
@@ -85,19 +85,18 @@ if model == 'B':
     theta_Q_day2 = parameter[:, 4][None, :]*6
     theta_rep_day2 = parameter[:, 5][None, :]*6
 
-    newagent = models.Vbm_B(lr_day1 = torch.tensor(lr_day1), \
-                          theta_Q_day1 = torch.tensor(theta_Q_day1), \
-                          theta_rep_day1 = torch.tensor(theta_rep_day1), \
-                          lr_day2 = torch.tensor(lr_day2), \
-                          theta_Q_day2 = torch.tensor(theta_Q_day2), \
-                          theta_rep_day2 = torch.tensor(theta_rep_day2), \
-                          k = torch.tensor(k),\
+    newagent = models.Vbm_B(lr_day1 = torch.tensor(lr_day1),
+                          theta_Q_day1 = torch.tensor(theta_Q_day1),
+                          theta_rep_day1 = torch.tensor(theta_rep_day1),
+                          lr_day2 = torch.tensor(lr_day2),
+                          theta_Q_day2 = torch.tensor(theta_Q_day2),
+                          theta_rep_day2 = torch.tensor(theta_rep_day2),
+                          k = torch.tensor(k),
                           Q_init = torch.tensor([Q_init]))
                 
-    ipdb.set_trace()
     newgroupdata = utils.comp_groupdata(groupdata)
-    infer = inferencemodels.GroupInference_modelB_parallel(newagent,  n_subjects, newgroupdata)
-    loss, params = infer.infer_posterior(iter_steps=250, num_particles = 10)
+    infer = inferencemodels.GeneralGroupInference(newagent,  n_subjects, newgroupdata)
+    loss, params = infer.infer_posterior(iter_steps=1_000, num_particles = 10)
     inference_df = infer.sample_posterior()
     pickle.dump( inference_df, open(f"behav_fit/groupinference/model{model}/k_{k}/group_inference.p", "wb" ) )
         

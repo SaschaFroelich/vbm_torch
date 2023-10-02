@@ -3,7 +3,7 @@
 """
 Created on Thu Jul 27 16:26:59 2023
 
-Simulation and parallel group-level inference
+Simulation and parallel group-level inference.
 
 @author: sascha
 """
@@ -79,19 +79,24 @@ if model == 'original':
         
         Q_init = [0.2, 0., 0., 0.2]
         Q_init_group.append(Q_init)
-        newagent = models.Vbm(omega = torch.tensor([[omega]]), \
-                              dectemp = torch.tensor([[dectemp]]), \
-                              lr = torch.tensor([[lr]]), \
-                              k=torch.tensor([k]),\
+        newagent = models.Vbm(omega = torch.tensor([[omega]]),
+                              dectemp = torch.tensor([[dectemp]]),
+                              lr = torch.tensor([[lr]]),
+                              k=torch.tensor([k]),
                               Q_init=torch.tensor([[Q_init]]))
             
-        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, 
+                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
+                         matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
-        data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-                "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-                    "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
+        data = {"Choices": newenv.choices, 
+                "Outcomes": newenv.outcomes,
+                "Trialsequence": newenv.data["trialsequence"], 
+                "Blocktype": newenv.data["blocktype"],
+                "Jokertypes": newenv.data["jokertypes"], 
+                "Blockidx": newenv.data["blockidx"]}
             
         utils.plot_results(pd.DataFrame(data), group = 0)
             
@@ -135,23 +140,28 @@ elif model == 'B':
 
         Q_init = [0.2, 0., 0., 0.2]
         Q_init_group.append(Q_init)
-        newagent = models.Vbm_B(lr_day1 = torch.tensor([[lr_day1]]), \
-                              theta_Q_day1 = torch.tensor([[theta_Q_day1]]), \
-                              theta_rep_day1 = torch.tensor([[theta_rep_day1]]), \
+        newagent = models.Vbm_B(lr_day1 = torch.tensor([[lr_day1]]),
+                              theta_Q_day1 = torch.tensor([[theta_Q_day1]]),
+                              theta_rep_day1 = torch.tensor([[theta_rep_day1]]),
                                   
-                              lr_day2 = torch.tensor([[lr_day2]]), \
-                              theta_Q_day2 = torch.tensor([[theta_Q_day2]]), \
-                              theta_rep_day2 = torch.tensor([[theta_rep_day2]]), \
-                              k=torch.tensor([k]),\
+                              lr_day2 = torch.tensor([[lr_day2]]),
+                              theta_Q_day2 = torch.tensor([[theta_Q_day2]]),
+                              theta_rep_day2 = torch.tensor([[theta_rep_day2]]),
+                              k=torch.tensor([k]),
                               Q_init=torch.tensor([[Q_init]]))
             
-        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, 
+                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
+                         matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
-        data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-                "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-                    "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
+        data = {"Choices": newenv.choices, 
+                "Outcomes": newenv.outcomes,
+                "Trialsequence": newenv.data["trialsequence"], 
+                "Blocktype": newenv.data["blocktype"],
+                "Jokertypes": newenv.data["jokertypes"], 
+                "Blockidx": newenv.data["blockidx"]}
             
         utils.plot_results(pd.DataFrame(data), group = 0)
             
@@ -176,15 +186,21 @@ elif model == 'testmodel':
         prob1_true.append(prob1)
         prob2_true.append(prob2)
 
-        newagent = models.testmodel(prob1 = torch.tensor([[prob1]]), prob2 = torch.tensor([[prob2]]))
+        newagent = models.testmodel(prob1 = torch.tensor([[prob1]]), 
+                                    prob2 = torch.tensor([[prob2]]))
             
-        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
+        newenv = env.Env(newagent, 
+                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
+                         matfile_dir = './matlabcode/clipre/')
         
         newenv.run()
         
-        data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-                "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-                    "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
+        data = {"Choices": newenv.choices, 
+                "Outcomes": newenv.outcomes,
+                "Trialsequence": newenv.data["trialsequence"], 
+                "Blocktype": newenv.data["blocktype"],
+                "Jokertypes": newenv.data["jokertypes"], 
+                "Blockidx": newenv.data["blockidx"]}
             
         utils.plot_results(pd.DataFrame(data), group = 0)
             
@@ -193,21 +209,21 @@ elif model == 'testmodel':
 newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
 
 if model == 'original':
-    agent = models.Vbm(omega = torch.tensor([omega_true]), \
-                       dectemp = torch.tensor([dectemp_true]), \
-                       lr = torch.tensor([lr_true]), \
-                       k = torch.tensor(k), \
+    agent = models.Vbm(omega = torch.tensor([omega_true]),
+                       dectemp = torch.tensor([dectemp_true]),
+                       lr = torch.tensor([lr_true]),
+                       k = torch.tensor(k),
                        Q_init = torch.tensor([Q_init_group]))
 
 elif model == 'B':
-    agent = models.Vbm_B(lr_day1 = torch.tensor([lr_day1_true]), \
-                          theta_Q_day1 = torch.tensor([theta_Q_day1_true]), \
-                          theta_rep_day1 = torch.tensor([theta_rep_day1_true]), \
+    agent = models.Vbm_B(lr_day1 = torch.tensor([lr_day1_true]),
+                          theta_Q_day1 = torch.tensor([theta_Q_day1_true]),
+                          theta_rep_day1 = torch.tensor([theta_rep_day1_true]),
 
-                          lr_day2 = torch.tensor([lr_day2_true]), \
-                          theta_Q_day2 = torch.tensor([theta_Q_day2_true]), \
-                          theta_rep_day2 = torch.tensor([theta_rep_day2_true]), \
-                          k = torch.tensor(k),\
+                          lr_day2 = torch.tensor([lr_day2_true]),
+                          theta_Q_day2 = torch.tensor([theta_Q_day2_true]),
+                          theta_rep_day2 = torch.tensor([theta_rep_day2_true]),
+                          k = torch.tensor(k),
                           Q_init = torch.tensor([Q_init_group]))
         
 elif model == 'testmodel':

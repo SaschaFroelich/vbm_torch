@@ -2056,14 +2056,14 @@ class GroupInference_modelB(object):
         return sample_df
 
 class GeneralGroupInference(object):
-
+    
     def __init__(self, agent, n_subjects, group_data):
-        """
-        Group inference for original model
+        '''
+        General Group inference..
         
         agents : list of agents
         group_data : list of data dicts 
-        """
+        '''
         self.agent = agent
         self.trials = agent.trials # length of experiment
         self.n_subjects = n_subjects # no. of participants
@@ -2130,7 +2130,11 @@ class GeneralGroupInference(object):
                 
                 if all([trial[i] == -1 for i in range(self.n_subjects)]):
                     "Beginning of new block"
-                    self.agent.update(torch.tensor([-1]), torch.tensor([-1]), torch.tensor([-1]), day=day, trialstimulus=trial)
+                    self.agent.update(torch.tensor([-1]), 
+                                      torch.tensor([-1]), 
+                                      torch.tensor([-1]), 
+                                      day=day, 
+                                      trialstimulus=trial)
                     
                 else:
                     current_choice = self.data["Choices"][tau]
@@ -2161,7 +2165,12 @@ class GeneralGroupInference(object):
                     
                 if all([trial[i] != -1 for i in range(self.n_subjects)]):
                     "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
-                    self.agent.update(current_choice, outcome, blocktype, day=day, trialstimulus=trial)
+                    self.agent.update(current_choice, 
+                                      outcome, 
+                                      blocktype, 
+                                      day=day, 
+                                      trialstimulus=trial)
+                    
                 # print("CHECKPOINT DELTA")
                 "Sample if dual-target trial and no error was performed"
                 if all([trial[i] > 10 for i in range(self.n_subjects)]):
@@ -2174,7 +2183,8 @@ class GeneralGroupInference(object):
                     #             obs = choices.broadcast_to(n_particles, self.n_subjects))
                     
                     # print("CHECKPOINT ECHO")
-                    pyro.sample('res_{}'.format(t), dist.Categorical(probs=probs), \
+                    pyro.sample('res_{}'.format(t), 
+                                dist.Categorical(probs=probs),
                                 obs = choices.broadcast_to(n_particles, self.n_subjects))
 
     def guide(self):
