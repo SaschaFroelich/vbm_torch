@@ -102,12 +102,12 @@ class Env():
                     blocktype[rand_idxs[0:num_blocks//2], :] = 0
                 
             elif Context == "tb":
-                blocktype = torch.chararray((num_blocks, 480));
+                blocktype = torch.ones((num_blocks, 480));
                 
                 blocktype[:, :, :] = 0
         
             elif Context == "random":
-                blocktype = torch.chararray((num_blocks, 480));
+                blocktype = torch.ones((num_blocks, 480));
                 
                 blocktype[:, :, :] = 1
                 
@@ -129,21 +129,31 @@ class Env():
             self.data["trialsequence"].append([-1])
             self.data["jokertypes"].append([-1])
             self.data["blockidx"].append([block])
-            self.data["blocktype"].append(["n"])
+            self.data["blocktype"].append([-1])
             block_no[block, :] = block # The index of the block in the current experiment
             
             current_blocktype = blocktype[block, 0]
             
             if current_blocktype == 0:
                 "Sequential block"
-                seq_matlab, seq_no_jokers_matlab, jokertypes = self.load_matfiles(self.matfile_dir, tb_block, current_blocktype, sequence = sequence)
-                self.data["blocktype"].extend([["s"]]*len(seq_matlab))
+                seq_matlab, seq_no_jokers_matlab, jokertypes = \
+                    self.load_matfiles(self.matfile_dir, 
+                                       tb_block, 
+                                       current_blocktype, 
+                                       sequence = sequence)
+                    
+                self.data["blocktype"].extend([[0]]*len(seq_matlab))
                 tb_block += 1
                 
             elif current_blocktype == 1:
                 "Random block"
-                seq_matlab, seq_no_jokers_matlab, jokertypes = self.load_matfiles(self.matfile_dir, random_block, current_blocktype, sequence = sequence)
-                self.data["blocktype"].extend([["r"]]*len(seq_matlab))
+                seq_matlab, seq_no_jokers_matlab, jokertypes = \
+                    self.load_matfiles(self.matfile_dir, 
+                                       random_block, 
+                                       current_blocktype, 
+                                       sequence = sequence)
+                    
+                self.data["blocktype"].extend([[1]]*len(seq_matlab))
                 random_block += 1
                 
             else:
@@ -182,7 +192,13 @@ class Env():
             
             if trial == -1:
                 "Beginning of a new block"
-                self.agent.update(torch.tensor([-1]), torch.tensor([-1]), torch.tensor([-1]), day=day, trialstimulus = trial, t = 0, exp_part = exp_part)
+                self.agent.update(torch.tensor([-1]), 
+                                  torch.tensor([-1]), 
+                                  torch.tensor([-1]), 
+                                  day=day, 
+                                  trialstimulus = trial, 
+                                  t = 0, 
+                                  exp_part = exp_part)
                 
                 self.choices.append(torch.tensor([-1]))
                 self.outcomes.append(torch.tensor([-1]))
@@ -196,10 +212,22 @@ class Env():
                 if day == 1:
                     if trial > 10:
                         t_day1 += 1
-                    self.agent.update(torch.tensor([current_choice]), torch.tensor([outcome]), [blocktype], day=day, trialstimulus = trial, t = t_day1, exp_part = exp_part)
+                    self.agent.update(torch.tensor([current_choice]), 
+                                      torch.tensor([outcome]), 
+                                      [blocktype], 
+                                      day=day, 
+                                      trialstimulus = trial, 
+                                      t = t_day1, 
+                                      exp_part = exp_part)
                     
                 elif day == 2:
                     if trial > 10:
                         t_day2 += 1
-                    self.agent.update(torch.tensor([current_choice]), torch.tensor([outcome]), [blocktype], day=day, trialstimulus = trial, t = t_day2, exp_part = exp_part)
+                    self.agent.update(torch.tensor([current_choice]), 
+                                      torch.tensor([outcome]), 
+                                      [blocktype], 
+                                      day=day, 
+                                      trialstimulus = trial, 
+                                      t = t_day2,
+                                      exp_part = exp_part)
                 

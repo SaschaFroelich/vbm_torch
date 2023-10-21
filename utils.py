@@ -207,7 +207,7 @@ def arrange_data_for_plot(i, df, **kwargs):
         if "Qdiff" in df.columns:
             data_Q["Qdiff"].append(df[df["Blockidx"]==block]["Qdiff"].mean())
         
-        if df[df["Blockidx"]==block]["Blocktype"].unique()[0] == "r":
+        if df[df["Blockidx"]==block]["Blocktype"].unique()[0] == 1:
             "Random Block"
             
             if "Qdiff" in df.columns:
@@ -227,7 +227,7 @@ def arrange_data_for_plot(i, df, **kwargs):
             else:
                 raise Exception("Fehla!")
             
-        elif df[df["Blockidx"]==block]["Blocktype"].unique()[0] == "s":
+        elif df[df["Blockidx"]==block]["Blocktype"].unique()[0] == 0:
             "Sequential Block"
             
             if "Qdiff" in df.columns:

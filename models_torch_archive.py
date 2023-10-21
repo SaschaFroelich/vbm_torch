@@ -2552,3 +2552,1064 @@ class SingleInference_modelD(object):
                       "theta_rep0_day2_rate": theta_rep0_day2_rate}
 
         return self.loss, param_dict
+    
+    
+class Testmodel(Vbm):
+    def __init__(self, prob1, prob2):
+
+        # assert(prob <= 1 and prob >= 0)    
+        self.prob1 = prob1
+        self.prob2 = prob2
+        self.num_blocks = 14
+        self.trials = 480*self.num_blocks
+        self.param_names = ['prob']
+        
+    def locs_to_pars(self, locs):
+        par_dict = {"prob1": torch.sigmoid(locs[..., 0]),
+                    "prob2": torch.sigmoid(locs[..., 1])}
+
+        return par_dict
+    
+    def update(self, choices, outcome, blocktype, **kwargs):
+        
+        pass
+    
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        ipdb.set_trace()
+        return torch.distributions.categorical.Categorical(probs=self.compute_probs(1,1)).sample()
+
+    def reset(self, locs):
+        par_dict = self.locs_to_pars(locs)  
+        
+        self.prob = par_dict["prob"]
+        
+    def compute_probs(self, trial, day):
+        ipdb.set_trace()
+        probs = torch.stack((self.prob1, 1-self.prob1), dim = -1)
+                
+        return probs
+
+class Vbm_B_onlydual():
+    
+    def __init__(self, \
+                 lr_day1, \
+                 theta_Q_day1, \
+                 theta_rep_day1, \
+                 lr_day2, \
+                 theta_Q_day2, \
+                 theta_rep_day2, \
+                 k, \
+                 Q_init, \
+                 num_blocks = 14):
+        """ 
+        --- Parameters ---
+        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+        dectemp (between 0 & inf): decision temperature β
+        lr (between 0 & 1) : learning rate
+        Q_init : (list of floats) initial Q-Values"""
+        self.NA = 4 # no. of possible actions
+        
+        if num_blocks != 1:
+            if num_blocks%2 != 0:
+                raise Exception("num_blocks must be an even value.")
+        
+        self.trials = 480*num_blocks
+        self.num_blocks = num_blocks
+        
+        self.theta_rep_day1 = torch.tensor([[theta_rep_day1]])
+        self.theta_Q_day1 = torch.tensor([[theta_Q_day1]]) # dectemp > 0
+        self.lr_day1 = torch.tensor([[lr_day1]])
+        
+        self.theta_rep_day2 = torch.tensor([[theta_rep_day2]])
+        self.theta_Q_day2 = torch.tensor([[theta_Q_day2]]) # dectemp > 0
+        self.lr_day2 = torch.tensor([[lr_day2]])
+        
+        self.k = torch.tensor([[k]])
+        self.Q_init = Q_init
+        self.Q = [torch.tensor([Q_init],)] # Goal-Directed Q-Values
+        self.rep = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)] # habitual values (repetition values)
+    
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        V0 = self.theta_rep_day1*self.rep[-1][..., 0] + self.theta_Q_day1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1*self.rep[-1][..., 1] + self.theta_Q_day1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1*self.rep[-1][..., 2] + self.theta_Q_day1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1*self.rep[-1][..., 3] + self.theta_Q_day1*self.Q[-1][..., 3]
+        
+        self.V = torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)
+        
+        # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
+        # Compute prior over sequences of length 4
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+    def softmax(self, z):
+        sm = torch.nn.Softmax(dim=1)
+        p_actions = sm(z)
+        return p_actions
+        
+    def update(self, choice, outcome, blocktype, **kwargs):
+        """
+        Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        
+        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)"
+        
+        --- Parameters ---
+        choice (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
+                                     -10 : error
+        outcome (0 or 1) : no reward (0) or reward (1)
+        blocktype : 's' (sequential blocks) or 'r' (random blocks)
+                    Important for updating of sequence counters.
+        """
+
+        if kwargs['day'] == 1:
+            lr = self.lr_day1
+            theta_Q = self.theta_Q_day1
+            theta_rep = self.theta_rep_day1
+            
+        elif kwargs['day'] == 2:
+            lr = self.lr_day2
+            theta_Q = self.theta_Q_day2
+            theta_rep = self.theta_rep_day2
+        
+        
+        if choice == -1 and outcome == -1 and blocktype == -1:
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1
+            self.ppchoice = -1
+            self.pchoice = -1
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.tensor([[0.25, 0.25, 0.25, 0.25]],))
+            self.Q.append(self.Q[-1])
+            
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            self.V.append(torch.cat((V0,V1,V2,V3))[None, :])
+            
+        else:
+            
+            ch = choice.type('torch.LongTensor')
+            outcome = outcome.type('torch.LongTensor')
+            
+            "----- Update GD-values -----"
+            # Outcome is either 0 or 1
+            if ch > -1:
+                "No error"
+                if kwargs['trialstimulus'] > 10:
+                    "Q-learning update only after dual-target trial!"
+                    Qchoice = (self.Q[-1][..., ch][:,None] + lr*(outcome-self.Q[-1][..., ch][:,None])) * torch.eye(self.NA)[ch, :]
+                    mask = torch.eye(self.NA, dtype=bool)[ch, :]
+                    Qnew = torch.where(mask, Qchoice, self.Q[-1])
+                    self.Q.append(Qnew)
+                
+                assert(outcome == 0 or outcome == 1)
+                
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters -----"
+            if blocktype == "s":
+                "Sequential Block"
+                self.seq_counter_tb[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+    
+            elif blocktype == "r":
+                "Random Block"
+                self.seq_counter_r[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+                    
+            else:
+                raise Exception("Da isch a Fehla aba ganz a gwaldiga!")
+            
+            "----- Update repetition values self.rep -----"
+            prev_seq = [str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())]
+            
+            new_row = [0., 0. ,0. ,0.]
+            for aa in range(4):
+            
+                if blocktype == 's':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_tb[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_tb[prev_seq[0] + "," + "0"] + self.seq_counter_tb[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_tb[prev_seq[0] + "," + "2"] + self.seq_counter_tb[prev_seq[0] + "," + "3"])
+    
+                elif blocktype == 'r':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_r[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_r[prev_seq[0] + "," + "0"] + self.seq_counter_r[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_r[prev_seq[0] + "," + "2"] + self.seq_counter_r[prev_seq[0] + "," + "3"])
+                                    
+                else:
+                    raise Exception("Da isch a Fehla aba ganz agwaldiga!")
+    
+            self.rep.append(torch.tensor([new_row],))
+            
+            "----- Compute new V-values for next trial -----"
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            
+            self.V.append(torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1))
+            
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = ch.item()
+
+    def find_resp_options(self, stimulus_mat):
+        """Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
+        INPUT: stimulus in MATLAB notation (1-indexed)
+        OUTPUT: response options in python notation (0-indexed)
+        """
+        
+        option2_python = int((stimulus_mat % 10) - 1 )
+        option1_python = int(((stimulus_mat - (stimulus_mat % 10)) / 10) -1)
+        
+        return option1_python, option2_python
+
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        
+        if trial < 10:
+            "Single-target trial"
+            choice_python = trial-1
+        
+        elif trial > 10:
+            # torch.manual_seed(123)
+
+            "Dual-target trial"
+            option1, option2 = self.find_resp_options(trial)
+                        
+            p_actions = self.softmax(torch.tensor([[self.V[:, option1], self.V[:, option2]]]))
+                                    
+            choice_sample = torch.multinomial(p_actions, 1)[0]
+
+            choice_python = option2*choice_sample + option1*(1-choice_sample)
+
+        return torch.squeeze(choice_python).type('torch.LongTensor')
+    
+    def reset(self, **kwargs):
+        self.lr_day1 = kwargs["lr_day1"]
+        self.theta_Q_day1 = kwargs["theta_Q_day1"]
+        self.theta_rep_day1 = kwargs["theta_rep_day1"]        
+        
+        self.lr_day2 = kwargs["lr_day2"]
+        self.theta_Q_day2 = kwargs["theta_Q_day2"]
+        self.theta_rep_day2 = kwargs["theta_rep_day2"]
+
+        self.k = kwargs["k"]
+            
+        self.Q = [torch.tensor([self.Q_init],)] # Goal-Directed Q-Values
+        
+        #self.p_actions_hist = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)]
+        self.NA = 4 # no. of possible actions
+        self.rep = [torch.ones((1, self.NA))*0.25] # habitual values (repetition values)
+        # Compute prior over sequences of length 4
+        
+        V0 = self.theta_rep_day1*self.rep[-1][..., 0] + self.theta_Q_day1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1*self.rep[-1][..., 1] + self.theta_Q_day1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1*self.rep[-1][..., 2] + self.theta_Q_day1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1*self.rep[-1][..., 3] + self.theta_Q_day1*self.Q[-1][..., 3]
+        
+        self.V = torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)
+        
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+class Vbm_B_2():
+    "Like model B, but with separate parameters for the first two blocks"
+    
+    def __init__(self, \
+                 lr_day1_1, \
+                 theta_Q_day1_1, \
+                 theta_rep_day1_1, \
+                 lr_day1_2, \
+                 theta_Q_day1_2, \
+                 theta_rep_day1_2, \
+                 lr_day2, \
+                 theta_Q_day2, \
+                 theta_rep_day2, \
+                 k, \
+                 Q_init, \
+                 num_blocks = 14):
+        
+        """ 
+        --- Parameters ---
+        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+        dectemp (between 0 & inf): decision temperature β
+        lr (between 0 & 1) : learning rate
+        Q_init : (list of floats) initial Q-Values"""
+        self.NA = 4 # no. of possible actions
+        
+        if num_blocks != 1:
+            if num_blocks%2 != 0:
+                raise Exception("num_blocks must be an even value.")
+
+        self.trials = 480*num_blocks
+        self.num_blocks = num_blocks
+        
+        self.theta_rep_day1_1 = torch.tensor([[theta_rep_day1_1]])
+        self.theta_Q_day1_1 = torch.tensor([[theta_Q_day1_1]]) # dectemp > 0
+        self.lr_day1_1 = torch.tensor([[lr_day1_1]])
+        
+        self.theta_rep_day1_2 = torch.tensor([[theta_rep_day1_2]])
+        self.theta_Q_day1_2 = torch.tensor([[theta_Q_day1_2]]) # dectemp > 0
+        self.lr_day1_2 = torch.tensor([[lr_day1_2]])
+        
+        self.theta_rep_day2 = torch.tensor([[theta_rep_day2]])
+        self.theta_Q_day2 = torch.tensor([[theta_Q_day2]]) # dectemp > 0
+        self.lr_day2 = torch.tensor([[lr_day2]])
+        
+        self.k = torch.tensor([[k]])
+        self.Q_init = Q_init
+        self.Q = [torch.tensor([Q_init],)] # Goal-Directed Q-Values
+        self.rep = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)] # habitual values (repetition values)
+    
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        V0 = self.theta_rep_day1_1*self.rep[-1][..., 0] + self.theta_Q_day1_1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1_1*self.rep[-1][..., 1] + self.theta_Q_day1_1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1_1*self.rep[-1][..., 2] + self.theta_Q_day1_1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1_1*self.rep[-1][..., 3] + self.theta_Q_day1_1*self.Q[-1][..., 3]
+        
+        self.V = torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)
+        
+        # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
+        # Compute prior over sequences of length 4
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+    def softmax(self, z):
+        sm = torch.nn.Softmax(dim=1)
+        p_actions = sm(z)
+        return p_actions
+        
+    def update(self, choice, outcome, blocktype, **kwargs):
+        
+        """
+        Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        
+        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)"
+        
+        --- Parameters ---
+        choice (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
+                                     -10 : error
+        outcome (0 or 1) : no reward (0) or reward (1)
+        blocktype : 's' (sequential blocks) or 'r' (random blocks)
+                    Important for updating of sequence counters.
+        exp_part : part of the experiment (1: day 1_1, 2: day 1_2, 3: day2)
+        """
+
+        if kwargs['exp_part'] == 1:
+            lr = self.lr_day1_1
+            theta_Q = self.theta_Q_day1_1
+            theta_rep = self.theta_rep_day1_1
+            
+        elif kwargs['exp_part'] == 2:
+            lr = self.lr_day1_2
+            theta_Q = self.theta_Q_day1_2
+            theta_rep = self.theta_rep_day1_2
+            
+        elif kwargs['exp_part'] == 3:
+            lr = self.lr_day2
+            theta_Q = self.theta_Q_day2
+            theta_rep = self.theta_rep_day2
+            
+        else:
+            raise Exception("Da isch a Fehla!")
+        
+        if choice == -1 and outcome == -1 and blocktype == -1:
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1
+            self.ppchoice = -1
+            self.pchoice = -1
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.tensor([[0.25, 0.25, 0.25, 0.25]],))
+            self.Q.append(self.Q[-1])
+            
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            self.V.append(torch.cat((V0,V1,V2,V3))[None, :])
+            
+        else:
+            ch = choice.type('torch.LongTensor')
+            outcome = outcome.type('torch.LongTensor')
+            
+            "----- Update GD-values -----"
+            # Outcome is either 0 or 1
+            if ch > -1:
+                "No error"
+                #if trialstimulus > 10:
+                "Q-learning update only after dual-target trial!"
+                Qchoice = (self.Q[-1][..., ch][:,None] + lr*(outcome-self.Q[-1][..., ch][:,None])) * torch.eye(self.NA)[ch, :]
+                mask = torch.eye(self.NA, dtype=bool)[ch, :]
+                Qnew = torch.where(mask, Qchoice, self.Q[-1])
+                self.Q.append(Qnew)
+                
+                assert(outcome == 0 or outcome == 1)
+                
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters -----"
+            if blocktype == "s":
+                "Sequential Block"
+                self.seq_counter_tb[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+    
+            elif blocktype == "r":
+                "Random Block"
+                self.seq_counter_r[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+                    
+            else:
+                raise Exception("Da isch a Fehla aba ganz a gwaldiga!")
+            
+            "----- Update repetition values self.rep -----"
+            prev_seq = [str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())]
+            
+            new_row = [0., 0. ,0. ,0.]
+            for aa in range(4):
+            
+                if blocktype == 's':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_tb[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_tb[prev_seq[0] + "," + "0"] + self.seq_counter_tb[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_tb[prev_seq[0] + "," + "2"] + self.seq_counter_tb[prev_seq[0] + "," + "3"])
+    
+                elif blocktype == 'r':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_r[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_r[prev_seq[0] + "," + "0"] + self.seq_counter_r[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_r[prev_seq[0] + "," + "2"] + self.seq_counter_r[prev_seq[0] + "," + "3"])
+                                    
+                else:
+                    raise Exception("Da isch a Fehla aba ganz agwaldiga!")
+    
+            self.rep.append(torch.tensor([new_row],))
+            
+            "----- Compute new V-values for next trial -----"
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            
+            self.V.append(torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1))
+            
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = ch.item()
+
+    def find_resp_options(self, stimulus_mat):
+        """Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
+        INPUT: stimulus in MATLAB notation (1-indexed)
+        OUTPUT: response options in python notation (0-indexed)
+        """
+        
+        option2_python = int((stimulus_mat % 10) - 1 )
+        option1_python = int(((stimulus_mat - (stimulus_mat % 10)) / 10) -1)
+        
+        return option1_python, option2_python
+
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        
+        if trial < 10:
+            "Single-target trial"
+            choice_python = trial-1
+        
+        elif trial > 10:
+            "Dual-target trial"
+            option1, option2 = self.find_resp_options(trial)
+                        
+            p_actions = self.softmax(torch.tensor([[self.V[:, option1], self.V[:, option2]]]))
+                                    
+            choice_sample = torch.multinomial(p_actions, 1)[0]
+    
+            choice_python = option2*choice_sample + option1*(1-choice_sample)
+
+        return torch.squeeze(choice_python).type('torch.LongTensor')
+    
+    def reset(self, **kwargs):
+        self.lr_day1_1 = kwargs["lr_day1_1"]
+        self.theta_Q_day1_1 = kwargs["theta_Q_day1_1"]
+        self.theta_rep_day1_1 = kwargs["theta_rep_day1_1"]
+        
+        self.lr_day1_2 = kwargs["lr_day1_2"]
+        self.theta_Q_day1_2 = kwargs["theta_Q_day1_2"]
+        self.theta_rep_day1_2 = kwargs["theta_rep_day1_2"]
+        
+        self.lr_day2 = kwargs["lr_day2"]
+        self.theta_Q_day2 = kwargs["theta_Q_day2"]
+        self.theta_rep_day2 = kwargs["theta_rep_day2"]
+
+        self.k = kwargs["k"]
+        self.Q = [torch.tensor([self.Q_init],)] # Goal-Directed Q-Values
+        
+        #self.p_actions_hist = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)]
+        self.NA = 4 # no. of possible actions
+        self.rep = [torch.ones((1, self.NA))*0.25] # habitual values (repetition values)
+        # Compute prior over sequences of length 4
+        
+        V0 = self.theta_rep_day1_1*self.rep[-1][..., 0] + self.theta_Q_day1_1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1_1*self.rep[-1][..., 1] + self.theta_Q_day1_1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1_1*self.rep[-1][..., 2] + self.theta_Q_day1_1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1_1*self.rep[-1][..., 3] + self.theta_Q_day1_1*self.Q[-1][..., 3]
+        
+        self.V = torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)
+        
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        
+                        
+class Vbm_B_3():
+    "Like model B, but with separate parameters for the first two blocks"
+    
+    def __init__(self, \
+                 theta_Q_day1_1, \
+                 theta_rep_day1_1, \
+                 theta_Q_day1_2, \
+                 theta_rep_day1_2, \
+                 theta_Q_day2, \
+                 theta_rep_day2, \
+                 k, \
+                 Q_init, \
+                 num_blocks = 14):
+        
+        """ 
+        --- Parameters ---
+        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+        dectemp (between 0 & inf): decision temperature β
+        lr (between 0 & 1) : learning rate
+        Q_init : (list of floats) initial Q-Values"""
+        self.NA = 4 # no. of possible actions
+        
+        if num_blocks != 1:
+            if num_blocks%2 != 0:
+                raise Exception("num_blocks must be an even value.")
+
+        self.trials = 480*num_blocks
+        self.num_blocks = num_blocks
+        
+        self.theta_rep_day1_1 = torch.tensor([[theta_rep_day1_1]])
+        self.theta_Q_day1_1 = torch.tensor([[theta_Q_day1_1]]) # dectemp > 0
+        
+        self.theta_rep_day1_2 = torch.tensor([[theta_rep_day1_2]])
+        self.theta_Q_day1_2 = torch.tensor([[theta_Q_day1_2]]) # dectemp > 0
+        
+        self.theta_rep_day2 = torch.tensor([[theta_rep_day2]])
+        self.theta_Q_day2 = torch.tensor([[theta_Q_day2]]) # dectemp > 0
+        
+        self.k = torch.tensor([[k]])
+        self.Q_init = Q_init
+        self.Q = [torch.tensor([Q_init],)] # Goal-Directed Q-Values
+        self.rep = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)] # habitual values (repetition values)
+    
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        V0 = self.theta_rep_day1_1*self.rep[-1][..., 0] + self.theta_Q_day1_1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1_1*self.rep[-1][..., 1] + self.theta_Q_day1_1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1_1*self.rep[-1][..., 2] + self.theta_Q_day1_1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1_1*self.rep[-1][..., 3] + self.theta_Q_day1_1*self.Q[-1][..., 3]
+        
+        self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
+        
+        # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
+        # Compute prior over sequences of length 4
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+    def softmax(self, z):
+        sm = torch.nn.Softmax(dim=1)
+        p_actions = sm(z)
+        return p_actions
+        
+    def update(self, choice, outcome, blocktype, **kwargs):
+        
+        """
+        Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        
+        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)"
+        
+        --- Parameters ---
+        choice (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
+                                     -10 : error
+        outcome (0 or 1) : no reward (0) or reward (1)
+        blocktype : 's' (sequential blocks) or 'r' (random blocks)
+                    Important for updating of sequence counters.
+        exp_part : part of the experiment (1: day 1_1, 2: day 1_2, 3: day2)
+        """
+
+        if kwargs['exp_part'] == 1:
+            theta_Q = self.theta_Q_day1_1
+            theta_rep = self.theta_rep_day1_1
+            
+        elif kwargs['exp_part'] == 2:
+            theta_Q = self.theta_Q_day1_2
+            theta_rep = self.theta_rep_day1_2
+            
+        elif kwargs['exp_part'] == 3:
+            theta_Q = self.theta_Q_day2
+            theta_rep = self.theta_rep_day2
+            
+        else:
+            raise Exception("Da isch a Fehla!")
+        
+        if choice == -1 and outcome == -1 and blocktype == -1:
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1
+            self.ppchoice = -1
+            self.pchoice = -1
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.tensor([[0.25, 0.25, 0.25, 0.25]],))
+            self.Q.append(self.Q[-1])
+            
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            self.V.append(torch.cat((V0,V1,V2,V3))[None, :])
+            
+        else:
+            ch = choice.type('torch.LongTensor')
+            outcome = outcome.type('torch.LongTensor')
+            
+            "----- No need to Update GD-values -----"
+                
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters -----"
+            if blocktype == "s":
+                "Sequential Block"
+                self.seq_counter_tb[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+    
+            elif blocktype == "r":
+                "Random Block"
+                self.seq_counter_r[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+                    
+            else:
+                raise Exception("Da isch a Fehla aba ganz a gwaldiga!")
+            
+            "----- Update repetition values self.rep -----"
+            prev_seq = [str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())]
+            
+            new_row = [0., 0. ,0. ,0.]
+            for aa in range(4):
+            
+                if blocktype == 's':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_tb[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_tb[prev_seq[0] + "," + "0"] + self.seq_counter_tb[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_tb[prev_seq[0] + "," + "2"] + self.seq_counter_tb[prev_seq[0] + "," + "3"])
+    
+                elif blocktype == 'r':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_r[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_r[prev_seq[0] + "," + "0"] + self.seq_counter_r[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_r[prev_seq[0] + "," + "2"] + self.seq_counter_r[prev_seq[0] + "," + "3"])
+                                    
+                else:
+                    raise Exception("Da isch a Fehla aba ganz agwaldiga!")
+    
+            self.rep.append(torch.tensor([new_row],))
+            
+            "----- Compute new V-values for next trial -----"
+            V0 = theta_rep*self.rep[-1][..., 0] + theta_Q*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = theta_rep*self.rep[-1][..., 1] + theta_Q*self.Q[-1][..., 1]
+            V2 = theta_rep*self.rep[-1][..., 2] + theta_Q*self.Q[-1][..., 2]
+            V3 = theta_rep*self.rep[-1][..., 3] + theta_Q*self.Q[-1][..., 3]
+            
+            self.V.append(torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1))
+            
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = ch.item()
+
+    def find_resp_options(self, stimulus_mat):
+        """Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
+        INPUT: stimulus in MATLAB notation (1-indexed)
+        OUTPUT: response options in python notation (0-indexed)
+        """
+        
+        option2_python = int((stimulus_mat % 10) - 1 )
+        option1_python = int(((stimulus_mat - (stimulus_mat % 10)) / 10) -1)
+        
+        return option1_python, option2_python
+
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        
+        if trial < 10:
+            "Single-target trial"
+            choice_python = trial-1
+        
+        elif trial > 10:
+            "Dual-target trial"
+            option1, option2 = self.find_resp_options(trial)
+                        
+            p_actions = self.softmax(torch.tensor([[self.V[:, option1], self.V[:, option2]]]))
+                                    
+            choice_sample = torch.multinomial(p_actions, 1)[0]
+    
+            choice_python = option2*choice_sample + option1*(1-choice_sample)
+
+        return torch.squeeze(choice_python).type('torch.LongTensor')
+    
+    def reset(self, **kwargs):
+        self.theta_Q_day1_1 = kwargs["theta_Q_day1_1"]
+        self.theta_rep_day1_1 = kwargs["theta_rep_day1_1"]
+        
+        self.theta_Q_day1_2 = kwargs["theta_Q_day1_2"]
+        self.theta_rep_day1_2 = kwargs["theta_rep_day1_2"]
+        
+        self.theta_Q_day2 = kwargs["theta_Q_day2"]
+        self.theta_rep_day2 = kwargs["theta_rep_day2"]
+
+        self.k = kwargs["k"]
+        self.Q = [torch.tensor([self.Q_init],)] # Goal-Directed Q-Values
+        
+        #self.p_actions_hist = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)]
+        self.NA = 4 # no. of possible actions
+        self.rep = [torch.ones((1, self.NA))*0.25] # habitual values (repetition values)
+        # Compute prior over sequences of length 4
+        
+        V0 = self.theta_rep_day1_1*self.rep[-1][..., 0] + self.theta_Q_day1_1*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep_day1_1*self.rep[-1][..., 1] + self.theta_Q_day1_1*self.Q[-1][..., 1]
+        V2 = self.theta_rep_day1_1*self.rep[-1][..., 2] + self.theta_Q_day1_1*self.Q[-1][..., 2]
+        V3 = self.theta_rep_day1_1*self.rep[-1][..., 3] + self.theta_Q_day1_1*self.Q[-1][..., 3]
+        
+        self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
+        
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+class Vbm_F():
+    "Fixed Q-values, but theta_rep and theta_Q develop linearly"
+    def __init__(self, \
+                 theta_Q0_day1, \
+                 theta_Qlambda_day1, \
+                 theta_rep0_day1, \
+                 theta_replambda_day1, \
+                 theta_Q0_day2, \
+                 theta_Qlambda_day2, \
+                 theta_rep0_day2, \
+                 theta_replambda_day2, \
+                 k, \
+                 Q_init, \
+                 num_blocks = 14):
+        
+        """ 
+        --- Parameters ---
+        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+        dectemp (between 0 & inf): decision temperature β
+        lr (between 0 & 1) : learning rate
+        Q_init : (list of floats) initial Q-Values"""
+        self.NA = 4 # no. of possible actions
+        
+        if num_blocks != 1:
+            if num_blocks%2 != 0:
+                raise Exception("num_blocks must be an even value.")
+        
+        self.trials = 480*num_blocks
+        self.num_blocks = num_blocks
+        
+        self.day = 1
+        " ===== Latent parameters ====="
+        self.theta_rep0_day1 = torch.tensor([[theta_rep0_day1]])
+        self.theta_replambda_day1 = torch.tensor([[theta_replambda_day1]])
+        
+        self.theta_Q0_day1 = torch.tensor([[theta_Q0_day1]])
+        self.theta_Qlambda_day1 = torch.tensor([[theta_Qlambda_day1]])
+        
+        self.theta_rep0_day2 = torch.tensor([[theta_rep0_day2]])
+        self.theta_replambda_day2 = torch.tensor([[theta_replambda_day2]])
+        
+        self.theta_Q0_day2 = torch.tensor([[theta_Q0_day2]])
+        self.theta_Qlambda_day2 = torch.tensor([[theta_Qlambda_day2]])
+        " ===== ===== ===== ====="
+        
+        self.theta_rep = [self.theta_rep0_day1]
+        self.theta_Q = [self.theta_Q0_day1]
+                
+        self.k = torch.tensor([[k]])
+        self.Q_init = Q_init
+        self.Q = torch.tensor([Q_init],) # Gial-Directed Q-Values
+        self.rep = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)] # habitual values (repetition values)
+
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        V0 = self.theta_rep[-1]*self.rep[-1][..., 0] + self.theta_Q[-1]*self.Q[..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep[-1]*self.rep[-1][..., 1] + self.theta_Q[-1]*self.Q[..., 1]
+        V2 = self.theta_rep[-1]*self.rep[-1][..., 2] + self.theta_Q[-1]*self.Q[..., 2]
+        V3 = self.theta_rep[-1]*self.rep[-1][..., 3] + self.theta_Q[-1]*self.Q[..., 3]
+        
+        self.V = [torch.cat((V0.transpose(0,1), V1.transpose(0,1), V2.transpose(0,1), V3.transpose(0,1)),1)]
+        
+        # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
+        # Compute prior over sequences of length 4
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+    def softmax(self, z):
+        sm = torch.nn.Softmax(dim=1)
+        p_actions = sm(z)
+        return p_actions
+        
+    def update(self, choice, outcome, blocktype, **kwargs):
+        """
+        Is called after every choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        
+        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)
+        
+        trial : 
+        
+        --- Parameters ---
+        choice (-10, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
+                                     -10 : error
+        outcome (0 or 1) : no reward (0) or reward (1)
+        blocktype : 's' (sequential blocks) or 'r' (random blocks)
+                    Important for updating of sequence counters.
+        """
+        
+        if choice == -1 and outcome == -1 and blocktype == -1:
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1
+            self.ppchoice = -1
+            self.pchoice = -1
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.tensor([[0.25, 0.25, 0.25, 0.25]],))
+            
+            V0 = self.theta_rep[-1]*self.rep[-1][..., 0] + self.theta_Q[-1]*self.Q[..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = self.theta_rep[-1]*self.rep[-1][..., 1] + self.theta_Q[-1]*self.Q[..., 1]
+            V2 = self.theta_rep[-1]*self.rep[-1][..., 2] + self.theta_Q[-1]*self.Q[..., 2]
+            V3 = self.theta_rep[-1]*self.rep[-1][..., 3] + self.theta_Q[-1]*self.Q[..., 3]
+            self.V.append(torch.cat((V0,V1,V2,V3))[None, :])
+            
+        else:
+            
+            ch = choice.type('torch.LongTensor')
+            outcome = outcome.type('torch.LongTensor')
+                        
+            if self.day == 1 and kwargs['day'] == 2:
+                "First Trial of 2nd day"
+                self.theta_rep.append(self.theta_rep0_day2)
+                self.theta_Q.append(self.theta_Q0_day2)
+                self.day = 2
+                
+            "----- No need to update GD-values -----"
+            assert(outcome == 0 or outcome == 1)
+                
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters -----"
+            if blocktype == "s":
+                "Sequential Block"
+                self.seq_counter_tb[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+
+            elif blocktype == "r":
+                "Random Block"
+                self.seq_counter_r[str(self.pppchoice) + "," + \
+                                 str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())] += 1
+                    
+            else:
+                raise Exception("Da isch a Fehla aba ganz a gwaldiga!")
+            
+            "----- Update repetition values self.rep -----"
+            prev_seq = [str(self.ppchoice) + "," + str(self.pchoice) + "," + str(ch.item())]
+            
+            new_row = [0., 0., 0., 0.]
+            for aa in range(4):
+            
+                if blocktype == 's':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_tb[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_tb[prev_seq[0] + "," + "0"] + self.seq_counter_tb[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_tb[prev_seq[0] + "," + "2"] + self.seq_counter_tb[prev_seq[0] + "," + "3"])
+    
+                elif blocktype == 'r':
+                    for aa in range(4):
+                        new_row[aa] = self.seq_counter_r[prev_seq[0] + "," + str(aa)] / \
+                                (self.seq_counter_r[prev_seq[0] + "," + "0"] + self.seq_counter_r[prev_seq[0] + "," + "1"] + \
+                                 self.seq_counter_r[prev_seq[0] + "," + "2"] + self.seq_counter_r[prev_seq[0] + "," + "3"])
+                                    
+                else:
+                    raise Exception("Da isch a Fehla aba ganz agwaldiga!")
+    
+            self.rep.append(torch.tensor([new_row],))
+                
+            "----- Compute new V-values for next trial -----"
+            V0 = self.theta_rep[-1]*self.rep[-1][..., 0] + self.theta_Q[-1]*self.Q[..., 0] # V-Values for actions (i.e. weighted action values)
+            V1 = self.theta_rep[-1]*self.rep[-1][..., 1] + self.theta_Q[-1]*self.Q[..., 1]
+            V2 = self.theta_rep[-1]*self.rep[-1][..., 2] + self.theta_Q[-1]*self.Q[..., 2]
+            V3 = self.theta_rep[-1]*self.rep[-1][..., 3] + self.theta_Q[-1]*self.Q[..., 3]
+            
+            self.V.append(torch.cat((V0.transpose(0,1), V1.transpose(0,1), V2.transpose(0,1), V3.transpose(0,1)),1))
+            
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = ch.item()
+            
+            "----- Update  theta_Q and theta_rep -----"
+            if self.day == 1:
+                self.theta_rep.append(self.theta_rep0_day1 + self.theta_replambda_day1 * kwargs['t'])
+                self.theta_Q.append(self.theta_Q0_day1 + self.theta_Qlambda_day1 * kwargs['t'])
+                
+            elif self.day == 2:
+                self.theta_rep.append(self.theta_rep0_day2 + self.theta_replambda_day2 * kwargs['t'])
+                self.theta_Q.append(self.theta_Q0_day2 + self.theta_Qlambda_day2 * kwargs['t'])
+
+    def find_resp_options(self, stimulus_mat):
+        """
+        Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
+        INPUT: stimulus in MATLAB notation (1-indexed)
+        OUTPUT: response options in python notation (0-indexed)
+        """
+        
+        option2_python = int((stimulus_mat % 10) - 1 )
+        option1_python = int(((stimulus_mat - (stimulus_mat % 10)) / 10) -1)
+        
+        return option1_python, option2_python
+
+    def choose_action(self, trial, day):
+        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "OUTPUT: choice response digit (in 0-indexing notation)"
+        
+        if trial < 10:
+            "Single-target trial"
+            choice_python = trial-1
+        
+        elif trial > 10:
+            "Dual-target trial"
+            option1, option2 = self.find_resp_options(trial)
+                        
+            p_actions = self.softmax(torch.tensor([[self.V[:, option1], self.V[:, option2]]]))
+            
+            # self.p_actions_hist.append(p_actions)
+            
+            choice_sample = torch.multinomial(p_actions, 1)[0]
+    
+            choice_python = option2*choice_sample + option1*(1-choice_sample)
+
+        return torch.squeeze(choice_python).type('torch.LongTensor')
+    
+    def reset(self, **kwargs):
+        "--- Day 1 ---"
+        self.theta_Q0_day1 = kwargs["theta_Q0_day1"]
+        self.theta_Qlambda_day1 = kwargs["theta_Qlambda_day1"]
+        
+        self.theta_rep0_day1 = kwargs["theta_rep0_day1"]
+        self.theta_replambda_day1 = kwargs["theta_replambda_day1"]
+
+        self.theta_rep = [self.theta_rep0_day1]
+        self.theta_Q = [self.theta_Q0_day1]
+
+        "--- Day 2 ---"
+        self.theta_Q0_day2 = kwargs["theta_Q0_day2"]
+        self.theta_Qlambda_day2 = kwargs["theta_Qlambda_day2"]
+        
+        self.theta_rep0_day2 = kwargs["theta_rep0_day2"]
+        self.theta_replambda_day2 = kwargs["theta_replambda_day2"]
+
+        self.day = 1
+        self.k = kwargs["k"]
+        self.Q = torch.tensor([self.Q_init],) # Goal-Directed Q-Values
+        
+        "=============== Setup ==============="
+        #self.p_actions_hist = [torch.tensor([[0.25, 0.25, 0.25, 0.25]],)]
+        self.NA = 4 # no. of possible actions
+        self.rep = [torch.ones((1, self.NA))*0.25] # habitual values (repetition values)
+        # Compute prior over sequences of length 4
+        
+        V0 = self.theta_rep[-1]*self.rep[-1][..., 0] + self.theta_Q[-1]*self.Q[..., 0] # V-Values for actions (i.e. weighted action values)
+        V1 = self.theta_rep[-1]*self.rep[-1][..., 1] + self.theta_Q[-1]*self.Q[..., 1]
+        V2 = self.theta_rep[-1]*self.rep[-1][..., 2] + self.theta_Q[-1]*self.Q[..., 2]
+        V3 = self.theta_rep[-1]*self.rep[-1][..., 3] + self.theta_Q[-1]*self.Q[..., 3]
+        
+        self.V = [torch.cat((V0.transpose(0,1),V1.transpose(0,1),V2.transpose(0,1),V3.transpose(0,1)),1)]
+        
+        self.seq_counter_tb = {}
+        self.seq_counter_r = {}
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-10 in seq_counter for errors)"
+        for i in [-10,-1,0,1,2,3]:
+            for j in [-10,-1,0,1,2,3]:
+                for k in [-10,-1,0,1,2,3]:
+                    for l in [-10,-1,0,1,2,3]:
+                        self.seq_counter_tb[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+                        self.seq_counter_r[str(i) + "," + str(j) + "," + str(k) + "," + str(l)] = self.k.item()/4
+
+pyro.clear_param_store()
