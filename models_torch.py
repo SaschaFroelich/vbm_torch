@@ -31,11 +31,11 @@ class Vbm():
         lr (between 0 & 1) : learning rate
         Q_init : (list of floats) initial Q-Values"""
         
-        # assert(omega.ndim == 2)
-        # assert(dectemp.ndim == 2)
-        # assert(lr.ndim == 2)
+        # #assert(omega.ndim == 2)
+        # #assert(dectemp.ndim == 2)
+        # #assert(lr.ndim == 2)
         
-        # assert(Q_init.ndim == 3)
+        # #assert(Q_init.ndim == 3)
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
@@ -74,7 +74,7 @@ class Vbm():
         
         self.V = [((1-self.omega)[..., None]*self.rep[-1] + self.omega[..., None]*self.Q[-1])]
         
-        # assert(Vold==self.V)
+        # #assert(Vold==self.V)
         
         # self.V = [(1-self.omega).T*self.rep[-1][0,...] + self.omeg.T*self.Q[-1][0, ...]]
         
@@ -88,7 +88,7 @@ class Vbm():
         "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
         self.init_seq_counter = self.k / 4 * np.ones((self.num_agents, 2, 6, 6, 6, 6))
         
-        self.seq_counter = self.init_seq_counter.clone()
+        self.seq_counter = self.init_seq_counter.clone().detach()
 
 
     def locs_to_pars(self, locs):
@@ -99,7 +99,25 @@ class Vbm():
         return par_dict
     
     def compute_probs(self, trial, day):
-        option1, option2 = self.find_resp_options([trial])
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        Returns
+        -------
+        probs : TYPE
+            DESCRIPTION.
+
+        '''
+        
+        #assert(torch.is_tensor(trial) and trial.ndim==1)
+        option1, option2 = self.find_resp_options(trial)
         
         _, mask = self.Qoutcomp(self.V[-1], option1)
         Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
@@ -112,6 +130,29 @@ class Vbm():
         return probs
         
     def Qoutcomp(self, Qin, choices):
+        '''        
+
+        Parameters
+        ----------
+        Qin : TYPE
+            DESCRIPTION.
+        choices : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+        mask : TYPE
+            DESCRIPTION.
+
+        '''
+        
         """Qin shape is [num_particles, num_agents, 4]"""
         """Returns a tensor with the same shape as Qin, with zeros everywhere except for the relevant places
         as indicated by 'choices', where the values of Qin are retained. Q positions for agents with an error choice
@@ -119,43 +160,51 @@ class Vbm():
         
         Qin = Qin.type(torch.double)
         
-        if len(Qin.shape) == 2:
-            Qin = Qin[None, ...]
+        # print(Qin.ndim)
+        # if len(Qin.shape) == 2:
+        #     Qin = Qin[None, ...]
             
-        elif len(Qin.shape) == 3:
-            pass
+        # elif len(Qin.shape) == 3:
+        #     pass
         
-        else:
-            ipdb.set_trace()
-            raise Exception("Fehla, digga!")
+        # else:
+        #     ipdb.set_trace()
+        #     raise Exception("Fehla, digga!")
         
-        try:
-            no_error_mask = [1 if ch != self.BAD_CHOICE else 0 for ch in choices]
-        except:
-            ipdb.set_trace()
-            
+        "np_error_mask will be True for those subjects that performed no error"  
+        no_error_mask = choices != self.BAD_CHOICE
+
         "Replace error choices by the number one"
-        choices_noerrors = torch.where(torch.tensor(no_error_mask).type(torch.bool), choices, torch.ones(choices.shape)).type(torch.int)
-    
-        Qout = torch.zeros(Qin.shape).double()
+        choices_noerrors = torch.where(no_error_mask.type(torch.bool), 
+                                       choices, 
+                                       torch.ones(choices.shape)).type(torch.int)
+        
+        # Qout = torch.zeros(Qin.shape).double()
         choicemask = torch.zeros(Qin.shape, dtype = int)
-        num_particles = Qout.shape[0] # num of particles
-        num_agents = Qout.shape[1] # num_agents
+        num_particles = Qin.shape[0] # num of particles
+        num_agents = Qin.shape[1] # num_agents
         
-        errormask = torch.tensor([0 if c == self.BAD_CHOICE else 1 for c in choices])
-        errormask = errormask.broadcast_to(num_particles, 4, num_agents).transpose(1,2)
+        no_error_mask = no_error_mask.broadcast_to(num_particles, 4, num_agents).transpose(1,2)
         
-        x = torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat(num_agents)
-        y = torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat_interleave(num_particles)
-        z = choices_noerrors.repeat_interleave(num_particles)
-        Qout[x, y, z] = Qin[x, y, z]
+        # x = torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat(num_agents)
+        # y = torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat_interleave(num_particles)
+        # z = choices_noerrors.repeat_interleave(num_particles)
+        
+        # Qout[torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat(num_agents),
+        #      torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat_interleave(num_particles), 
+        #      choices_noerrors.repeat_interleave(num_particles)] = \
+        # Qin[torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat(num_agents), 
+        #     torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat_interleave(num_particles),
+        #     choices_noerrors.repeat_interleave(num_particles)]
     
-        choicemask[torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat_interleave(num_agents), \
-              torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat(num_particles), \
+        choicemask[torch.linspace(0, num_particles-1,num_particles, dtype = int).repeat_interleave(num_agents),
+              torch.linspace(0, num_agents-1,num_agents, dtype = int).repeat(num_particles),
               choices_noerrors.repeat(num_particles)] = 1
         
-        mask = errormask*choicemask
-        return Qout.double()*mask, mask
+        mask = no_error_mask*choicemask
+        
+
+        return Qin*mask, mask
     
     def softmax(self, z):
         sm = torch.nn.Softmax(dim=-1)
@@ -164,45 +213,68 @@ class Vbm():
         return p_actions
 
     def find_resp_options(self, stimulus_mat):
+        '''
+        
+
+        Parameters
+        ----------
+        stimulus_mat : torch tensor with shape [num_agents]
+            DESCRIPTION.
+
+        Returns
+        -------
+        option1_python : tensor with shape [num_agents]
+            DESCRIPTION.
+        option2_python : tensor with shape [num_agents]
+            DESCRIPTION.
+
+        '''
+        
         """
         Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
         options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
         INPUT: stimulus in MATLAB notation (1-indexed) (simple list of stimuli)
         OUTPUT: response options in python notation (0-indexed)
         """
-        option2_python = ((torch.tensor(stimulus_mat) % 10) - 1).type(torch.int)
-        option1_python = (((torch.tensor(stimulus_mat) - (torch.tensor(stimulus_mat) % 10)) / 10) -1).type(torch.int)
+        #assert(torch.is_tensor(stimulus_mat))
+        option2_python = ((stimulus_mat % 10) - 1).type(torch.int)
+        option1_python = (((stimulus_mat - (stimulus_mat % 10)) / 10) -1).type(torch.int)
         
         if option2_python.ndim == 2 and option2_python.shape[0] == 1:
             option1_python = torch.squeeze(option1_python)
             option2_python = torch.squeeze(option2_python)
             
+        #assert(option1_python.ndim == 1)
+        #assert(option2_python.ndim == 1)
         return option1_python, option2_python
 
     def choose_action(self, trial, day):
-        "INPUT: trial (in 1-indexing (i.e. MATLAB notation))"
+        "INPUT: trial (torch tensor) (in 1-indexing (i.e. MATLAB notation))"
         "OUTPUT: choice response digit (in 0-indexing notation)"
         
         if trial < 10:
             "Single-target trial"
-            choice_python = torch.tensor(trial-1)
+            choice_python = trial-1
         
         elif trial > 10:
             # torch.manual_seed(123)
             
             "Dual-target trial"
-            option1, option2 = self.find_resp_options([trial])
+            #assert(torch.is_tensor(trial) and trial.ndim==1)
+            option1, option2 = self.find_resp_options(trial)
             
             # shape of softmax argument should be (n_particles, n_subjects, 2)
             # p_actions = self.softmax(torch.cat((self.V[-1][..., option1], self.V[-1][..., option2]), dim = -1))
             # p_actions comes out as shape [1, 1, 2]
             # choice_sample = torch.multinomial(torch.squeeze(p_actions), 1)[0]
             
-            choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()
+            "[0, :] to choose 0th particle, since choose_action() will only ever be called with 0 particles"
+            choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()[0, :]
 
             choice_python = option2*choice_sample + option1*(1-choice_sample)
             
         "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
+        #assert(choice_python.ndim==1)
         return torch.squeeze(choice_python).type('torch.LongTensor')
 
     def update(self, choices, outcomes, blocktype, **kwargs):
@@ -229,19 +301,10 @@ class Vbm():
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.lr.shape[0], self.lr.shape[1], self.NA)/self.NA)
             self.Q.append(self.Q[-1])
-                        
-            # V0 = (1-self.omega)*self.rep[-1][..., 0] + self.omega*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
-            # V1 = (1-self.omega)*self.rep[-1][..., 1] + self.omega*self.Q[-1][..., 1]
-            # V2 = (1-self.omega)*self.rep[-1][..., 2] + self.omega*self.Q[-1][..., 2]
-            # V3 = (1-self.omega)*self.rep[-1][..., 3] + self.omega*self.Q[-1][..., 3]
-            # self.V.append(torch.stack((V0,V1,V2,V3), 2))
             
             self.V.append((1-self.omega)[..., None]*self.rep[-1] + self.omega[..., None]*self.Q[-1])
             
-            # self.V.append((1-self.omega).T*self.rep[-1][0,...] + self.omeg.T*self.Q[-1][0, ...])
-            # dfgh
         else:
-            
             "----- Update GD-values -----"
             Qout, mask = self.Qoutcomp(self.Q[-1], choices)
             Qnew = self.Q[-1] + self.lr[..., None]*(outcomes[None,...,None]-Qout)*mask
@@ -249,46 +312,91 @@ class Vbm():
             self.Q.append(Qnew)
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            repnew = []
-            for agent in range(self.num_agents):
-                new_row = [0., 0., 0., 0.]
+            # "Old Code"
+            # repnew = [None]*self.num_agents
+            # for agent in range(self.num_agents):
+            #     new_row = [0., 0., 0., 0.]
 
-                self.seq_counter[agent, 
-                                 blocktype[agent],
-                                self.pppchoice[agent],
-                                self.ppchoice[agent],
-                                self.pchoice[agent],
-                                choices[agent]] += 1
+            #     self.seq_counter[agent,
+            #                     blocktype[agent],
+            #                     self.pppchoice[agent],
+            #                     self.ppchoice[agent],
+            #                     self.pchoice[agent],
+            #                     choices[agent]] += 1
             
-                " Update rep values "
-                index = (agent, 
-                         blocktype[agent], 
-                         self.ppchoice[agent],
-                         self.pchoice[agent], 
-                         choices[agent])
+            #     " Update rep values "
+            #     index = (agent, 
+            #               blocktype[agent], 
+            #               self.ppchoice[agent],
+            #               self.pchoice[agent], 
+            #               choices[agent])
 
-                seqs_sum =  self.seq_counter[index + (0,)] + \
-                            self.seq_counter[index + (1,)] + \
-                            self.seq_counter[index + (2,)] + \
-                            self.seq_counter[index + (3,)]
+            #     seqs_sum =  self.seq_counter[index + (0,)] + \
+            #                 self.seq_counter[index + (1,)] + \
+            #                 self.seq_counter[index + (2,)] + \
+            #                 self.seq_counter[index + (3,)]
+                                            
+            #     new_row = [self.seq_counter[index + (action,)] / seqs_sum for action in range(4)] 
+                
+            #     repnew[agent]=new_row
+            
+            # self.rep.append(torch.tensor(repnew).broadcast_to(self.num_particles , self.num_agents, 4))
+            # #print("Executed B in %.6f secs"%(time.time()-start))
+            
+            # seq_counter_new = self.seq_counter.clone().detach()
+            
+            # "New Code"
+            # repnew = [None]*self.num_agents
+            # for agent in range(self.num_agents):
+            #     new_row = [0., 0., 0., 0.]
 
-                new_row = [self.seq_counter[index + (action,)] / seqs_sum for action in range(4)] 
+            #     self.seq_counter[agent,
+            #                     blocktype[agent],
+            #                     self.pppchoice[agent],
+            #                     self.ppchoice[agent],
+            #                     self.pchoice[agent],
+            #                     choices[agent]] += 1
+
+            #     seqs_sum = self.seq_counter[agent, blocktype[agent], 
+            #               self.ppchoice[agent], self.pchoice[agent], 
+            #               choices[agent], 0:4].sum()
+                
+            #     new_row = (self.seq_counter[agent, blocktype[agent], 
+            #               self.ppchoice[agent], self.pchoice[agent], 
+            #               choices[agent], 0:4] /seqs_sum).tolist()
+            #     repnew[agent] = new_row
+                
+            # old = torch.tensor(repnew).broadcast_to(self.num_particles , self.num_agents, 4)
+            # self.rep.append(old)
+            # #print("Executed B in %.6f secs"%(time.time()-start))
             
-                repnew.append(new_row)
+            "Even newer code"
+            " Update rep values "
+            self.seq_counter[torch.arange(self.num_agents),
+                            blocktype,
+                            self.pppchoice,
+                            self.ppchoice,
+                            self.pchoice,
+                            choices] += 1
+        
+            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        self.ppchoice, 
+                                        self.pchoice, 
+                                        choices, 
+                                        0:4].sum(axis=-1)
             
-            self.rep.append(torch.tensor(repnew)[None, :].broadcast_to(self.num_particles , self.num_agents, 4))
-            
+            new_rows = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        self.ppchoice, 
+                                        self.pchoice, 
+                                        choices, 
+                                        0:4] / seqs_sum[...,None]
+
+            self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             "----- Compute new V-values for next trial -----"
-            # V0 = (1-self.omega)*self.rep[-1][..., 0] + self.omega*self.Q[-1][..., 0] # V-Values for actions (i.e. weighted action values)
-            # V1 = (1-self.omega)*self.rep[-1][..., 1] + self.omega*self.Q[-1][..., 1]
-            # V2 = (1-self.omega)*self.rep[-1][..., 2] + self.omega*self.Q[-1][..., 2]
-            # V3 = (1-self.omega)*self.rep[-1][..., 3] + self.omega*self.Q[-1][..., 3]
-            # self.V.append(torch.stack((V0,V1,V2,V3), 2))
             
             self.V.append((1-self.omega)[..., None]*self.rep[-1] + self.omega[..., None]*self.Q[-1])
-            
-            # self.V.append((1-self.omega).T*self.rep[-1][0,...] + self.omeg.T*self.Q[-1][0, ...])
-            # dfgh
             
             if len(self.Q) > 10:
                 "Free up some memory space"
@@ -301,7 +409,7 @@ class Vbm():
             self.pppchoice = self.ppchoice
             self.ppchoice = self.pchoice
             self.pchoice = choices
-    
+            
     def reset(self, locs):
         par_dict = self.locs_to_pars(locs)
                 
@@ -339,7 +447,7 @@ class Vbm():
         "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
         self.init_seq_counter = self.k / 4 * np.ones((self.num_agents, 2, 6, 6, 6, 6))
         
-        self.seq_counter = self.init_seq_counter.clone()
+        self.seq_counter = self.init_seq_counter.clone().detach()
         
         
 class Vbm_B(Vbm):
@@ -362,15 +470,15 @@ class Vbm_B(Vbm):
         Q_init : (list of floats) initial Q-Values
         """
         
-        # assert(lr_day1.ndim == 2)
-        # assert(theta_Q_day1.ndim == 2)
-        # assert(theta_rep_day1.ndim == 2)
+        # #assert(lr_day1.ndim == 2)
+        # #assert(theta_Q_day1.ndim == 2)
+        # #assert(theta_rep_day1.ndim == 2)
         
-        # assert(lr_day2.ndim == 2)
-        # assert(theta_Q_day2.ndim == 2)
-        # assert(theta_rep_day2.ndim == 2)
+        # #assert(lr_day2.ndim == 2)
+        # #assert(theta_Q_day2.ndim == 2)
+        # #assert(theta_rep_day2.ndim == 2)
         
-        # assert(Q_init.ndim == 3)
+        # #assert(Q_init.ndim == 3)
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
@@ -427,7 +535,7 @@ class Vbm_B(Vbm):
         "Dimensions are [agent, blocktypes, pppchoice, ppchoice, pchoice, choice]"
         self.init_seq_counter = self.k / 4 * np.ones((self.num_agents, 2, 6, 6, 6, 6))
         
-        self.seq_counter = self.init_seq_counter.clone()
+        self.seq_counter = self.init_seq_counter.clone().detach()
     
     def locs_to_pars(self, locs):
         par_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
@@ -472,10 +580,10 @@ class Vbm_B(Vbm):
         None.
 
         '''
-        # # assert(torch.is_tensor(choices))
-        # # assert(torch.is_tensor(outcomes))
-        # # assert(torch.is_tensor(blocktype))
-        # assert(isinstance(day, int))
+        # # #assert(torch.is_tensor(choices))
+        # # #assert(torch.is_tensor(outcomes))
+        # # #assert(torch.is_tensor(blocktype))
+        # #assert(isinstance(day, int))
 
         if day == 1:
             lr = self.lr_day1
@@ -617,4 +725,4 @@ class Vbm_B(Vbm):
         "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
         self.init_seq_counter = self.k / 4 * np.ones((self.num_agents, 2, 6, 6, 6, 6))
         
-        self.seq_counter = self.init_seq_counter.clone()
+        self.seq_counter = self.init_seq_counter.clone().detach()

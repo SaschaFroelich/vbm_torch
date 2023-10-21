@@ -60,7 +60,6 @@ seq_counter, jrepnew = v_update_habitual(seq_counter,
 
 
 #%%
-
 "Test simplification of V computation"
 
 num_particles = 1
@@ -82,3 +81,37 @@ Vnew = [(theta_rep_day1[..., None]*rep[-1] + theta_Q_day1[..., None]*Q[-1])]
 
 assert(Vold[-1].shape==Vnew[-1].shape)
 assert(torch.all(Vold[-1]==Vnew[-1]))
+
+#%%
+import models_torch as models
+import numpy
+"Test the new Qoutcomp"
+num_agents = 5
+num_particles = 3
+npar = 3
+
+Qin = torch.rand(num_particles, num_agents, 4)
+choices = torch.tensor(numpy.random.choice([-2,0,1,2,3], size=num_agents))
+
+parameter = numpy.random.uniform(0,1, npar)
+omega = parameter[1]
+dectemp = (parameter[2]+1)*3
+lr = parameter[0]*0.1
+
+Q_init = [0.2, 0., 0., 0.2]
+agent = models.Vbm(omega = torch.tensor([[omega]]),
+                      dectemp = torch.tensor([[dectemp]]),
+                      lr = torch.tensor([[lr]]),
+                      k=torch.tensor([4.]),
+                      Q_init=torch.tensor([[Q_init]]))
+
+Qout, mask = agent.Qoutcomp(Qin, choices)
+
+print("Qin:\n")
+print(Qin)
+print("Choices:\n")
+print(choices)
+print("Qout:\n")
+print(Qout)
+print("mask:\n")
+print(mask)

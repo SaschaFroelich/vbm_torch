@@ -166,8 +166,8 @@ class Env():
         t_day1 = -1
         t_day2 = -1
         for tau in range(len(self.data["trialsequence"])):
-            trial = self.data["trialsequence"][tau][0]
-            blocktype = self.data["blocktype"][tau][0]
+            trial = torch.tensor(self.data["trialsequence"][tau])
+            blocktype = torch.tensor(self.data["blocktype"][tau])
                       
             if self.data["blockidx"][tau][0] <= 5:
                 day = 1
@@ -214,8 +214,8 @@ class Env():
                         t_day1 += 1
                     self.agent.update(torch.tensor([current_choice]), 
                                       torch.tensor([outcome]), 
-                                      [blocktype], 
-                                      day=day, 
+                                      blocktype, 
+                                      day = day, 
                                       trialstimulus = trial, 
                                       t = t_day1, 
                                       exp_part = exp_part)
@@ -225,8 +225,8 @@ class Env():
                         t_day2 += 1
                     self.agent.update(torch.tensor([current_choice]), 
                                       torch.tensor([outcome]), 
-                                      [blocktype], 
-                                      day=day, 
+                                      blocktype, 
+                                      day = day, 
                                       trialstimulus = trial, 
                                       t = t_day2,
                                       exp_part = exp_part)

@@ -75,7 +75,7 @@ class SingleInference(object):
             #vec_ben = np.round(np.array(self.data["repvals"][tau]),12)
             #vec_agent = np.round(np.array(torch.squeeze(self.agent.rep[-1])),12)
             
-            #np.testing.assert_allclose(vec_ben, vec_agent, rtol=1e-5)
+            #np.testing.#assert_allclose(vec_ben, vec_agent, rtol=1e-5)
             
             if self.data["Blockidx"][tau] <= 5:
                 day = 1
@@ -109,6 +109,7 @@ class SingleInference(object):
             if trial > 10:
                 "Dual-Target Trial"
                 t+=1
+                #assert(isinstance(trial, list))
                 option1, option2 = self.agent.find_resp_options(trial)
                 
                 # Comes out as [1, n_actions] or [n_particles, n_actions]probs
@@ -383,6 +384,7 @@ class SingleInference_modelB(object):
             if trial > 10:
                 "Dual-Target Trial"
                 t+=1
+                #assert(isinstance(trial, list))
                 option1, option2 = self.agent.find_resp_options(trial)
                 
                 # Comes out as [1, n_actions] or [n_particles, n_actions]
@@ -695,6 +697,7 @@ class SingleInference_modelB_2(object):
             if trial > 10:
                 "Dual-Target Trial"
                 t+=1
+                #assert(isinstance(trial, list))
                 option1, option2 = self.agent.find_resp_options(trial)
 
                 probs = self.agent.softmax(torch.cat(([self.agent.V[-1][:, option1][:, None], self.agent.V[-1][:, option2][:, None]]), dim=-1))
@@ -1016,6 +1019,7 @@ class SingleInference_modelB_3(object):
             if trial > 10:
                 "Dual-Target Trial"
                 t+=1
+                #assert(isinstance(trial, list))
                 option1, option2 = self.agent.find_resp_options(trial)
 
                 probs = self.agent.softmax(torch.cat(([self.agent.V[-1][:, option1][:, None], self.agent.V[-1][:, option2][:, None]]), dim=-1))
@@ -1316,7 +1320,7 @@ class SingleInference_modelF(object):
                     
                 elif day == 2:
                     t_day2 += 1
-                    
+                #assert(isinstance(trial, list))
                 option1, option2 = self.agent.find_resp_options(trial)
                 
                 # Comes out as [1, n_actions] or [n_particles, n_actions]
@@ -1551,7 +1555,7 @@ class GroupInference(object):
             "K: Gamma distribution"
             k=torch.tensor([4.])
             
-            assert(lr.ndim == 1 or lr.ndim == 2)
+            #assert(lr.ndim == 1 or lr.ndim == 2)
             
             if lr.ndim == 2:
                 n_particles = lr.shape[0]
@@ -1593,6 +1597,7 @@ class GroupInference(object):
                     if trial > 10:
                         "Dual-Target Trial"
                         t+=1
+                        #assert(isinstance(trial, list))
                         option1, option2 = self.agents[pb].find_resp_options(trial)
                         
                         # probs should have shape [n_particles, n_subjects, nactions], or [n_subjects, nactions]
@@ -1871,6 +1876,7 @@ class GroupInference_modelB(object):
                     if trial > 10:
                         "Dual-Target Trial"
                         t+=1
+                        #assert(isinstance(trial, list))
                         option1, option2 = self.agents[pb].find_resp_options(trial)
                         
                         # probs should have shape [n_particles, n_subjects, nactions], or [n_subjects, nactions]
@@ -2116,8 +2122,8 @@ class GeneralGroupInference(object):
                 # obs_mask = torch.ones(self.n_subjects, dtype=torch.bool)
                 
                 # start_time = time.time()
-                trial = self.data["Trialsequence"][tau]
-                blocktype = self.data["Blocktype"][tau]
+                trial = torch.tensor(self.data["Trialsequence"][tau])
+                blocktype = torch.tensor(self.data["Blocktype"][tau])
                 
                 if all([self.data["Blockidx"][tau][i] <= 5 for i in range(self.n_subjects)]):
                     day = 1
@@ -2133,8 +2139,8 @@ class GeneralGroupInference(object):
                     self.agent.update(torch.tensor([-1]), 
                                       torch.tensor([-1]), 
                                       torch.tensor([-1]), 
-                                      day=day, 
-                                      trialstimulus=trial)
+                                      day = day, 
+                                      trialstimulus = trial)
                     
                 else:
                     current_choice = self.data["Choices"][tau]
@@ -2143,6 +2149,7 @@ class GeneralGroupInference(object):
                 if all([trial[i] > 10 for i in range(self.n_subjects)]):
                     "Dual-Target Trial"
                     t+=1
+                    #assert(torch.is_tensor(trial))
                     option1, option2 = self.agent.find_resp_options(trial)
                     # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
                     # probs should have shape [n_particles, n_subjects, nactions], or [n_subjects, nactions]
@@ -2156,6 +2163,7 @@ class GeneralGroupInference(object):
                     
                     # probs = self.agent.softmax(torch.stack((Vopt1, Vopt2), 2))
                     "==========================================="
+                    #assert(trial.ndim==1)
                     probs = self.agent.compute_probs(trial, day)
                     # print(probs)
                     "==========================================="

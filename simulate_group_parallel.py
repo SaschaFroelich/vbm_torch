@@ -44,7 +44,7 @@ plt.style.use("classic")
 model = 'original'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 20
+num_agents = 5
 k = 4.
 print(f"Running model {model}")
 
