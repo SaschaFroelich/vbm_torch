@@ -57,8 +57,6 @@ class GeneralGroupInference(object):
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
-        import time
-        start = time.time()
         with pyro.plate('subject', self.num_agents) as ind:
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_parameters]).to_event(1)
@@ -74,6 +72,8 @@ class GeneralGroupInference(object):
             num_particles = locs.shape[0]
             print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
             t = -1
+            # probs_all = []
+            # obs_all = []
             for tau in pyro.markov(range(self.trials)):
     
                 trial = torch.tensor(self.data["Trialsequence"][tau])
@@ -88,7 +88,7 @@ class GeneralGroupInference(object):
                 else:
                     raise Exception("Da isch a Fehla!")
                 
-                if all([trial[i] == -1 for i in range(self.num_agents)]):
+                if all(trial == -1):
                     "Beginning of new block"
                     self.agent.update(torch.tensor([-1]), 
                                       torch.tensor([-1]), 
@@ -100,39 +100,41 @@ class GeneralGroupInference(object):
                     current_choice = self.data["Choices"][tau]
                     outcome = self.data["Outcomes"][tau]
                 
-                "This be incorrect since participants may see different trials at different times"
-                if all([trial[i] > 10 for i in range(self.num_agents)]):
-                    "Dual-Target Trial"
-                    t+=1
-                    #assert(torch.is_tensor(trial))
-                    option1, option2 = self.agent.find_resp_options(trial)
-                    # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
-                    # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
-                    # RHS comes out as [1, n_actions] or [num_particles, n_actions]
-                    
-                    "==========================================="
-                    probs = self.agent.compute_probs(trial, day)
-                    "==========================================="
-                    
-                    choices = torch.tensor([0 if current_choice[idx] == option1[idx] else 1 for idx in range(len(current_choice))])
-                    obs_mask = torch.tensor([0 if cc == -2 else 1 for cc in current_choice ]).type(torch.bool)
-
-                if all([trial[i] != -1 for i in range(self.num_agents)]):
+                    "This be incorrect since participants may see different trials at different times"
+                    if any(trial > 10):
+                        "Dual-Target Trial"
+                        t+=1
+                        option1, option2 = self.agent.find_resp_options(trial)
+                        # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
+                        # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
+                        # RHS comes out as [1, n_actions] or [num_particles, n_actions]
+                        
+                        "==========================================="
+                        probs = self.agent.compute_probs(trial, day)
+                        "==========================================="
+                        
+                        # choices = torch.tensor([0 if current_choice[idx] == option1[idx] else 1 for idx in range(len(current_choice))])
+                        # obs_mask = torch.tensor([0 if cc == -2 else 1 for cc in current_choice ]).type(torch.bool)
+                        
+                        choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, self.num_agents)
+                        
+                        # choices_all.append(choices)
+                        # probs_all.append(probs)
+                        
+                        "Do I even use this?"
+                        obs_mask = current_choice != -2
+    
                     "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
                     self.agent.update(current_choice, 
                                       outcome, 
                                       blocktype, 
-                                      day=day, 
-                                      trialstimulus=trial)
-                    
-                "Sample if dual-target trial and no error was performed"
-                if all([trial[i] > 10 for i in range(self.num_agents)]):
-                    pyro.sample('res_{}'.format(t), 
-                                dist.Categorical(probs=probs),
-                                obs = choices.broadcast_to(num_particles, self.num_agents))
-
-            print("Executed aft %.4f seconds"%(time.time()-start))
-
+                                      day = day, 
+                                      trialstimulus = trial)
+    
+                    if any(trial > 10):
+                        pyro.sample('res_{}'.format(t), 
+                                    dist.Categorical(probs = probs),
+                                    obs = choices)
 
     def guide(self):
         trns = torch.distributions.biject_to(dist.constraints.positive)

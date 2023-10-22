@@ -90,8 +90,9 @@ class Vbm():
 
         Returns
         -------
-        probs : TYPE
-            DESCRIPTION.
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
 
         '''
         
@@ -179,7 +180,8 @@ class Vbm():
 
     def find_resp_options(self, stimulus_mat):
         '''
-        
+        Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
 
         Parameters
         ----------
@@ -189,18 +191,15 @@ class Vbm():
         Returns
         -------
         option1_python : tensor with shape [num_agents]
-            DESCRIPTION.
+            -1 in case of single-target trial.
+            Otherwise option 1 of dual-target trial. 0-indexed.
+        
         option2_python : tensor with shape [num_agents]
-            DESCRIPTION.
+            -1 in case of single-target trial.
+            Otherwise option 1 of dual-target trial. 0-indexed.
 
         '''
         
-        """
-        Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
-        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
-        INPUT: stimulus in MATLAB notation (1-indexed) (simple list of stimuli)
-        OUTPUT: response options in python notation (0-indexed)
-        """
         #assert(torch.is_tensor(stimulus_mat))
         option2_python = ((stimulus_mat % 10) - 1).type(torch.int)
         option1_python = (((stimulus_mat - (stimulus_mat % 10)) / 10) -1).type(torch.int)
