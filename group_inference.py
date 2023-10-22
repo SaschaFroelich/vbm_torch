@@ -89,7 +89,7 @@ def guide_single(obs_tosses1, obs_tosses2, repetitions):
 # model shape taken from pybefit: https://github.com/dimarkov/pybefit
 # this model uses Gaussian Normal distributions whose output is then mapped onto the relvant interval.
 # we will look into why this is defined as it is in one of the presentations
-def model_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
+def model_group(obs_tosses1, obs_tosses2, repetitions, num_agents):
 
     npar = 2  # number of parameters: p1 and p2
 
@@ -110,8 +110,8 @@ def model_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
     # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
     # you embed what should be done for each subject into the "with pyro.plate" context
     # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
-    # i.e. p1 below will have the length n_subjects
-    with pyro.plate('subject', n_subjects) as ind:
+    # i.e. p1 below will have the length num_agents
+    with pyro.plate('subject', num_agents) as ind:
 
         # draw parameters from Normal and transform (for numeric trick reasons)
         base_dist = dist.Normal(0., 1.).expand_by([npar]).to_event(1)
@@ -122,7 +122,7 @@ def model_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
         # here to between 0 and 1 using a sigmoid
         # Is this where my agent would come in?
         
-        # Shape for inference: [n_subjects] or [n_par, n_subj]
+        # Shape for inference: [num_agents] or [n_par, n_subj]
         p1 = torch.sigmoid(locs[...,0])
         p2 = torch.sigmoid(locs[...,1])
 
@@ -133,8 +133,8 @@ def model_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
             #print("===================================0")
             #print(obs_tosses1[t].shape)
             #print(p1.shape)
-            # obs shape for inference: [n_subjects] 
-            # p1 shape for inference: [n_subjects] or [n_part, n_subjects]
+            # obs shape for inference: [num_agents] 
+            # p1 shape for inference: [num_agents] or [n_part, num_agents]
             coin_toss1 = pyro.sample('toss1_{}'.format(t), dist.Bernoulli(probs=p1), obs=obs_tosses1[t])
             coin_toss2 = pyro.sample('toss2_{}'.format(t), dist.Bernoulli(probs=p2), obs=obs_tosses2[t])
 
@@ -143,7 +143,7 @@ def model_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
 # this guide uses Gaussian Normal distributions whose output is then mapped onto the relvant interval.
 # the guide (contrary to the model) is a multivariate normal and allows for correlations between the parameters
 # we will look into why this is defined as it is in one of the presentations
-def guide_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
+def guide_group(obs_tosses1, obs_tosses2, repetitions, num_agents):
 
     # number of parameters: 2, p1 and p2
     npar = 2
@@ -172,12 +172,12 @@ def guide_group(obs_tosses1, obs_tosses2, repetitions, n_subjects):
     mu = pyro.sample("mu", dist.Delta(unc_mu, event_dim=1))
     tau = pyro.sample("tau", dist.Delta(c_tau, log_density=ld_tau, event_dim=1))
 
-    m_locs = pyro.param('m_locs', torch.zeros(n_subjects, npar))
+    m_locs = pyro.param('m_locs', torch.zeros(num_agents, npar))
     st_locs = pyro.param('scale_tril_locs',
-                    torch.eye(npar).repeat(n_subjects, 1, 1),
+                    torch.eye(npar).repeat(num_agents, 1, 1),
                     constraint=dist.constraints.lower_cholesky)
 
-    with pyro.plate('subject', n_subjects):
+    with pyro.plate('subject', num_agents):
         # sample unconstrained parameters from multivariate normal
         locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
@@ -229,11 +229,11 @@ def run_svi(iter_steps, model, guide, *fn_args, optim_kwargs={'lr': .01},
     plt.show()
 
 # samples results
-def sample_posterior(n_subjects, guide, *fn_args, n_samples=1000):
+def sample_posterior(num_agents, guide, *fn_args, n_samples=1000):
     # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
-    p1_global = np.zeros((n_samples, n_subjects))
-    p2_global = np.zeros((n_samples, n_subjects))
+    p1_global = np.zeros((n_samples, num_agents))
+    p2_global = np.zeros((n_samples, num_agents))
 
     # sample p1 and p2 from guide (the posterior over ps). 
     # Calling the guide yields samples from the posterior after SVI has run.
@@ -248,10 +248,10 @@ def sample_posterior(n_subjects, guide, *fn_args, n_samples=1000):
         p2_global[i] = p2.detach().numpy()
 
     # do some data formatting steps
-    p1_flat = np.array([p1_global[i,n] for i in range(n_samples) for n in range(n_subjects)])
-    p2_flat = np.array([p2_global[i,n] for i in range(n_samples) for n in range(n_subjects)])
+    p1_flat = np.array([p1_global[i,n] for i in range(n_samples) for n in range(num_agents)])
+    p2_flat = np.array([p2_global[i,n] for i in range(n_samples) for n in range(num_agents)])
 
-    subs_flat = np.array([n for i in range(n_samples) for n in range(n_subjects)])
+    subs_flat = np.array([n for i in range(n_samples) for n in range(num_agents)])
 
 
     sample_dict = {"p1": p1_flat, "p2": p2_flat, "subject": subs_flat}
@@ -267,21 +267,21 @@ now follows the part where things are actually called and ran
 """
 
 # now we can set more subjects, e.g. 3
-n_subjects = 3
+num_agents = 3
 # they have each 2 coins which they repeatedly toss
 repetitions = 30
 
 # for better visual inspeciton of the results are the probs fixed.
-probs1 = torch.tensor([0.2, 0.5, 0.8]).repeat(repetitions,1) #torch.rand(n_subjects).repeat(repetitions,1)
+probs1 = torch.tensor([0.2, 0.5, 0.8]).repeat(repetitions,1) #torch.rand(num_agents).repeat(repetitions,1)
 print("subject prob1s for coin 1:", probs1[0])
-probs2 = torch.tensor([0.1, 0.7, 0.4]).repeat(repetitions,1) #torch.rand(n_subjects).repeat(repetitions,1)
+probs2 = torch.tensor([0.1, 0.7, 0.4]).repeat(repetitions,1) #torch.rand(num_agents).repeat(repetitions,1)
 print("subject prob2s for coin 2:", probs2[0])
 
 # simulate coin tosses
 obs_tosses1, obs_tosses2 = simulation(probs1, probs2, repetitions)
 
 # set model and guide function arguments
-fn_args = [obs_tosses1, obs_tosses2, repetitions, n_subjects]
+fn_args = [obs_tosses1, obs_tosses2, repetitions, num_agents]
 
 # number of inference steps
 iter_steps = 500
@@ -291,7 +291,7 @@ run_svi(iter_steps, model_group, guide_group, *fn_args)
 
 # sample from posterior
 num_samples = 500
-sample_df = sample_posterior(n_subjects, guide_group, *fn_args, n_samples=num_samples)
+sample_df = sample_posterior(num_agents, guide_group, *fn_args, n_samples=num_samples)
 
 # plot the probs of coin 1 for each subject
 plt.figure()

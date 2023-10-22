@@ -14,7 +14,7 @@ device = torch.device("cpu")
 
 class GeneralGroupInference(object):
 
-    def __init__(self, agent, n_subjects, group_data):
+    def __init__(self, agent, num_agents, group_data):
         """
         Group inference for original model
         
@@ -23,7 +23,7 @@ class GeneralGroupInference(object):
         """
         self.agent = agent
         self.trials = agent.trials # length of experiment
-        self.n_subjects = n_subjects # no. of participants
+        self.num_agents = num_agents # no. of participants
         self.data = group_data # list of dictionaries
         self.n_parameters = len(self.agent.param_names) # number of parameters
         self.loss = []
@@ -46,14 +46,14 @@ class GeneralGroupInference(object):
         # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
-        with pyro.plate('subject', self.n_subjects) as ind:
+        with pyro.plate('subject', self.num_agents) as ind:
 
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.n_parameters]).to_event(1)
             transform = dist.transforms.AffineTransform(mu, sig)
             locs = pyro.sample('locs', dist.TransformedDistribution(base_dist, [transform]))
     
-            "locs is either of shape [n_participants, n_parameters] or of shape [n_particles, n_participants, n_parameters]"
+            "locs is either of shape [num_agents, n_parameters] or of shape [n_particles, num_agents, n_parameters]"
             if locs.ndim == 2:
                 locs = locs[None, :]
                 
@@ -67,16 +67,16 @@ class GeneralGroupInference(object):
                 trial = self.data["Trialsequence"][tau]
                 blocktype = self.data["Blocktype"][tau]
                 
-                if all([self.data["Blockidx"][tau][i] <= 5 for i in range(self.n_subjects)]):
+                if all([self.data["Blockidx"][tau][i] <= 5 for i in range(self.num_agents)]):
                     day = 1
                     
-                elif all([self.data["Blockidx"][tau][i] > 5 for i in range(self.n_subjects)]):
+                elif all([self.data["Blockidx"][tau][i] > 5 for i in range(self.num_agents)]):
                     day = 2
                     
                 else:
                     raise Exception("Da isch a Fehla!")
                 
-                if all([trial[i] == -1 for i in range(self.n_subjects)]):
+                if all([trial[i] == -1 for i in range(self.num_agents)]):
                     "Beginning of new block"
                     self.agent.update(torch.tensor([-1]), torch.tensor([-1]), torch.tensor([-1]), day=day, trialstimulus=trial)
                     
@@ -84,7 +84,7 @@ class GeneralGroupInference(object):
                     current_choice = self.data["Choices"][tau]
                     outcome = self.data["Outcomes"][tau]
                 
-                if all([trial[i] > 10 for i in range(self.n_subjects)]):
+                if all([trial[i] > 10 for i in range(self.num_agents)]):
                     "Dual-Target Trial"
                     t+=1
                     option1, option2 = self.agent.find_resp_options(trial)
@@ -94,15 +94,15 @@ class GeneralGroupInference(object):
                     choices = torch.tensor([0 if current_choice[idx] == option1[idx] else 1 for idx in range(len(current_choice))])
                     obs_mask = torch.tensor([0 if cc == -10 else 1 for cc in current_choice ]).type(torch.bool)
 
-                if all([trial[i] != -1 for i in range(self.n_subjects)]):
+                if all([trial[i] != -1 for i in range(self.num_agents)]):
                     "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
                     self.agent.update(current_choice, outcome, blocktype, day=day, trialstimulus=trial)
 
                 "Sample if dual-target trial and no error was performed"
-                if all([trial[i] > 10 for i in range(self.n_subjects)]):
+                if all([trial[i] > 10 for i in range(self.num_agents)]):
                     pyro.sample('res_{}'.format(t), dist.Categorical(probs=probs), \
-                                obs = choices.broadcast_to(n_particles, self.n_subjects), \
-                                obs_mask = obs_mask.broadcast_to(n_particles, self.n_subjects))
+                                obs = choices.broadcast_to(n_particles, self.num_agents), \
+                                obs_mask = obs_mask.broadcast_to(n_particles, self.num_agents))
 
     def guide(self):
         trns = torch.distributions.biject_to(dist.constraints.positive)
@@ -130,12 +130,12 @@ class GeneralGroupInference(object):
         mu = pyro.sample("mu", dist.Delta(unc_mu, event_dim=1))
         tau = pyro.sample("tau", dist.Delta(c_tau, log_density=ld_tau, event_dim=1))
 
-        m_locs = pyro.param('m_locs', torch.zeros(self.n_subjects, self.n_parameters))
+        m_locs = pyro.param('m_locs', torch.zeros(self.num_agents, self.n_parameters))
         st_locs = pyro.param('scale_tril_locs',
-                        torch.eye(self.n_parameters).repeat(self.n_subjects, 1, 1),
+                        torch.eye(self.n_parameters).repeat(self.num_agents, 1, 1),
                         constraint=dist.constraints.lower_cholesky)
 
-        with pyro.plate('subject', self.n_subjects):
+        with pyro.plate('subject', self.num_agents):
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
         return {'tau': tau, 'mu': mu, 'locs': locs}

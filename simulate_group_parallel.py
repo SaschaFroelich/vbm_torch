@@ -41,7 +41,7 @@ plt.style.use("classic")
 # method = sys.argv[3] # "svi" or "mcmc"
 # num_agents = 50
 
-model = 'original'
+model = 'B'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 5
@@ -232,7 +232,7 @@ elif model == 'testmodel':
 print("===== Starting inference =====")
 infer = inferencemodels.GeneralGroupInference(agent, num_agents, newgroupdata)
 # loss, params = infer.infer_posterior(iter_steps=100, num_particles = 10)
-infer.infer_posterior(iter_steps=25, num_particles = 10)
+infer.infer_posterior(iter_steps=2500, num_particles = 10)
 inference_df = infer.sample_posterior()
 # pickle.dump( (lr_day1_true, \
 #               theta_Q_day1_true, \

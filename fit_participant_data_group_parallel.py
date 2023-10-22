@@ -50,7 +50,7 @@ else:
         
 if model == 'B':
     npar = 6 # num of particles
-    n_subjects = 36
+    num_agents = 36
     
     groupdata = []
     Q_init = []
@@ -75,7 +75,7 @@ if model == 'B':
             elif group == 2 or group == 3:
                 Q_init.append([0., 0.2, 0.2, 0.])
 
-    parameter = np.random.uniform(0,1, (n_subjects, npar))
+    parameter = np.random.uniform(0,1, (num_agents, npar))
     lr_day1 = parameter[:, 0][None, :]*0.1
     theta_Q_day1 = parameter[:, 1][None, :]*6
     theta_rep_day1 = parameter[:, 2][None, :]*6
@@ -94,7 +94,7 @@ if model == 'B':
                           Q_init = torch.tensor([Q_init]))
                 
     newgroupdata = utils.comp_groupdata(groupdata)
-    infer = inferencemodels.GeneralGroupInference(newagent,  n_subjects, newgroupdata)
+    infer = inferencemodels.GeneralGroupInference(newagent,  num_agents, newgroupdata)
     loss, params = infer.infer_posterior(iter_steps=1_000, num_particles = 10)
     inference_df = infer.sample_posterior()
     pickle.dump( inference_df, open(f"behav_fit/groupinference/model{model}/k_{k}/group_inference.p", "wb" ) )
