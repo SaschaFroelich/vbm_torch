@@ -18,7 +18,6 @@ import matplotlib.pylab as plt
 import seaborn as sns
 import torch
 
-import numpy
 import scipy
 
 import models_torch as models
@@ -41,225 +40,105 @@ plt.style.use("classic")
 # method = sys.argv[3] # "svi" or "mcmc"
 # num_agents = 50
 
-model = 'B'
+model = 'original'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 40
-k = 4.
+# k = 4.
 print(f"Running model {model}")
 
 #%%
+'''
+Simulate data
+'''
 
 if resim:
     raise Exception("Not implemented yet, buddy!")
     
-if model == 'original':
-    npar = 3
-    
-    agents = []
-    groupdata = []
-    
-    omega_true = []
-    dectemp_true = []
-    lr_true = []
-
-    Q_init_group = []
-    
-    "Simulate with random parameters"
-    for ag in range(num_agents):
-        print("Simulating agent no. %d"%ag)
-        parameter = numpy.random.uniform(0,1, npar)
-        omega = parameter[1]
-        dectemp = (parameter[2]+1)*3
-        lr = parameter[0]*0.1
-        
-        omega_true.append(omega)
-        dectemp_true.append(dectemp)
-        lr_true.append(lr)
-        
-        Q_init = [0.2, 0., 0., 0.2]
-        Q_init_group.append(Q_init)
-        newagent = models.Vbm(omega = torch.tensor([[omega]]),
-                              dectemp = torch.tensor([[dectemp]]),
-                              lr = torch.tensor([[lr]]),
-                              k=torch.tensor([k]),
-                              Q_init=torch.tensor([[Q_init]]))
-            
-        newenv = env.Env(newagent, 
-                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
-                         matfile_dir = './matlabcode/clipre/')
-        
-        newenv.run()
-        
-        data = {"Choices": newenv.choices, 
-                "Outcomes": newenv.outcomes,
-                "Trialsequence": newenv.data["trialsequence"], 
-                "Blocktype": newenv.data["blocktype"],
-                "Jokertypes": newenv.data["jokertypes"], 
-                "Blockidx": newenv.data["blockidx"]}
-            
-        utils.plot_results(pd.DataFrame(data), group = 0)
-            
-        groupdata.append(data)
-   
-elif model == 'B':
-    npar = 6
-    
-    agents = []
-    groupdata = []
-    
-    lr_day1_true = []
-    theta_Q_day1_true = []
-    theta_rep_day1_true = []
-    
-    lr_day2_true = []
-    theta_Q_day2_true = []
-    theta_rep_day2_true = []
-    
-    Q_init_group = []
-    
-    "Simulate with random parameters"
-    for ag in range(num_agents):
-        print("Simulating agent no. %d"%ag)
-        parameter = numpy.random.uniform(0,1, npar)
-        lr_day1 = parameter[0]*0.1
-        theta_Q_day1 = parameter[1]*6
-        theta_rep_day1 = parameter[2]*6
-        
-        lr_day2 = parameter[0]*0.1
-        theta_Q_day2 = parameter[1]*6
-        theta_rep_day2 = parameter[2]*6
-        
-        lr_day1_true.append(lr_day1)
-        theta_Q_day1_true.append(theta_Q_day1)
-        theta_rep_day1_true.append(theta_rep_day1)
-        
-        lr_day2_true.append(lr_day2)
-        theta_Q_day2_true.append(theta_Q_day2)
-        theta_rep_day2_true.append(theta_rep_day2)
-
-        Q_init = [0.2, 0., 0., 0.2]
-        Q_init_group.append(Q_init)
-        newagent = models.Vbm_B(lr_day1 = torch.tensor([[lr_day1]]),
-                              theta_Q_day1 = torch.tensor([[theta_Q_day1]]),
-                              theta_rep_day1 = torch.tensor([[theta_rep_day1]]),
-                                  
-                              lr_day2 = torch.tensor([[lr_day2]]),
-                              theta_Q_day2 = torch.tensor([[theta_Q_day2]]),
-                              theta_rep_day2 = torch.tensor([[theta_rep_day2]]),
-                              k=torch.tensor([k]),
-                              Q_init=torch.tensor([[Q_init]]))
-            
-        newenv = env.Env(newagent, 
-                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
-                         matfile_dir = './matlabcode/clipre/')
-        
-        newenv.run()
-        
-        data = {"Choices": newenv.choices, 
-                "Outcomes": newenv.outcomes,
-                "Trialsequence": newenv.data["trialsequence"], 
-                "Blocktype": newenv.data["blocktype"],
-                "Jokertypes": newenv.data["jokertypes"], 
-                "Blockidx": newenv.data["blockidx"]}
-            
-        utils.plot_results(pd.DataFrame(data), group = 0)
-            
-        groupdata.append(data)  
-
-elif model == 'testmodel':
-    npar = 2
-    
-    agents = []
-    groupdata = []
-    
-    prob1_true = []
-    prob2_true = []
-    
-    "Simulate with random parameters"
-    for ag in range(num_agents):
-        print("Simulating agent no. %d"%ag)
-        parameter = numpy.random.uniform(0,1, npar)
-        prob1 = parameter[0]
-        prob2 = parameter[1]
-        
-        prob1_true.append(prob1)
-        prob2_true.append(prob2)
-
-        newagent = models.testmodel(prob1 = torch.tensor([[prob1]]), 
-                                    prob2 = torch.tensor([[prob2]]))
-            
-        newenv = env.Env(newagent, 
-                         rewprobs=[0.8, 0.2, 0.2, 0.8], 
-                         matfile_dir = './matlabcode/clipre/')
-        
-        newenv.run()
-        
-        data = {"Choices": newenv.choices, 
-                "Outcomes": newenv.outcomes,
-                "Trialsequence": newenv.data["trialsequence"], 
-                "Blocktype": newenv.data["blocktype"],
-                "Jokertypes": newenv.data["jokertypes"], 
-                "Blockidx": newenv.data["blockidx"]}
-            
-        utils.plot_results(pd.DataFrame(data), group = 0)
-            
-        groupdata.append(data)  
-
+"----- Simulate data"
+Q_init=[0.2, 0., 0., 0.2]
+groupdata, params, params_df = utils.simulate_data(model, num_agents, Q_init = Q_init)
 newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
 
-if model == 'original':
-    agent = models.Vbm(omega = torch.tensor([omega_true]),
-                       dectemp = torch.tensor([dectemp_true]),
-                       lr = torch.tensor([lr_true]),
-                       k = torch.tensor(k),
-                       Q_init = torch.tensor([Q_init_group]))
 
-elif model == 'B':
-    agent = models.Vbm_B(lr_day1 = torch.tensor([lr_day1_true]),
-                          theta_Q_day1 = torch.tensor([theta_Q_day1_true]),
-                          theta_rep_day1 = torch.tensor([theta_rep_day1_true]),
 
-                          lr_day2 = torch.tensor([lr_day2_true]),
-                          theta_Q_day2 = torch.tensor([theta_Q_day2_true]),
-                          theta_rep_day2 = torch.tensor([theta_rep_day2_true]),
-                          k = torch.tensor(k),
-                          Q_init = torch.tensor([Q_init_group]))
-        
-elif model == 'testmodel':
-    agent = models.testmodel(prob1 = torch.tensor([prob1_true]), prob2 = torch.tensor([prob2_true]))
+#%%
+'''
+Inference
+'''
+
+"----- Initialize new agent object with num_agents agents for inference"
+agent = utils.init_agent(model, Q_init, num_agents = num_agents, params = params)
+
+# df_true = pd.DataFrame({'lr_day1_true' : lr_day1_true,
+#                         'theta_Q_day1_true' : theta_Q_day1_true,
+#                         'theta_rep_day1_true' : theta_rep_day1_true,
+                        
+#                         'lr_day2_true' : lr_day2_true,
+#                         'theta_Q_day2_true' : theta_Q_day2_true,
+#                         'theta_rep_day2_true' : theta_rep_day2_true})
+
 
 print("===== Starting inference =====")
+"----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, num_agents, newgroupdata)
-# loss, params = infer.infer_posterior(iter_steps=100, num_particles = 10)
-infer.infer_posterior(iter_steps=2500, num_particles = 10)
+infer.infer_posterior(iter_steps = 12_500, num_particles = 10)
+
+"----- Sample parameter estimates from posterior"
 inference_df = infer.sample_posterior()
-# pickle.dump( (lr_day1_true, \
-#               theta_Q_day1_true, \
-#               theta_rep_day1_true, \
-#               lr_day2_true, \
-#               theta_Q_day2_true, \
-#               theta_rep_day2_true, \
-#               inference_df), open(f"param_recov/groupinference/model{model}/k_{k}/group_inference.p", "wb" ) )
-
-# pickle.dump( loss, open(f"param_recov/groupinference/model{model}/k_{k}/ELBO_group_inference.p", "wb" ) )
-
 df = inference_df.groupby(['subject']).mean()
-#%%
-import numpy as np
-# (lr_day1_true, theta_Q_day1_true, \
-#               theta_rep_day1_true, \
-#               lr_day2_true, \
-#               theta_Q_day2_true, \
-#               theta_rep_day2_true, \
-#               inference_df) = pickle.load( open(f"param_recov/groupinference/model{model}/k_{k}/group_inference.p", "rb" ) )
-    
-# loss = pickle.load( open(f"param_recov/groupinference/model{model}/k_{k}/ELBO_group_inference.p", "rb" ) )
 
-"Plot ELBO"
+"----- Save results to file"
+df_all = pd.concat([df, params_df], axis = 1)
+
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# pickle.dump( infer.loss, open(f"parameter_recovery/loss_{timestamp}.p", "wb" ) )
+pickle.dump( (df_all, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
+
+#%%
+'''
+Analysis
+'''
+
+"----- Open Files"
+import tkinter as tk
+from tkinter import filedialog
+
+def open_files():
+    global filenames
+    filenames = filedialog.askopenfilenames()
+    print(f'File paths: {filenames}')
+    # return filenames
+    root.destroy()
+    
+root = tk.Tk()
+button = tk.Button(root, text="Open Files", command=open_files)
+print(button)
+button.pack()
+root.mainloop()
+# root.destroy()
+
+#%%
+'''
+Plot ELBO and Parameter Estimates
+'''
+df_all, infer.loss, param_names = pickle.load(open( filenames[0], "rb" ))
+
+fig, ax = plt.subplots()
 plt.plot(infer.loss)
+plt.title("ELBO")
+ax.set_xlabel("Number of iterations")
+ax.set_ylabel("ELBO")
 plt.show()
 
+for param in param_names:
+    fig, ax = plt.subplots()
+    sns.scatterplot(x=param + '_true', y=param, data=df_all)
+    plt.plot(df_all[param+'_true'], df_all[param+'_true'])
+    plt.show()
 
-# for par in range(npar):
-# plt.scatter(lr_day1_true, df.iloc[])
+
+#%%
+
+
+

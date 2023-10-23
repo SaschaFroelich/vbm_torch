@@ -442,3 +442,190 @@ def comp_groupdata(groupdata, for_ddm = 1):
             newgroupdata["RT"].append(RT)
         
     return newgroupdata
+
+def init_agent(model, Q_init, num_agents=1, params = None):
+    '''
+    
+    Parameters
+    ----------
+    model : str
+        The model class to simulate data with.
+
+    Q_init : list, len 4
+        Initial Q-Values of the agent.
+
+    num_agents : int
+        Number of agents in a single agent object.
+        The default is 1.
+        
+    params : torch tensor, shape [num_params, num_agents]
+        Parameters to initialize agents with
+        If None, parameters will be set randomly.
+
+
+    Returns
+    -------
+    newagent : obj of class model
+
+    '''
+    
+    import models_torch as models
+    
+    k = 4.
+    if model =='original':
+        num_params = models.Vbm.num_params #number of latent model parameters
+        
+        if params is None:
+            print("Setting random parameters.")
+            params = numpy.random.uniform(0,1, (num_params, num_agents))
+            
+        else:
+            print("Setting initial parameters as provided.")
+            
+        omega = params[0, :][None,...]
+        dectemp = (params[1, :][None,...]+1)*3
+        lr = params[2, :][None,...]*0.01
+        newagent = models.Vbm(omega = torch.tensor(omega),
+                              dectemp = torch.tensor(dectemp),
+                              lr = torch.tensor(lr),
+                              k=torch.tensor([k]),
+                              Q_init=torch.tensor([[Q_init]]))
+        
+        
+    elif model == 'B':
+        num_params = models.Vbm_B.num_params #number of latent model parameters
+        
+        if params is None:
+            print("Setting random parameters.")
+            params = numpy.random.uniform(0,1, (num_params, num_agents))
+            
+        else:
+            print("Setting initial parameters as provided.")
+            
+        lr_day1 = params[0, :][None,...]*0.01
+        theta_Q_day1 = params[1, :][None,...]*6
+        theta_rep_day1 = params[2, :][None,...]*6
+        
+        lr_day2 = params[0, :][None,...]*0.01
+        theta_Q_day2 = params[1, :][None,...]*6
+        theta_rep_day2 = params[2, :][None,...]*6
+        
+        newagent = models.Vbm_B(lr_day1 = torch.tensor(lr_day1),
+                              theta_Q_day1 = torch.tensor(theta_Q_day1),
+                              theta_rep_day1 = torch.tensor(theta_rep_day1),
+                                  
+                              lr_day2 = torch.tensor(lr_day2),
+                              theta_Q_day2 = torch.tensor(theta_Q_day2),
+                              theta_rep_day2 = torch.tensor(theta_rep_day2),
+                              k=torch.tensor([k]),
+                              Q_init=torch.tensor([[Q_init]]))
+        
+        
+    else:
+        raise Exception("No model specified")
+        
+    return newagent
+        
+def simulate_data(model, 
+                  num_agents, 
+                  Q_init, 
+                  sequence = None, 
+                  blockorder = None):
+    '''
+    Parameters
+    ----------
+    model : str
+        The model class to simulate data with.
+
+    num_agents : int
+        Number of agents for simulation.
+        
+    Q_init : list, len 4
+        Initial Q-Values of the agent.
+        
+    sequence : list, len num_agents
+        Whether sequence or mirror sequence.
+        1/2 : sequence/ mirror sequence
+        
+    blockorder : list, len num_agents
+        Which blockorder
+        1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+        
+    Returns
+    -------
+    groupdata : list of len num_agents
+        Contains 1 dictionary per agent, with experimental data.
+        Keys: 
+            Choices
+            Outcomes
+            Trialsequence
+            Blocktype
+            Jokertypes
+            Blockidx
+            
+    params_true : torch tensor, shape [num_params, num_agents]
+        Contains the parameter values with which the simulations were performed.
+
+    params_true_df : DataFrame
+        Contains the parameter values with which the simulations were performed.
+
+    '''
+    
+    if sequence is None:
+        sequence = [1]*num_agents
+        
+    if blockorder is None:
+        blockorder = [1]*num_agents
+    
+    if model == 'original':
+        num_params = models.Vbm.num_params #number of latent model parameters
+        
+    elif model == 'B':
+        num_params = models.Vbm_B.num_params #number of latent model parameters
+    
+    groupdata = []
+    params_true = torch.zeros((num_params, num_agents))
+    
+    Q_init_group = []
+
+    sequence_matfile_dirs = ['./matlabcode/clipre/',
+                             './matlabcode/clipre/mirror_'] 
+    
+    rewprobs = [[0.8, 0.2, 0.2, 0.8],
+                [0.2, 0.8, 0.8, 0.2]]
+    
+    "Simulate with random parameters"
+    for ag_idx in range(num_agents):
+        
+        print("Simulating agent no. %d"%ag_idx)
+        Q_init_group.append(Q_init)
+        newagent = init_agent('original', Q_init)
+        
+        for param_idx in range(len(newagent.param_names)):
+            params_true[param_idx, ag_idx] = newagent.par_dict[newagent.param_names[param_idx]]
+
+        newenv = env.Env(newagent,
+                         rewprobs = rewprobs[sequence[ag_idx]],
+                         matfile_dir = sequence_matfile_dirs[sequence[ag_idx]],
+                         blockorder = )
+        
+        newenv.run()
+        
+        data = {"Choices": newenv.choices, 
+                "Outcomes": newenv.outcomes,
+                "Trialsequence": newenv.data["trialsequence"], 
+                "Blocktype": newenv.data["blocktype"],
+                "Jokertypes": newenv.data["jokertypes"], 
+                "Blockidx": newenv.data["blockidx"]}
+            
+        plot_results(pd.DataFrame(data), group = 0)
+            
+        groupdata.append(data)
+        
+    "---- Create DataFrame"
+    columns = []
+    for key in newagent.par_dict.keys():
+        columns.append(key + '_true')
+    params_true_df = pd.DataFrame(params_true.numpy().T, columns = columns)
+        
+    return groupdata, params_true, params_true_df

@@ -23,29 +23,64 @@ device = torch.device("cpu")
 torch.set_default_tensor_type(torch.DoubleTensor)
 
 class Vbm():
+
+    num_params = 3
+    param_names = ["omega", "dectemp", "lr"]
+    NA = 4 # no. of possible actions
+    
     def __init__(self, omega, dectemp, lr, k, Q_init, num_blocks = 14):
-        """ 
-        --- Parameters ---
-        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
-        dectemp (between 0 & inf): decision temperature β
-        lr (between 0 & 1) : learning rate
-        Q_init : (list of floats) initial Q-Values"""
+        '''
+        
+
+        Parameters
+        ----------
+        omega : torch tensor, shape [num_particles, num_agents]
+        0 < omega < 1. p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
+            
+        dectemp : torch tensor, shape [num_particles, num_agents]
+        0 < dectemp < inf. Decision temperature β
+
+        lr : torch tensor, shape [num_particles, num_agents]
+        0 < dectemp < 1. Learning rate
+
+        k : TYPE
+            DESCRIPTION.
+            
+        Q_init : torch tensor, shape [num_particles, num_agents, 4]
+            Initial Q-Values.
+            
+        num_blocks : TYPE, optional
+            DESCRIPTION. The default is 14.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
                 raise Exception("num_blocks must be an even value.")
         
         "Setup"
-        self.param_names = ["omega", "dectemp", "lr"]
         self.num_particles = omega.shape[0]
         self.num_agents = omega.shape[1]
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
-        self.NA = 4 # no. of possible actions
         
         "--- Latent variables ---"
+        self.par_dict = {}
+        self.par_dict['omega'] = omega
+        self.par_dict['dectemp'] = dectemp # dectemp > 0 for softmax function
+        self.par_dict['lr'] = lr
         self.omega = omega
-        self.dectemp = dectemp # dectemp > 0 for softmax function
+        self.dectemp = dectemp
         self.lr = lr
         "--- --- --- ---"
         
@@ -71,11 +106,11 @@ class Vbm():
 
 
     def locs_to_pars(self, locs):
-        par_dict = {"omega": torch.sigmoid(locs[..., 0]),
+        self.par_dict = {"omega": torch.sigmoid(locs[..., 0]),
                     "dectemp": torch.exp(locs[..., 1]),
                     "lr": torch.sigmoid(locs[..., 2])}
-
-        return par_dict
+        
+        return self.par_dict
     
     def compute_probs(self, trial, day):
         '''
@@ -96,7 +131,6 @@ class Vbm():
 
         '''
         
-        #assert(torch.is_tensor(trial) and trial.ndim==1)
         option1, option2 = self.find_resp_options(trial)
         
         _, mask = self.Qoutcomp(self.V[-1], option1)
@@ -324,15 +358,15 @@ class Vbm():
             self.pchoice = choices
             
     def reset(self, locs):
-        par_dict = self.locs_to_pars(locs)
-                
+        _ = self.locs_to_pars(locs)
+        
         self.num_particles = locs.shape[0]
         self.num_agents = locs.shape[1]
         
         "Latent Variables"
-        self.omega = par_dict["omega"]
-        self.dectemp = par_dict["dectemp"]
-        self.lr = par_dict["lr"]
+        self.omega = self.par_dict["omega"]
+        self.dectemp = self.par_dict["dectemp"]
+        self.lr = self.par_dict["lr"]
         
         "K"
         # self.k = kwargs["k"]
@@ -355,6 +389,16 @@ class Vbm():
         
 class Vbm_B(Vbm):
     
+    num_params = 6
+    param_names = ["lr_day1", 
+                    "theta_Q_day1", 
+                    "theta_rep_day1", 
+                    "lr_day2", 
+                    "theta_Q_day2", 
+                    "theta_rep_day2"]
+    
+    NA = 4 # no. of possible actions
+    
     def __init__(self,
                  lr_day1,
                  theta_Q_day1,
@@ -365,37 +409,12 @@ class Vbm_B(Vbm):
                  k,
                  Q_init,
                  num_blocks = 14):
-        """ 
-        --- Parameters ---
-        omega (between 0 & 1): weighting factor between habitual and goal-directed: p(a1) = σ(β*[(1-ω)*(r(a1)-r(a2)) + ω*(Q(a1)-Q(a2)))]
-        dectemp (between 0 & inf): decision temperature β
-        lr (between 0 & 1) : learning rate
-        Q_init : (list of floats) initial Q-Values
-        """
-        
-        # #assert(lr_day1.ndim == 2)
-        # #assert(theta_Q_day1.ndim == 2)
-        # #assert(theta_rep_day1.ndim == 2)
-        
-        # #assert(lr_day2.ndim == 2)
-        # #assert(theta_Q_day2.ndim == 2)
-        # #assert(theta_rep_day2.ndim == 2)
-        
-        # #assert(Q_init.ndim == 3)
         
         if num_blocks != 1:
             if num_blocks%2 != 0:
                 raise Exception("num_blocks must be an even value.")
 
         "Setup"
-        self.param_names = ["lr_day1", 
-                            "theta_Q_day1", 
-                            "theta_rep_day1", 
-                            "lr_day2", 
-                            "theta_Q_day2", 
-                            "theta_rep_day2"]
-        
-        self.NA = 4 # no. of possible actions
         self.num_particles = lr_day1.shape[0]
         self.num_agents = lr_day1.shape[1]
         self.dectemp = torch.tensor([[1.]]) # For softmax function
@@ -404,6 +423,14 @@ class Vbm_B(Vbm):
         self.num_blocks = num_blocks
         
         "Latent Variables"
+        self.par_dict = {}
+        self.par_dict['lr_day1'] = lr_day1
+        self.par_dict['theta_Q_day1'] = theta_Q_day1 # dectemp > 0
+        self.par_dict['theta_rep_day1'] = theta_rep_day1
+        
+        self.par_dict['lr_day2'] = lr_day2
+        self.par_dict['theta_Q_day2'] = theta_Q_day2 # dectemp > 0
+        self.par_dict['theta_rep_day2'] = theta_rep_day2
         self.theta_rep_day1 = theta_rep_day1
         self.theta_Q_day1 = theta_Q_day1 # dectemp > 0
         self.lr_day1 = lr_day1
@@ -434,15 +461,15 @@ class Vbm_B(Vbm):
         self.seq_counter = self.init_seq_counter.clone().detach()
     
     def locs_to_pars(self, locs):
-        par_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
+        self.par_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
                     "theta_Q_day1": torch.exp(locs[..., 1]),
                     "theta_rep_day1": torch.exp(locs[..., 2]),
                     
                     "lr_day2": torch.sigmoid(locs[..., 3]),
                     "theta_Q_day2": torch.exp(locs[..., 4]),
                     "theta_rep_day2": torch.exp(locs[..., 5])}
-
-        return par_dict
+        
+        return self.par_dict
 
     def update(self, choices, outcomes, blocktype, day, **kwargs):
         '''
@@ -549,21 +576,21 @@ class Vbm_B(Vbm):
             self.ppchoice = self.pchoice
             self.pchoice = choices
 
-    def reset(self, locs):
-        par_dict = self.locs_to_pars(locs)
+    def reset(self, locs):   
+        _ = self.locs_to_pars(locs)
         
         "Setup"
         self.num_particles = locs.shape[0]
         self.num_agents = locs.shape[1]
         
         "Latent Variables"
-        self.lr_day1 = par_dict["lr_day1"]
-        self.theta_Q_day1 = par_dict["theta_Q_day1"]
-        self.theta_rep_day1 = par_dict["theta_rep_day1"]        
+        self.lr_day1 = self.par_dict["lr_day1"]
+        self.theta_Q_day1 = self.par_dict["theta_Q_day1"]
+        self.theta_rep_day1 = self.par_dict["theta_rep_day1"]        
         
-        self.lr_day2 = par_dict["lr_day2"]
-        self.theta_Q_day2 = par_dict["theta_Q_day2"]
-        self.theta_rep_day2 = par_dict["theta_rep_day2"]
+        self.lr_day2 = self.par_dict["lr_day2"]
+        self.theta_Q_day2 = self.par_dict["theta_Q_day2"]
+        self.theta_rep_day2 = self.par_dict["theta_rep_day2"]
         
         "K"
         # self.k = kwargs["k"]
