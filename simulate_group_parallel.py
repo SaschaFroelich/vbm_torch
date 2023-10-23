@@ -68,7 +68,10 @@ Inference
 '''
 
 "----- Initialize new agent object with num_agents agents for inference"
-agent = utils.init_agent(model, Q_init, num_agents = num_agents, params = params)
+agent = utils.init_agent(model, 
+                         Q_init, 
+                         num_agents = num_agents, 
+                         params = params)
 
 # df_true = pd.DataFrame({'lr_day1_true' : lr_day1_true,
 #                         'theta_Q_day1_true' : theta_Q_day1_true,

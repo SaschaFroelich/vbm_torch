@@ -284,20 +284,39 @@ class Vbm():
         return torch.squeeze(choice_python).type('torch.LongTensor')
 
     def update(self, choices, outcomes, blocktype, **kwargs):
-        """
-        Is called after a dual-target choice and updates Q-values, sequence counters, habit values (i.e. repetition values), and V-Values.
+        '''
+
+        Parameters
+        ----------
+        choices : torch.tensor with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+                        
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
         
-        choices : the single-target trial choices before the next dual-taregt trial (<0 is error) (0-indexed)"
-        
-        --- Parameters ---
-        choice (-2, 0, 1, 2, or 3): The particiapnt's choice at the dual-target trial
-                                     -2 : error
-        outcomes (0 or 1) : no reward (0) or reward (1)
-        blocktype : 's' (sequential blocks) or 'r' (random blocks)
-                    Important for updating of sequence counters.
-        """
-        
-        if all([ch == -1 for ch in choices]) and all([out == -1 for out in outcomes]) and all([bb == -1 for bb in blocktype]):
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
             self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)

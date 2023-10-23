@@ -11,6 +11,7 @@ import ipdb
 import numpy as np
 import torch
 import pandas as pd
+import env
 
 import pyro
 import pyro.distributions as dist
@@ -70,71 +71,74 @@ class GeneralGroupInference(object):
             self.agent.reset(locs)
             
             num_particles = locs.shape[0]
-            print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
-            t = -1
-            # probs_all = []
-            # obs_all = []
-            for tau in pyro.markov(range(self.trials)):
+            # print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
+            
+            env.Env.run_loop(None, self.agent, self.data, num_particles, infer = 1)
+        
+    # def run_loop(self, agent, num_particles):
+            
+    #     t = -1
+    #     for tau in pyro.markov(range(self.trials)):
     
-                trial = torch.tensor(self.data["Trialsequence"][tau])
-                blocktype = torch.tensor(self.data["Blocktype"][tau])
+    #         trial = torch.tensor(self.data["trialsequence"][tau])
+    #         blocktype = torch.tensor(self.data["blocktype"][tau])
+            
+    #         if all([self.data["blockidx"][tau][i] <= 5 for i in range(self.num_agents)]):
+    #             day = 1
                 
-                if all([self.data["Blockidx"][tau][i] <= 5 for i in range(self.num_agents)]):
-                    day = 1
-                    
-                elif all([self.data["Blockidx"][tau][i] > 5 for i in range(self.num_agents)]):
-                    day = 2
-                    
-                else:
-                    raise Exception("Da isch a Fehla!")
+    #         elif all([self.data["blockidx"][tau][i] > 5 for i in range(self.num_agents)]):
+    #             day = 2
                 
-                if all(trial == -1):
-                    "Beginning of new block"
-                    self.agent.update(torch.tensor([-1]), 
-                                      torch.tensor([-1]), 
-                                      torch.tensor([-1]), 
-                                      day = day, 
-                                      trialstimulus = trial)
-                    
-                else:
-                    current_choice = self.data["Choices"][tau]
-                    outcome = self.data["Outcomes"][tau]
+    #         else:
+    #             raise Exception("Da isch a Fehla!")
+            
+    #         if all(trial == -1):
+    #             "Beginning of new block"
+    #             self.agent.update(torch.tensor([-1]*self.agent.num_agents), 
+    #                               torch.tensor([-1]*self.agent.num_agents), 
+    #                               torch.tensor([-1]*self.agent.num_agents), 
+    #                               day = day, 
+    #                               trialstimulus = trial)
                 
-                    "This be incorrect since participants may see different trials at different times"
-                    if any(trial > 10):
-                        "Dual-Target Trial"
-                        t+=1
-                        option1, option2 = self.agent.find_resp_options(trial)
-                        # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
-                        # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
-                        # RHS comes out as [1, n_actions] or [num_particles, n_actions]
-                        
-                        "==========================================="
-                        probs = self.agent.compute_probs(trial, day)
-                        "==========================================="
-                        
-                        # choices = torch.tensor([0 if current_choice[idx] == option1[idx] else 1 for idx in range(len(current_choice))])
-                        # obs_mask = torch.tensor([0 if cc == -2 else 1 for cc in current_choice ]).type(torch.bool)
-                        
-                        choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, self.num_agents)
-                        
-                        # choices_all.append(choices)
-                        # probs_all.append(probs)
-                        
-                        "Do I even use this?"
-                        obs_mask = current_choice != -2
+    #         else:
+    #             current_choice = self.data["choices"][tau]
+    #             outcome = self.data["outcomes"][tau]
+            
+    #             if any(trial > 10):
+    #                 "Dual-Target Trial"
+    #                 t+=1
+    #                 option1, option2 = self.agent.find_resp_options(trial)
+    #                 # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
+    #                 # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
+    #                 # RHS comes out as [1, n_actions] or [num_particles, n_actions]
+                    
+    #                 "==========================================="
+    #                 probs = self.agent.compute_probs(trial, day)
+    #                 "==========================================="
+                    
+    #                 choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, self.num_agents)
+    #                 obs_mask = (current_choice != -2).broadcast_to(num_particles, self.num_agents)
     
-                    "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
-                    self.agent.update(current_choice, 
-                                      outcome, 
-                                      blocktype, 
-                                      day = day, 
-                                      trialstimulus = trial)
+    #                 if any(current_choice == -10):
+    #                     raise Exception("Fehla!")
+                        
+    #                 if torch.any(obs_mask == False):
+    #                     dfgh
     
-                    if any(trial > 10):
-                        pyro.sample('res_{}'.format(t), 
-                                    dist.Categorical(probs = probs),
-                                    obs = choices)
+    #             "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
+    #             self.agent.update(current_choice, 
+    #                               outcome, 
+    #                               blocktype, 
+    #                               day = day, 
+    #                               trialstimulus = trial)
+    
+    #             if any(trial > 10):
+    #                 "STT are 0.5 0.5"
+    #                 "errors are obs_masked"
+    #                 pyro.sample('res_{}'.format(t), 
+    #                             dist.Categorical(probs = probs),
+    #                             obs = choices,
+    #                             obs_mask = obs_mask)
 
     def guide(self):
         trns = torch.distributions.biject_to(dist.constraints.positive)
@@ -270,18 +274,18 @@ class SingleInference(object):
         t = -1
         for tau in range(self.trials):
             
-            trial = self.data["Trialsequence"][tau]
-            blocktype = self.data["Blocktype"][tau]
+            trial = self.data["trialsequence"][tau]
+            blocktype = self.data["blocktype"][tau]
             
             #vec_ben = np.round(np.array(self.data["repvals"][tau]),12)
             #vec_agent = np.round(np.array(torch.squeeze(self.agent.rep[-1])),12)
             
             #np.testing.#assert_allclose(vec_ben, vec_agent, rtol=1e-5)
             
-            if self.data["Blockidx"][tau] <= 5:
+            if self.data["blockidx"][tau] <= 5:
                 day = 1
                 
-            elif self.data["Blockidx"][tau] > 5:
+            elif self.data["blockidx"][tau] > 5:
                 day = 2
             
             if trial == -1:
@@ -304,8 +308,8 @@ class SingleInference(object):
                 
                 
             else:
-                current_choice = self.data["Choices"][tau]
-                outcome = self.data["Outcomes"][tau]
+                current_choice = self.data["choices"][tau]
+                outcome = self.data["outcomes"][tau]
                 
             if trial > 10:
                 "Dual-Target Trial"
@@ -562,13 +566,13 @@ class SingleInference_modelB(object):
         
         t = -1
         for tau in range(self.trials):
-            trial = self.data["Trialsequence"][tau][0]
-            blocktype = self.data["Blocktype"][tau][0]
+            trial = self.data["trialsequence"][tau][0]
+            blocktype = self.data["blocktype"][tau][0]
             
-            if self.data["Blockidx"][tau][0] <= 5:
+            if self.data["blockidx"][tau][0] <= 5:
                 day = 1
                 
-            elif self.data["Blockidx"][tau][0] > 5:
+            elif self.data["blockidx"][tau][0] > 5:
                 day = 2
                 
             else:
@@ -579,8 +583,8 @@ class SingleInference_modelB(object):
                 self.agent.update(torch.tensor([-1]), torch.tensor([-1]), torch.tensor([-1]), day=day, trialstimulus=trial)
                 
             else:
-                current_choice = self.data["Choices"][tau]
-                outcome = self.data["Outcomes"][tau]
+                current_choice = self.data["choices"][tau]
+                outcome = self.data["outcomes"][tau]
                 
             if trial > 10:
                 "Dual-Target Trial"
@@ -872,16 +876,16 @@ class SingleInference_modelB_2(object):
         t = -1
         for tau in range(self.trials):
             
-            trial = self.data["Trialsequence"][tau]
-            blocktype = self.data["Blocktype"][tau]
+            trial = self.data["trialsequence"][tau]
+            blocktype = self.data["blocktype"][tau]
             
-            if self.data["Blockidx"][tau] <= 1:
+            if self.data["blockidx"][tau] <= 1:
                 exp_part = 1
                 
-            elif self.data["Blockidx"][tau] > 1 and self.data["Blockidx"][tau] <= 5:
+            elif self.data["blockidx"][tau] > 1 and self.data["blockidx"][tau] <= 5:
                 exp_part = 2
                 
-            elif self.data["Blockidx"][tau] > 5:
+            elif self.data["blockidx"][tau] > 5:
                 exp_part = 3
                 
             else:
@@ -892,8 +896,8 @@ class SingleInference_modelB_2(object):
                 self.agent.update(-1,-1,-1, exp_part=exp_part, trialstimulus=trial)
                 
             else:
-                current_choice = self.data["Choices"][tau]
-                outcome = self.data["Outcomes"][tau]
+                current_choice = self.data["choices"][tau]
+                outcome = self.data["outcomes"][tau]
                 
             if trial > 10:
                 "Dual-Target Trial"
@@ -1194,16 +1198,16 @@ class SingleInference_modelB_3(object):
         t = -1
         for tau in range(self.trials):
             
-            trial = self.data["Trialsequence"][tau]
-            blocktype = self.data["Blocktype"][tau]
+            trial = self.data["trialsequence"][tau]
+            blocktype = self.data["blocktype"][tau]
             
-            if self.data["Blockidx"][tau] <= 1:
+            if self.data["blockidx"][tau] <= 1:
                 exp_part = 1
                 
-            elif self.data["Blockidx"][tau] > 1 and self.data["Blockidx"][tau] <= 5:
+            elif self.data["blockidx"][tau] > 1 and self.data["blockidx"][tau] <= 5:
                 exp_part = 2
                 
-            elif self.data["Blockidx"][tau] > 5:
+            elif self.data["blockidx"][tau] > 5:
                 exp_part = 3
                 
             else:
@@ -1214,8 +1218,8 @@ class SingleInference_modelB_3(object):
                 self.agent.update(-1,-1,-1, exp_part=exp_part, trialstimulus=trial)
                 
             else:
-                current_choice = self.data["Choices"][tau]
-                outcome = self.data["Outcomes"][tau]
+                current_choice = self.data["choices"][tau]
+                outcome = self.data["outcomes"][tau]
                 
             if trial > 10:
                 "Dual-Target Trial"
@@ -1493,13 +1497,13 @@ class SingleInference_modelF(object):
         t_day2 = -1 # For time-dependent model parameter on day 2
         for tau in range(self.trials):
             
-            trial = self.data["Trialsequence"][tau]
-            blocktype = self.data["Blocktype"][tau]
+            trial = self.data["trialsequence"][tau]
+            blocktype = self.data["blocktype"][tau]
             
-            if self.data["Blockidx"][tau] <= 5:
+            if self.data["blockidx"][tau] <= 5:
                 day = 1
                 
-            elif self.data["Blockidx"][tau] > 5:
+            elif self.data["blockidx"][tau] > 5:
                 day = 2
                 
             else:
@@ -1510,8 +1514,8 @@ class SingleInference_modelF(object):
                 self.agent.update(-1,-1,-1, day=day, trialstimulus=trial, t = 0)
                 
             else:
-                current_choice = self.data["Choices"][tau]
-                outcome = self.data["Outcomes"][tau]
+                current_choice = self.data["choices"][tau]
+                outcome = self.data["outcomes"][tau]
 
             if trial > 10:
                 "Dual-Target Trial"
@@ -1784,16 +1788,16 @@ class GroupInference(object):
                 
                 # start_time = time.time()
                 for pb in range(self.num_agents):
-                    trial = self.group_data[pb]["Trialsequence"][tau]
-                    blocktype = self.group_data[pb]["Blocktype"][tau]
+                    trial = self.group_data[pb]["trialsequence"][tau]
+                    blocktype = self.group_data[pb]["blocktype"][tau]
                     
                     if trial == -1:
                         "Beginning of new block"
                         self.agents[pb].update(-1,-1,-1)
                         
                     else:
-                        current_choice = self.group_data[pb]["Choices"][tau]
-                        outcome = self.group_data[pb]["Outcomes"][tau]
+                        current_choice = self.group_data[pb]["choices"][tau]
+                        outcome = self.group_data[pb]["outcomes"][tau]
                         
                     if trial > 10:
                         "Dual-Target Trial"
@@ -2052,13 +2056,13 @@ class GroupInference_modelB(object):
                 
                 # start_time = time.time()
                 for pb in range(self.num_agents):
-                    trial = self.group_data[pb]["Trialsequence"][tau]
-                    blocktype = self.group_data[pb]["Blocktype"][tau]
+                    trial = self.group_data[pb]["trialsequence"][tau]
+                    blocktype = self.group_data[pb]["blocktype"][tau]
                     
-                    if self.group_data[pb]["Blockidx"][tau] <= 5:
+                    if self.group_data[pb]["blockidx"][tau] <= 5:
                         day = 1
                         
-                    elif self.group_data[pb]["Blockidx"][tau] > 5:
+                    elif self.group_data[pb]["blockidx"][tau] > 5:
                         day = 2
                         
                     else:
@@ -2070,8 +2074,8 @@ class GroupInference_modelB(object):
                         
                     else:
                         ipdb.set_trace()
-                        current_choice = self.group_data[pb]["Choices"][tau]
-                        outcome = self.group_data[pb]["Outcomes"][tau]
+                        current_choice = self.group_data[pb]["choices"][tau]
+                        outcome = self.group_data[pb]["outcomes"][tau]
 
                     # ipdb.set_trace()
                     if trial > 10:

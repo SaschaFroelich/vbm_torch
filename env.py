@@ -6,23 +6,59 @@ Created on Fri May 19 10:16:01 2023
 @author: sascha
 """
 
+
 import torch
 import ipdb
 import scipy
 
+import pyro
+import pyro.distributions as dist
+
 class Env():
     
-    def __init__(self, agent, rewprobs, matfile_dir):
+    def __init__(self, 
+                 agent, 
+                 matfile_dir):
+        '''
+        Environment is used for simulating data.
+        One separate environment is instantiated for each agent, with no multiple agents inside.
+        
+        Methods
+        ----------
+        load_matfiles()
+        run()
+        run_loop()
+        
+        Parameters
+        ----------
+        agent : obj
+            Instantiation of the agent class.
+            May be instantiated for multiple parallel agents.
+            
+        matfile_dir : TYPE
+            DESCRIPTION.
+
+            
+        Returns
+        -------
+        None.
+
+        '''
+        
+        assert(agent.num_agents == 1)
         self.agent = agent
-        self.rewprobs = torch.tensor(rewprobs)
         self.matfile_dir = matfile_dir
         
         self.choices = []
         self.outcomes = []
         
-    def load_matfiles(self, matfile_dir, blocknr, blocktype, sequence = 1):
-        "blocknr : num. of block of given type (not same as Blockidx in experiment)"
-        "sequence : 1 or 2 (2 means mirror sequence)"
+    def load_matfiles(self, 
+                      matfile_dir, 
+                      blocknr, 
+                      blocktype, 
+                      sequence = 1):
+        
+        "blocknr : num. of block of given type (not same as blockidx in experiment)"
         
         if sequence == 2:
             prefix = "mirror_"
@@ -70,60 +106,67 @@ class Env():
             torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
                 jokertypes
         
-    def run(self, block_order = 1, sequence = 1):
-        """
+    def run(self, 
+            sequence = 1, 
+            blockorder = 1):
+        '''
+        
         Parameters
         ----------
+        sequence : int
+            Whether sequence or mirror sequence.
+            1/2 : sequence/ mirror sequence
+
+        blockorder : int
+            Which blockorder
+            1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
         
-        block_order : 1 or 2
-            Which block order to use (in case of Context =="all")
+        self.data = {}
+        if sequence == 1:
+            self.data['rewprobs'] = torch.tensor([0.8, 0.2, 0.2, 0.8])
             
-        sequence : 1 or 2
-            2 means mirror sequence
+        elif sequence == 2:
+            self.data['rewprobs'] = torch.tensor([0.2, 0.8, 0.8, 0.2])
             
-        """    
+        else:
+            raise Exception("Fehla!")
         
         Context = "all"
         num_blocks = self.agent.num_blocks
+        assert(num_blocks == 14)
         
-        if num_blocks > 1:
-            tb_idxs = [1,3,5,6,8,10,12] # tb idxs for block_order == 1
-            rand_idxs = [0,2,4,7,9,11,13] # random idxs for block_order == 1
-            
-            if Context == "all":
-                blocktype = torch.ones((num_blocks, 480))*-1;
-                
-                if block_order == 1:
-                    blocktype[tb_idxs[0:num_blocks//2], :] = 0 # fixed sequence condition
-                    blocktype[rand_idxs[0:num_blocks//2], :] = 1 # random condition
-                                
-                elif block_order == 2:
-                    blocktype[tb_idxs[0:num_blocks//2], :] = 1
-                    blocktype[rand_idxs[0:num_blocks//2], :] = 0
-                
-            elif Context == "tb":
-                blocktype = torch.ones((num_blocks, 480));
-                
-                blocktype[:, :, :] = 0
+        tb_idxs = [1,3,5,6,8,10,12] # tb idxs for blockorder == 1
+        rand_idxs = [0,2,4,7,9,11,13] # random idxs for blockorder == 1
         
-            elif Context == "random":
-                blocktype = torch.ones((num_blocks, 480));
-                
-                blocktype[:, :, :] = 1
-                
-        elif num_blocks == 1:
-            blocktype = torch.ones((num_blocks, 480))*-1;
-            if block_order == 1:
-                blocktype[:, :] = 1 # random condition
-                            
-            elif block_order == 2:
-                blocktype[:, :] = 0 # sequential condition
-                
-        block_no = -100*torch.ones((num_blocks, 480), dtype=torch.int8); # The index of the block in the current experiment
+        blocktype = torch.ones((num_blocks, 480))*-1;
+        
+        if blockorder == 1:
+            blocktype[tb_idxs[0:num_blocks//2], :] = 0 # fixed sequence condition
+            blocktype[rand_idxs[0:num_blocks//2], :] = 1 # random condition
+                        
+        elif blockorder == 2:
+            blocktype[tb_idxs[0:num_blocks//2], :] = 1
+            blocktype[rand_idxs[0:num_blocks//2], :] = 0
     
+        block_no = -100*torch.ones((num_blocks, 480), dtype=torch.int8); # The index of the block in the current experiment
+
         tb_block = 0
-        random_block = 0   
-        self.data = {"trialsequence": [], "blocktype": [], "jokertypes": [], "blockidx": []}
+        random_block = 0  
+        self.data['trialsequence'] = []
+        self.data['blocktype'] = []
+        self.data['jokertypes'] = []
+        self.data['blockidx'] = []
         for block in range(num_blocks):
             "New block!"
             self.data["trialsequence"].append([-1])
@@ -163,71 +206,175 @@ class Env():
             self.data["jokertypes"].extend([[j] for j in jokertypes])
             self.data["blockidx"].extend([[block]]*480)
         
-        t_day1 = -1
-        t_day2 = -1
-        for tau in range(len(self.data["trialsequence"])):
-            trial = torch.tensor(self.data["trialsequence"][tau])
-            blocktype = torch.tensor(self.data["blocktype"][tau])
-                      
-            if self.data["blockidx"][tau][0] <= 5:
+        self.run_loop(self.agent, self.data, 1, infer = 0)
+        
+    def run_loop(self, agent, data, num_particles, infer = 0):
+        '''
+
+        Parameters
+        ----------
+        agent : TYPE
+            DESCRIPTION.
+        data : TYPE
+            DESCRIPTION.
+        num_particles : TYPE
+            DESCRIPTION.
+        infer : bool, optional
+            0/1 simulate data/ infer model parameters
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        num_trials = len(data["trialsequence"])
+        t = -1
+        for tau in pyro.markov(range(num_trials)):
+    
+            trial = torch.tensor(data["trialsequence"][tau])
+            blocktype = torch.tensor(data["blocktype"][tau])
+            
+            if all([data["blockidx"][tau][i] <= 5 for i in range(agent.num_agents)]):
                 day = 1
                 
-            elif self.data["blockidx"][tau][0] > 5:
+            elif all([data["blockidx"][tau][i] > 5 for i in range(agent.num_agents)]):
                 day = 2
                 
             else:
                 raise Exception("Da isch a Fehla!")
-                
-            if self.data["blockidx"][tau][0] <= 1:
-                exp_part = 1
-                
-            elif self.data["blockidx"][tau][0] > 1 and self.data["blockidx"][tau][0] <= 5:
-                exp_part = 2
-                
-            elif self.data["blockidx"][tau][0] > 5:
-                exp_part = 3
-                
-            else:
-                raise Exception("Da isch a Fehla!")
             
-            if trial == -1:
-                "Beginning of a new block"
-                self.agent.update(torch.tensor([-1]), 
-                                  torch.tensor([-1]), 
-                                  torch.tensor([-1]), 
-                                  day=day, 
-                                  trialstimulus = trial, 
-                                  t = 0, 
-                                  exp_part = exp_part)
+            if all(trial == -1):
+                "Beginning of new block"
+                agent.update(torch.tensor([-1]*agent.num_agents), 
+                                torch.tensor([-1]*agent.num_agents), 
+                                torch.tensor([-1]*agent.num_agents), 
+                                day = day, 
+                                trialstimulus = trial)
                 
-                self.choices.append(torch.tensor([-1]))
-                self.outcomes.append(torch.tensor([-1]))
+                if not infer:
+                    self.choices.append(torch.tensor([-1], requires_grad = False))
+                    self.outcomes.append(torch.tensor([-1], requires_grad = False))
                 
             else:
-                current_choice = self.agent.choose_action(trial, day)
-                outcome = torch.bernoulli(self.rewprobs[current_choice])
-                self.choices.append(torch.tensor([current_choice.item()]))
-                self.outcomes.append(torch.tensor([outcome.item()]))
+                if infer:
+                    current_choice = data["choices"][tau]
+                    outcome = data["outcomes"][tau]
+            
+                else:
+                    "Simulation"
+                    assert(torch.is_tensor(trial))
+                    current_choice = torch.tensor(agent.choose_action(trial, day).item(), requires_grad = False)
+                    outcome = torch.bernoulli(data['rewprobs'][current_choice])
+                    self.choices.append(torch.tensor([current_choice.item()]))
+                    self.outcomes.append(torch.tensor([outcome.item()]))
+            
+                if infer and any(trial > 10):
+                    "Dual-Target Trial"
+                    t+=1
+                    option1, option2 = agent.find_resp_options(trial)
+                    # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
+                    # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
+                    # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
-                if day == 1:
-                    if trial > 10:
-                        t_day1 += 1
-                    self.agent.update(torch.tensor([current_choice]), 
-                                      torch.tensor([outcome]), 
-                                      blocktype, 
-                                      day = day, 
-                                      trialstimulus = trial, 
-                                      t = t_day1, 
-                                      exp_part = exp_part)
+                    "==========================================="
+                    probs = agent.compute_probs(trial, day)
+                    "==========================================="
                     
-                elif day == 2:
-                    if trial > 10:
-                        t_day2 += 1
-                    self.agent.update(torch.tensor([current_choice]), 
-                                      torch.tensor([outcome]), 
-                                      blocktype, 
-                                      day = day, 
-                                      trialstimulus = trial, 
-                                      t = t_day2,
-                                      exp_part = exp_part)
+                    choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
+                    obs_mask = (current_choice != -2).broadcast_to(num_particles, agent.num_agents)
+    
+                    if any(current_choice == -10):
+                        raise Exception("Fehla!")
+                        
+                    if torch.any(obs_mask == False):
+                        dfgh
+    
+                "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
+                agent.update(current_choice, 
+                                outcome, 
+                                blocktype, 
+                                day = day, 
+                                trialstimulus = trial)
+    
+                if infer and any(trial > 10):
+                    "STT are 0.5 0.5"
+                    "errors are obs_masked"
+                    pyro.sample('res_{}'.format(t), 
+                                dist.Categorical(probs = probs),
+                                obs = choices,
+                                obs_mask = obs_mask)
+            
+        # t_day1 = -1
+        # t_day2 = -1
+        # for tau in range(len(self.data["trialsequence"])):
+        #     trial = torch.tensor(self.data["trialsequence"][tau])
+        #     blocktype = torch.tensor(self.data["blocktype"][tau])
+                      
+        #     if self.data["blockidx"][tau][0] <= 5:
+        #         day = 1
+                
+        #     elif self.data["blockidx"][tau][0] > 5:
+        #         day = 2
+                
+        #     else:
+        #         raise Exception("Da isch a Fehla!")
+                
+        #     if self.data["blockidx"][tau][0] <= 1:
+        #         exp_part = 1
+                
+        #     elif self.data["blockidx"][tau][0] > 1 and self.data["blockidx"][tau][0] <= 5:
+        #         exp_part = 2
+                
+        #     elif self.data["blockidx"][tau][0] > 5:
+        #         exp_part = 3
+                
+        #     else:
+        #         raise Exception("Da isch a Fehla!")
+            
+        #     if trial == -1:
+        #         "Beginning of a new block"
+        #         self.agent.update(torch.tensor([-1]), 
+        #                           torch.tensor([-1]), 
+        #                           torch.tensor([-1]), 
+        #                           day=day, 
+        #                           trialstimulus = trial, 
+        #                           t = 0, 
+        #                           exp_part = exp_part)
+                
+        #         self.choices.append(torch.tensor([-1]))
+        #         self.outcomes.append(torch.tensor([-1]))
+                
+        #     else:
+        #         current_choice = self.agent.choose_action(trial, day)
+        #         outcome = torch.bernoulli(self.rewprobs[current_choice])
+        #         self.choices.append(torch.tensor([current_choice.item()]))
+        #         self.outcomes.append(torch.tensor([outcome.item()]))
+                    
+        #         if day == 1:
+        #             if trial > 10:
+        #                 t_day1 += 1
+        #             self.agent.update(torch.tensor([current_choice]), 
+        #                               torch.tensor([outcome]), 
+        #                               blocktype, 
+        #                               day = day, 
+        #                               trialstimulus = trial, 
+        #                               t = t_day1, 
+        #                               exp_part = exp_part)
+                    
+        #         elif day == 2:
+        #             if trial > 10:
+        #                 t_day2 += 1
+        #             self.agent.update(torch.tensor([current_choice]), 
+        #                               torch.tensor([outcome]), 
+        #                               blocktype, 
+        #                               day = day, 
+        #                               trialstimulus = trial, 
+        #                               t = t_day2,
+        #                               exp_part = exp_part)
                 

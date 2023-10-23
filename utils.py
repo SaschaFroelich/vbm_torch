@@ -129,12 +129,12 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
     blockidx = [[blockidx[i]] for i in range(len(blockidx))]
     RT = [[RT[i]] for i in range(len(RT))]
         
-    data = {"Trialsequence": trialsequence, \
-            "Trialsequence no jokers": trialsequence_wo_jokers, \
-            "Choices": choices, \
-            "Outcomes": outcomes, \
-            "Blocktype": blocktype, \
-            "Blockidx": blockidx, \
+    data = {"trialsequence": trialsequence, \
+            "trialsequence no jokers": trialsequence_wo_jokers, \
+            "choices": choices, \
+            "outcomes": outcomes, \
+            "blocktype": blocktype, \
+            "blockidx": blockidx, \
             "RT": RT}
             
     return data, ID
@@ -179,25 +179,25 @@ def arrange_data_for_plot(i, df, **kwargs):
     df = df.applymap(lambda x: x.item() if torch.is_tensor(x) else x)
     
     """
-    Choices -> Goal-Directed Choices.
+    choices -> Goal-Directed choices.
     0: Low-Reward Choice, 1: High-Reward Choice 
     groups 0 & 1: (from High-Rew: 0 & 3, Low-Rew: 1 & 2)
     groups 2 & 3: (from High-Rew: 1 & 2, Low-Rew: 0 & 3)
     """
     
     if kwargs["group"] == 0 or kwargs["group"] == 1:
-        df['Choices'] = df['Choices'].map(lambda x: 1 if x==0 else 0 if x==1 else 0 if x==2 else 1)
+        df['choices'] = df['choices'].map(lambda x: 1 if x==0 else 0 if x==1 else 0 if x==2 else 1)
         
     elif kwargs["group"] == 2 or kwargs["group"] == 3:
-        df['Choices'] = df['Choices'].map(lambda x: 0 if x==0 else 1 if x==1 else 1 if x==2 else 0)
+        df['choices'] = df['choices'].map(lambda x: 0 if x==0 else 1 if x==1 else 1 if x==2 else 0)
     
     else:
         raise Exception("Group is not correctly specified, pal!")
     
-    data_new = {"HPCF": [], "Trialtype": [], "Blockidx": [], "datatype" : []}
-    data_Q = {"Qdiff": [], "Blocktype":[], "Blockidx": []}
+    data_new = {"HPCF": [], "Trialtype": [], "blockidx": [], "datatype" : []}
+    data_Q = {"Qdiff": [], "blocktype":[], "blockidx": []}
     
-    for block in df["Blockidx"].unique():
+    for block in df["blockidx"].unique():
         # For column "Jokertypes":
         # -1 no joker
         # 0 random 
@@ -205,18 +205,18 @@ def arrange_data_for_plot(i, df, **kwargs):
         # 2 incongruent
         
         if "Qdiff" in df.columns:
-            data_Q["Qdiff"].append(df[df["Blockidx"]==block]["Qdiff"].mean())
+            data_Q["Qdiff"].append(df[df["blockidx"]==block]["Qdiff"].mean())
         
-        if df[df["Blockidx"]==block]["Blocktype"].unique()[0] == 1:
+        if df[df["blockidx"]==block]["blocktype"].unique()[0] == 1:
             "Random Block"
             
             if "Qdiff" in df.columns:
-                data_Q["Blocktype"].append("r")
-                data_Q["Blockidx"].append(block)
+                data_Q["blocktype"].append("r")
+                data_Q["blockidx"].append(block)
                 
-            data_new["Blockidx"].append(block)
+            data_new["blockidx"].append(block)
             data_new["Trialtype"].append("random")
-            data_new["HPCF"].append(df[(df["Blockidx"] == block) & (df["Jokertypes"] == 0)]["Choices"].mean())
+            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["Jokertypes"] == 0)]["choices"].mean())
             
             if i == 0:
                 data_new["datatype"].append("given (Group %s)"%kwargs["group"])
@@ -227,17 +227,17 @@ def arrange_data_for_plot(i, df, **kwargs):
             else:
                 raise Exception("Fehla!")
             
-        elif df[df["Blockidx"]==block]["Blocktype"].unique()[0] == 0:
+        elif df[df["blockidx"]==block]["blocktype"].unique()[0] == 0:
             "Sequential Block"
             
             if "Qdiff" in df.columns:
-                data_Q["Blocktype"].append("s")
-                data_Q["Blockidx"].append(block)
+                data_Q["blocktype"].append("s")
+                data_Q["blockidx"].append(block)
             
             "Congruent Jokers"
-            data_new["Blockidx"].append(block)
+            data_new["blockidx"].append(block)
             data_new["Trialtype"].append("congruent")
-            data_new["HPCF"].append(df[(df["Blockidx"] == block) & (df["Jokertypes"] == 1)]["Choices"].mean())
+            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["Jokertypes"] == 1)]["choices"].mean())
             
             if i == 0:
                 data_new["datatype"].append("given (Group %s)"%kwargs["group"])
@@ -249,9 +249,9 @@ def arrange_data_for_plot(i, df, **kwargs):
                 raise Exception("Fehla!")
             
             "Incongruent Jokers"
-            data_new["Blockidx"].append(block)
+            data_new["blockidx"].append(block)
             data_new["Trialtype"].append("incongruent")
-            data_new["HPCF"].append(df[(df["Blockidx"] == block) & (df["Jokertypes"] == 2)]["Choices"].mean())
+            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["Jokertypes"] == 2)]["choices"].mean())
             
             if i == 0:
                 data_new["datatype"].append("given (Group %s)"%kwargs["group"])
@@ -269,14 +269,50 @@ def arrange_data_for_plot(i, df, **kwargs):
     return data_new, data_Q
 
 def plot_results(data_sim, *args, **kwargs):
-    """
-    data_sim :  DataFrame with data of single participant to be plotted.
-    *args :     - DataFrame with second set of data to be plotted (for comparison with first DataFrame)
-    **kwargs :  group
+    '''
     
-    Jokertypes : -1 no joker, 0 random , 1 congruent, 2 incongruent
-    """
 
+    Parameters
+    ----------
+    data_sim : DataFrame
+        DataFrame with data of single participant to be plotted.
+        
+    *args : DataFrame
+        DataFrame with second set of data to be plotted (for comparison with first DataFrame).
+        
+    **kwargs :  group (int)
+                    Experimental group.
+                title (str)
+                    Title of the plot
+                omega_true (float)
+                omega_inf (float)
+                ymin (float)
+                savedir (str)
+                plotname (str)
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+    TYPE
+        DESCRIPTION.
+
+    '''
+    
+
+    '''
+    Jokertypes 
+    ----------
+    -1 no joker
+    0 random
+    1 congruent
+    2 incongruent
+    '''
     if args:
         datas = (data_sim, args[0])
     
@@ -307,12 +343,12 @@ def plot_results(data_sim, *args, **kwargs):
     elif kwargs["group"] == 1 or kwargs["group"] == 3:
         custom_palette = ['g', 'b', 'r'] # congruent, incongruent, random
 
-    sns.relplot(x="Blockidx", y="HPCF", hue = "Trialtype", data=df_new, kind="line", col="datatype", palette = custom_palette)
+    sns.relplot(x="blockidx", y="HPCF", hue = "Trialtype", data=df_new, kind="line", col="datatype", palette = custom_palette)
     # plt.plot([5.5, 5.5],[0.5,1], color='black') # plot Day1/Day2 line
     
     "----- UNCOMMENT THESE TWO LINES TO PLOT QDIFF ------------"
     # if "Qdiff" in df.columns:
-    #     sns.relplot(x='Blockidx', y="Qdiff", hue ="Blocktype", data=df_Q, kind = 'line')
+    #     sns.relplot(x='blockidx', y="Qdiff", hue ="blocktype", data=df_Q, kind = 'line')
     "----- --------------------------------------- ------------"
 
     if "ymin" in kwargs:
@@ -339,6 +375,9 @@ def plot_results(data_sim, *args, **kwargs):
             plt.savefig(kwargs["savedir"]+"/%s.png"%kwargs["plotname"])
         else:
             plt.savefig(kwargs["savedir"]+"/plot_%d.png"%(numpy.random.randint(10e+9)))
+        
+    if 'title' in kwargs:
+        plt.title("Simulated data.")
         
     plt.show()    
     
@@ -374,9 +413,9 @@ def simulate_model_behaviour(num_agents, model, **kwargs):
         newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
 
         newenv.run()
-        data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-                "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-                "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
+        data = {"choices": newenv.choices, "outcomes": newenv.outcomes,\
+                "trialsequence": newenv.data["trialsequence"], "blocktype": newenv.data["blocktype"],\
+                "Jokertypes": newenv.data["jokertypes"], "blockidx": newenv.data["blockidx"], \
                 "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
 
         df = pd.DataFrame(data)
@@ -388,31 +427,54 @@ def simulate_model_behaviour(num_agents, model, **kwargs):
         df_all = pd.concat((df_all, df_new))
         
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
-    sns.relplot(x="Blockidx", y="HPCF", hue = "Trialtype", data=df_all, kind="line", palette=custom_palette)
+    sns.relplot(x="blockidx", y="HPCF", hue = "Trialtype", data=df_all, kind="line", palette=custom_palette)
     plt.plot([5.5, 5.5],[0.5,1], color='black')
     plt.show()
     
 def comp_groupdata(groupdata, for_ddm = 1):
-    """Trialsequence no jokers and RT are only important for DDM to determine the jokertype"""
+    '''
+    Parameters
+    ----------
+    groupdata : list of len num_agents
+        Contains 1 dictionary per agent, with experimental data.
+        Keys: 
+            choices
+            outcomes
+            trialsequence
+            blocktype
+            Jokertypes
+            blockidx
+            
+    for_ddm : TYPE, optional
+        DESCRIPTION. The default is 1.
+
+    Returns
+    -------
+    newgroupdata : dict
+        Contains keys as in groupdata.
+        len = num_trials
+        Each element of a key is another list with length num_agents
+
+    '''
     
     if for_ddm:
-        newgroupdata = {"Trialsequence" : [],\
-                        #"Trialsequence no jokers" : [],\
-                        "Choices" : [],\
-                        "Outcomes" : [],\
-                        "Blocktype" : [],\
-                        "Blockidx" : [],\
+        newgroupdata = {"trialsequence" : [],\
+                        #"trialsequence no jokers" : [],\
+                        "choices" : [],\
+                        "outcomes" : [],\
+                        "blocktype" : [],\
+                        "blockidx" : [],\
                         "RT": []}
             
     else:
-        newgroupdata = {"Trialsequence" : [],\
-                        #"Trialsequence no jokers" : [],\
-                        "Choices" : [],\
-                        "Outcomes" : [],\
-                        "Blocktype" : [],\
-                        "Blockidx" : []}
+        newgroupdata = {"trialsequence" : [],\
+                        #"trialsequence no jokers" : [],\
+                        "choices" : [],\
+                        "outcomes" : [],\
+                        "blocktype" : [],\
+                        "blockidx" : []}
     
-    for trial in range(len(groupdata[0]["Trialsequence"])):
+    for trial in range(len(groupdata[0]["trialsequence"])):
         trialsequence = []
         # trialseq_no_jokers = []
         choices = []
@@ -423,21 +485,21 @@ def comp_groupdata(groupdata, for_ddm = 1):
             RT = []
 
         for dt in groupdata:
-            trialsequence.append(dt["Trialsequence"][trial][0])
-            # trialseq_no_jokers.append(dt["Trialsequence no jokers"][trial][0])
-            choices.append(dt["Choices"][trial][0].item())
-            outcomes.append(dt["Outcomes"][trial][0].item())
-            blocktype.append(dt["Blocktype"][trial][0])
-            blockidx.append(dt["Blockidx"][trial][0])
+            trialsequence.append(dt["trialsequence"][trial][0])
+            # trialseq_no_jokers.append(dt["trialsequence no jokers"][trial][0])
+            choices.append(dt["choices"][trial][0].item())
+            outcomes.append(dt["outcomes"][trial][0].item())
+            blocktype.append(dt["blocktype"][trial][0])
+            blockidx.append(dt["blockidx"][trial][0])
             if for_ddm:
                 RT.append(dt["RT"][trial][0])
             
-        newgroupdata["Trialsequence"].append(trialsequence)
-        # newgroupdata["Trialsequence no jokers"].append(trialseq_no_jokers)
-        newgroupdata["Choices"].append(torch.tensor(choices, dtype = int))
-        newgroupdata["Outcomes"].append(torch.tensor(outcomes, dtype = int))
-        newgroupdata["Blocktype"].append(blocktype)
-        newgroupdata["Blockidx"].append(blockidx)
+        newgroupdata["trialsequence"].append(trialsequence)
+        # newgroupdata["trialsequence no jokers"].append(trialseq_no_jokers)
+        newgroupdata["choices"].append(torch.tensor(choices, dtype = int))
+        newgroupdata["outcomes"].append(torch.tensor(outcomes, dtype = int))
+        newgroupdata["blocktype"].append(blocktype)
+        newgroupdata["blockidx"].append(blockidx)
         if for_ddm:
             newgroupdata["RT"].append(RT)
         
@@ -520,7 +582,6 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=torch.tensor([[Q_init]]))
         
-        
     else:
         raise Exception("No model specified")
         
@@ -532,6 +593,8 @@ def simulate_data(model,
                   sequence = None, 
                   blockorder = None):
     '''
+    Simulates data and plots results.
+    
     Parameters
     ----------
     model : str
@@ -556,12 +619,12 @@ def simulate_data(model,
     groupdata : list of len num_agents
         Contains 1 dictionary per agent, with experimental data.
         Keys: 
-            Choices
-            Outcomes
-            Trialsequence
-            Blocktype
+            choices
+            outcomes
+            trialsequence
+            blocktype
             Jokertypes
-            Blockidx
+            blockidx
             
     params_true : torch tensor, shape [num_params, num_agents]
         Contains the parameter values with which the simulations were performed.
@@ -587,12 +650,6 @@ def simulate_data(model,
     params_true = torch.zeros((num_params, num_agents))
     
     Q_init_group = []
-
-    sequence_matfile_dirs = ['./matlabcode/clipre/',
-                             './matlabcode/clipre/mirror_'] 
-    
-    rewprobs = [[0.8, 0.2, 0.2, 0.8],
-                [0.2, 0.8, 0.8, 0.2]]
     
     "Simulate with random parameters"
     for ag_idx in range(num_agents):
@@ -604,21 +661,19 @@ def simulate_data(model,
         for param_idx in range(len(newagent.param_names)):
             params_true[param_idx, ag_idx] = newagent.par_dict[newagent.param_names[param_idx]]
 
-        newenv = env.Env(newagent,
-                         rewprobs = rewprobs[sequence[ag_idx]],
-                         matfile_dir = sequence_matfile_dirs[sequence[ag_idx]],
-                         blockorder = )
+        newenv = env.Env(newagent, matfile_dir = './matlabcode/clipre/')
         
-        newenv.run()
+        newenv.run(sequence = sequence[ag_idx],
+                   blockorder = blockorder[ag_idx])
         
-        data = {"Choices": newenv.choices, 
-                "Outcomes": newenv.outcomes,
-                "Trialsequence": newenv.data["trialsequence"], 
-                "Blocktype": newenv.data["blocktype"],
+        data = {"choices": newenv.choices, 
+                "outcomes": newenv.outcomes,
+                "trialsequence": newenv.data["trialsequence"], 
+                "blocktype": newenv.data["blocktype"],
                 "Jokertypes": newenv.data["jokertypes"], 
-                "Blockidx": newenv.data["blockidx"]}
+                "blockidx": newenv.data["blockidx"]}
             
-        plot_results(pd.DataFrame(data), group = 0)
+        plot_results(pd.DataFrame(data), group = 0, title = 'Simulated Data')
             
         groupdata.append(data)
         
