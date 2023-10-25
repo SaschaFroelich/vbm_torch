@@ -3,6 +3,8 @@
 """
 Created on Wed Jun  7 15:03:15 2023
 
+Parameter Recovery Analysis to load from pickle files.
+
 @author: sascha
 """
 
@@ -295,10 +297,6 @@ g.map_diag(sns.distplot, kde_kws={'color': 'black'})
 g.map_upper(corrdot)
 
 g.savefig("bla.svg")
-
-# r,p = scipy.stats.pearsonr(df_inf["learning rate"], df_inf["omega"])
-# r,p = scipy.stats.pearsonr(df_inf["learning rate"], df_inf["Decision Temp"])
-# r,p = scipy.stats.pearsonr(df_inf["omega"], df_inf["Decision Temp"])
 
 #%%
 
