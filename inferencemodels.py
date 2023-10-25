@@ -16,6 +16,9 @@ import env
 import pyro
 import pyro.distributions as dist
 
+# np.random.seed(123)
+# torch.manual_seed(123)
+
 beta_variance = lambda alpha, beta: alpha*beta / ((alpha+beta)**2 * (alpha + beta + 1))
 gamma_variance = lambda conc, rate: conc/(rate**2)
 

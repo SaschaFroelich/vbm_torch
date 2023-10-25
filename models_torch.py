@@ -74,6 +74,9 @@ class Vbm():
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
+        self.errorrates_stt = torch.rand(1)*0.1
+        self.errorrates_dtt = torch.rand(1)*0.2
+        
         "--- Latent variables ---"
         self.par_dict = {}
         self.par_dict['omega'] = omega
@@ -264,12 +267,16 @@ class Vbm():
         -------
         tensor with shape []
             Chosen action of agent. 0-indexed.
+            -2 = error
 
         '''
         
         if trial < 10:
             "Single-target trial"
             choice_python = trial-1
+            cond = (torch.rand(1) < self.errorrates_stt) 
+            choice_python = cond * self.BAD_CHOICE + ~cond * choice_python
+                            
         
         elif trial > 10:
             "Dual-target trial"
@@ -280,8 +287,11 @@ class Vbm():
 
             choice_python = option2*choice_sample + option1*(1-choice_sample)
             
+            cond = (torch.rand(1) < self.errorrates_dtt)
+            choice_python =  cond * self.BAD_CHOICE + ~cond * choice_python
+            
         "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
-        return torch.squeeze(choice_python).type('torch.LongTensor')
+        return torch.squeeze(choice_python.clone().detach()).type('torch.LongTensor')
 
     def update(self, choices, outcomes, blocktype, **kwargs):
         '''
@@ -440,6 +450,9 @@ class Vbm_B(Vbm):
         
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
+        
+        self.errorrates_stt = torch.rand(1)*0.1
+        self.errorrates_dtt = torch.rand(1)*0.2
         
         "Latent Variables"
         self.par_dict = {}

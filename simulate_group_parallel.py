@@ -32,6 +32,8 @@ import sys
 from datetime import datetime
 import pickle
 
+import numpy as np 
+
 plt.style.use("classic")
 
 #%%
@@ -57,7 +59,11 @@ if resim:
     
 "----- Simulate data"
 Q_init=[0.2, 0., 0., 0.2]
-groupdata, params, params_df = utils.simulate_data(model, num_agents, Q_init = Q_init)
+groupdata, params, params_df = utils.simulate_data(model, 
+                                                   num_agents, 
+                                                   Q_init = Q_init,
+                                                   blockorder = [1]*num_agents)
+
 newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
 
 
@@ -102,7 +108,7 @@ pickle.dump( (df_all, infer.loss, agent.param_names), open(f"parameter_recovery/
 '''
 Analysis
 '''
-
+#%%
 "----- Open Files"
 import tkinter as tk
 from tkinter import filedialog
@@ -143,5 +149,11 @@ for param in param_names:
 
 #%%
 
-
-
+'''
+Simulate data from inferred parameters
+'''
+groupdata, params, params_df = utils.simulate_data(model, 
+                                                   num_agents, 
+                                                   Q_init = Q_init,
+                                                   blockorder = np.random.randint(1,3,size=num_agents).tolist(),
+                                                   params = torch.tensor(np.array(df_all.iloc[:, 0:len(param_names)]).T))

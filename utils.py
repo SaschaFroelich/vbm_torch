@@ -9,7 +9,7 @@ Created on Fri Jun  9 12:52:24 2023
 import env 
 import ipdb
 import torch
-import numpy
+import numpy as np
 import scipy
 import glob
 import pandas as pd
@@ -19,7 +19,10 @@ import models_torch as models
 
 from statistics import mean, stdev
 from math import sqrt
-    
+
+# np.random.seed(123)
+# torch.manual_seed(123)
+
 def get_participant_data(file_day1, group, data_dir, published_results = 0):
     "Get data of an individual participant"
     assert(group < 4)
@@ -55,10 +58,10 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
         correct.append(-1)
         RT.append(-1)
         
-        correct.extend(numpy.squeeze(participant_day1["correct_all_cell"][0][i]).tolist())
-        choices.extend(numpy.squeeze(participant_day1["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
-        outcomes.extend(numpy.squeeze(participant_day1["rew_cell"][0][i]).tolist())
-        RT.extend(numpy.squeeze(participant_day1["RT_cell"][0][i]).tolist())
+        correct.extend(np.squeeze(participant_day1["correct_all_cell"][0][i]).tolist())
+        choices.extend(np.squeeze(participant_day1["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
+        outcomes.extend(np.squeeze(participant_day1["rew_cell"][0][i]).tolist())
+        RT.extend(np.squeeze(participant_day1["RT_cell"][0][i]).tolist())
         
     block_order_day2 = [[0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6], [0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6]]
         
@@ -69,10 +72,10 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
         correct.append(-1)
         RT.append(-1)
         
-        correct.extend(numpy.squeeze(participant_day2["correct_all_cell"][0][i]).tolist())
-        choices.extend(numpy.squeeze(participant_day2["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
-        outcomes.extend(numpy.squeeze(participant_day2["rew_cell"][0][i]).tolist())
-        RT.extend(numpy.squeeze(participant_day2["RT_cell"][0][i]).tolist())
+        correct.extend(np.squeeze(participant_day2["correct_all_cell"][0][i]).tolist())
+        choices.extend(np.squeeze(participant_day2["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
+        outcomes.extend(np.squeeze(participant_day2["rew_cell"][0][i]).tolist())
+        RT.extend(np.squeeze(participant_day2["RT_cell"][0][i]).tolist())
     
     "Errors to -9 (0 -> -9)"
     choices = [ch if ch != 0 else -9 for ch in choices]
@@ -161,8 +164,8 @@ def get_trialseq(group, block_no, published_results = 0):
               ["r", "s", "r", "s", "r", "s", "s", "r", "s", "r", "s", "r", "s", "r"],\
               ["s", "r", "s", "r", "s", "r", "r", "s", "r", "s", "r", "s", "r", "s"]]    
     
-    return torch.tensor(numpy.squeeze(mat["sequence"])), types[group][block_no], \
-        torch.tensor(numpy.squeeze(mat["sequence_without_jokers"]))
+    return torch.tensor(np.squeeze(mat["sequence"])), types[group][block_no], \
+        torch.tensor(np.squeeze(mat["sequence_without_jokers"]))
 
 def replace_single_element_lists(value):
     if len(value) == 1:
@@ -374,7 +377,7 @@ def plot_results(data_sim, *args, **kwargs):
         if "plotname" in kwargs:
             plt.savefig(kwargs["savedir"]+"/%s.png"%kwargs["plotname"])
         else:
-            plt.savefig(kwargs["savedir"]+"/plot_%d.png"%(numpy.random.randint(10e+9)))
+            plt.savefig(kwargs["savedir"]+"/plot_%d.png"%(np.random.randint(10e+9)))
         
     if 'title' in kwargs:
         plt.title("Simulated data.")
@@ -539,17 +542,18 @@ def init_agent(model, Q_init, num_agents=1, params = None):
         
         if params is None:
             print("Setting random parameters.")
-            params = numpy.random.uniform(0,1, (num_params, num_agents))
+            params = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
         else:
             print("Setting initial parameters as provided.")
-            
-        omega = params[0, :][None,...]
-        dectemp = (params[1, :][None,...]+1)*3
-        lr = params[2, :][None,...]*0.01
-        newagent = models.Vbm(omega = torch.tensor(omega),
-                              dectemp = torch.tensor(dectemp),
-                              lr = torch.tensor(lr),
+        
+        omega = params[0:1, :]
+        dectemp = (params[1:2, :]+1)*3
+        lr = params[2:3, :]*0.01
+        newagent = models.Vbm(omega = omega,
+                              dectemp = dectemp,
+                              lr = lr,
+                              
                               k=torch.tensor([k]),
                               Q_init=torch.tensor([[Q_init]]))
         
@@ -559,26 +563,27 @@ def init_agent(model, Q_init, num_agents=1, params = None):
         
         if params is None:
             print("Setting random parameters.")
-            params = numpy.random.uniform(0,1, (num_params, num_agents))
+            params = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
         else:
             print("Setting initial parameters as provided.")
             
-        lr_day1 = params[0, :][None,...]*0.01
-        theta_Q_day1 = params[1, :][None,...]*6
-        theta_rep_day1 = params[2, :][None,...]*6
+        lr_day1 = params[0:1, :]*0.01
+        theta_Q_day1 = params[1:2, :]*6
+        theta_rep_day1 = params[2:3, :]*6
         
-        lr_day2 = params[0, :][None,...]*0.01
-        theta_Q_day2 = params[1, :][None,...]*6
-        theta_rep_day2 = params[2, :][None,...]*6
+        lr_day2 = params[3:4, :]*0.01
+        theta_Q_day2 = params[4:5, :]*6
+        theta_rep_day2 = params[5:6, :]*6
         
-        newagent = models.Vbm_B(lr_day1 = torch.tensor(lr_day1),
-                              theta_Q_day1 = torch.tensor(theta_Q_day1),
-                              theta_rep_day1 = torch.tensor(theta_rep_day1),
+        newagent = models.Vbm_B(lr_day1 = lr_day1,
+                              theta_Q_day1 = theta_Q_day1,
+                              theta_rep_day1 = theta_rep_day1,
                                   
-                              lr_day2 = torch.tensor(lr_day2),
-                              theta_Q_day2 = torch.tensor(theta_Q_day2),
-                              theta_rep_day2 = torch.tensor(theta_rep_day2),
+                              lr_day2 = lr_day2,
+                              theta_Q_day2 = theta_Q_day2,
+                              theta_rep_day2 = theta_rep_day2,
+                              
                               k=torch.tensor([k]),
                               Q_init=torch.tensor([[Q_init]]))
         
@@ -591,7 +596,8 @@ def simulate_data(model,
                   num_agents, 
                   Q_init, 
                   sequence = None, 
-                  blockorder = None):
+                  blockorder = None,
+                  params = None):
     '''
     Simulates data and plots results.
     
@@ -609,10 +615,14 @@ def simulate_data(model,
     sequence : list, len num_agents
         Whether sequence or mirror sequence.
         1/2 : sequence/ mirror sequence
+        Mirror sequence has reversed reward probabilities.
         
     blockorder : list, len num_agents
         Which blockorder
         1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+        
+    params : tensor, shape [num_params, num_agents]
+        Contains the latent model parameters with which to simulate data.
         
     Returns
     -------
@@ -639,6 +649,9 @@ def simulate_data(model,
         
     if blockorder is None:
         blockorder = [1]*num_agents
+        
+    else: 
+        raise Exception("Not implemented.")
     
     if model == 'original':
         num_params = models.Vbm.num_params #number of latent model parameters
@@ -656,7 +669,12 @@ def simulate_data(model,
         
         print("Simulating agent no. %d"%ag_idx)
         Q_init_group.append(Q_init)
-        newagent = init_agent('original', Q_init)
+        
+        if params == None:
+            newagent = init_agent('original', Q_init, num_agents = 1)
+        
+        else:
+            newagent = init_agent('original', Q_init, num_agents = 1, params = params[:, ag_idx:ag_idx+1])
         
         for param_idx in range(len(newagent.param_names)):
             params_true[param_idx, ag_idx] = newagent.par_dict[newagent.param_names[param_idx]]

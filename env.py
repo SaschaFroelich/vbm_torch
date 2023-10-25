@@ -14,6 +14,8 @@ import scipy
 import pyro
 import pyro.distributions as dist
 
+# torch.manual_seed(123)
+
 class Env():
     
     def __init__(self, 
@@ -158,6 +160,9 @@ class Env():
         elif blockorder == 2:
             blocktype[tb_idxs[0:num_blocks//2], :] = 1
             blocktype[rand_idxs[0:num_blocks//2], :] = 0
+            
+        else:
+            raise Exception(print("Problem with blockorder."))
     
         block_no = -100*torch.ones((num_blocks, 480), dtype=torch.int8); # The index of the block in the current experiment
 
@@ -235,8 +240,8 @@ class Env():
         
         num_trials = len(data["trialsequence"])
         t = -1
+
         for tau in pyro.markov(range(num_trials)):
-    
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             
@@ -268,7 +273,7 @@ class Env():
             
                 else:
                     "Simulation"
-                    assert(torch.is_tensor(trial))
+                    # assert(torch.is_tensor(trial))
                     current_choice = torch.tensor(agent.choose_action(trial, day).item(), requires_grad = False)
                     outcome = torch.bernoulli(data['rewprobs'][current_choice])
                     self.choices.append(torch.tensor([current_choice.item()]))
@@ -285,17 +290,15 @@ class Env():
                     "==========================================="
                     probs = agent.compute_probs(trial, day)
                     "==========================================="
-                    
-                    choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
-                    obs_mask = (current_choice != -2).broadcast_to(num_particles, agent.num_agents)
+                    # ipdb.set_trace()
+                    choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
+                    "obs_mask is False where errors were performed, and where a subject saw a STT."
+                    obs_mask = (current_choice != -2).broadcast_to(num_particles, agent.num_agents) *\
+                                (trial > 10).broadcast_to(num_particles, agent.num_agents)
     
                     if any(current_choice == -10):
                         raise Exception("Fehla!")
                         
-                    if torch.any(obs_mask == False):
-                        dfgh
-    
-                "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
                 agent.update(current_choice, 
                                 outcome, 
                                 blocktype, 
@@ -303,11 +306,11 @@ class Env():
                                 trialstimulus = trial)
     
                 if infer and any(trial > 10):
-                    "STT are 0.5 0.5"
+                    "STT are [0.5, 0.5]"
                     "errors are obs_masked"
                     pyro.sample('res_{}'.format(t), 
                                 dist.Categorical(probs = probs),
-                                obs = choices,
+                                obs = choices_bin,
                                 obs_mask = obs_mask)
             
         # t_day1 = -1
