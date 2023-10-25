@@ -41,6 +41,25 @@ def remap(blockno):
     return blockno_new
 
 def violin(df, with_colbar = 1, sharey = False):
+    '''
+
+    Parameters
+    ----------
+    df : DataFrame
+        DESCRIPTION.
+        
+    with_colbar : bool, optional
+        DESCRIPTION. The default is 1.
+        
+    sharey : bool, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
     plt.style.use("seaborn-v0_8-dark")
     
     npar = len(df["parameter"].unique())
@@ -52,16 +71,22 @@ def violin(df, with_colbar = 1, sharey = False):
         if with_colbar:    
     
             "ax[0]"
-            sns.violinplot(ax=ax[par], x="parameter", y="inferred", data=df[df["parameter"]==df["parameter"].unique()[par]], color=".8")
-            sns.stripplot(x="parameter", \
-                          y="inferred", \
-                          hue="variance", \
-                          edgecolor = 'gray', \
-                          linewidth = 1, \
-                          data=df[df["parameter"]==df["parameter"].unique()[par]], \
-                          jitter=True, \
-                          ax=ax[par], \
+            sns.violinplot(ax=ax[par], 
+                           x="parameter", 
+                           y="inferred", 
+                           data=df[df["parameter"]==df["parameter"].unique()[par]], 
+                           color=".8")
+            
+            sns.stripplot(x="parameter",
+                          y="inferred",
+                          hue="variance",
+                          edgecolor = 'gray',
+                          linewidth = 1,
+                          data=df[df["parameter"]==df["parameter"].unique()[par]],
+                          jitter=True,
+                          ax=ax[par],
                           palette="coolwarm")
+            
             ax[par].legend([],[], frameon=False)
             
             "Position"
@@ -74,7 +99,8 @@ def violin(df, with_colbar = 1, sharey = False):
             "Colorbar"
             variance = df[df["parameter"]==df["parameter"].unique()[par]]["variance"]
             
-            normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, vmin=min(variance), \
+            normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2,
+                                             vmin=min(variance),
                                               vmax=max(variance))
             colormap = cm.coolwarm
             scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
@@ -83,14 +109,18 @@ def violin(df, with_colbar = 1, sharey = False):
             
         else:
             "ax[0]"
-            g1 = sns.violinplot(ax=ax[par], x="parameter", y="inferred", data=df[df["parameter"]==df["parameter"].unique()[par]], color=".8")
+            g1 = sns.violinplot(ax=ax[par],
+                                x="parameter",
+                                y="inferred",
+                                data=df[df["parameter"]==df["parameter"].unique()[par]],
+                                color=".8")
             
-            g2 = sns.stripplot(x="parameter", \
-                          y="inferred", \
-                          edgecolor = 'gray', \
-                          linewidth = 1, \
-                          data=df[df["parameter"]==df["parameter"].unique()[par]], \
-                          jitter=True, \
+            g2 = sns.stripplot(x="parameter",
+                          y="inferred",
+                          edgecolor = 'gray',
+                          linewidth = 1,
+                          data=df[df["parameter"]==df["parameter"].unique()[par]],
+                          jitter=True,
                           ax=ax[par])
                 
             if par > 0:

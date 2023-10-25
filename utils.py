@@ -23,7 +23,86 @@ from math import sqrt
 # np.random.seed(123)
 # torch.manual_seed(123)
 
+def get_groupdata(data_dir):
+    '''
+    
+
+    Parameters
+    ----------
+    data_dir : str
+        Directory with data.
+
+    Returns
+    -------
+    newgroupdata : dict
+        Contains experimental data.
+        Keys
+            trialsequence : nested list, 'shape' [num_trials, num_agents]
+            choices : nested list, 'shape' [num_trials, num_agents]
+            outcomes : nested list, 'shape' [num_trials, num_agents]
+            blocktype : nested list, 'shape' [num_trials, num_agents]
+            blockidx : nested list, 'shape' [num_trials, num_agents]
+            RT : nested list, 'shape' [num_trials, num_agents]
+            group : list, len [num_agents]
+
+    '''
+    
+    groupdata = []
+    group = []
+    
+    pb = -1
+    for grp in range(4):
+        files_day1 = glob.glob(data_dir + "Grp%d/csv/*Tag1*.mat"%(grp+1))
+        for file1 in files_day1:
+            "Loop over participants"
+            pb += 1
+            group.append(grp)
+            data, _ = get_participant_data(file1, 
+                                            grp, 
+                                            data_dir,
+                                            published_results = 0)
+            
+            groupdata.append(data)
+                
+    newgroupdata = comp_groupdata(groupdata, for_ddm = 0)
+    newgroupdata['group'] = group
+    
+    return newgroupdata
+
 def get_participant_data(file_day1, group, data_dir, published_results = 0):
+    '''
+    Parameters
+    ----------
+    file_day1 : TYPE
+        DESCRIPTION.
+        
+    group : int
+        Experimental Group
+        
+    data_dir : str
+        Where experimental data is stored.
+        
+    published_results : int, optional
+        0/1 get unpublished/ published results. The default is 0.
+
+    Returns
+    -------
+    data : dict
+        DESCRIPTION.
+        
+    ID : str
+        Participant-specific ID.
+        Keys:
+            trialsequence
+            trialsequence no jokers
+            choices : list, len num_trials, -2,-1,0,1,2, or 3
+            outcomes
+            blocktype
+            blockidx
+            RT
+
+    '''
+    
     "Get data of an individual participant"
     assert(group < 4)
     "RETURN: data (dict) used for inference"
@@ -77,17 +156,16 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
         outcomes.extend(np.squeeze(participant_day2["rew_cell"][0][i]).tolist())
         RT.extend(np.squeeze(participant_day2["RT_cell"][0][i]).tolist())
     
-    "Errors to -9 (0 -> -9)"
-    choices = [ch if ch != 0 else -9 for ch in choices]
+    'So far, choices is list containing -1 (new block trial), 0 (error), and resp options 1,2,3,4,'
+    'Transform choices to 0-indexing, and errors to -2.'
+    choices = [-2 if ch == 0 else ch for ch in choices]
+    choices = [-2 if ch == -2 else -1 if ch == -1 else ch-1 for ch in choices]
     
-    "Transform choices to 0-indexing by subtracting 1 -> this transforms errors to -10, leave -1 (new block) unchanged"
-    choices = [ch-1 if ch != -1 else -1 for ch in choices] # Now new block is again -1
-                    
-    "Transform outcomes: 2 (no reward) -> 0, -1 (error) -> -10, 1 -> 1, -2->-1"
-    outcomes = [0 if out == 2 else -10 if out == -1 else 1 if out == 1 else -1 for out in outcomes]
+    "Transform outcomes: 2 (no reward) -> 0, -1 (error) -> -2, 1 -> 1, -2->-1"
+    outcomes = [0 if out == 2 else -2 if out == -1 else 1 if out == 1 else -1 for out in outcomes]
     
     "Check internal consistency: indexes of errors should be the same in choices and in correct"
-    indices_ch = [i for i, x in enumerate(choices) if x == -10]
+    indices_ch = [i for i, x in enumerate(choices) if x == -2]
     indices_corr = [i for i, x in enumerate(correct) if x != 1 and x != -1]
     
     assert(indices_ch == indices_corr)
@@ -108,7 +186,7 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
         "Mark the beginning of a new block"
         trialsequence.append(torch.tensor(-1))
         trialsequence_wo_jokers.append(torch.tensor(-1))
-        blocktype.append("n")
+        blocktype.append(torch.tensor(-1))
         blockidx.append(block)
         
         seq, btype, seq_wo_jokers = get_trialseq(group, 
@@ -146,23 +224,50 @@ def get_trialseq(group, block_no, published_results = 0):
     "NB: in mat-files, the block order was already swapped, as if all participants saw the first group's block order! Have to correct for this!"
     
     "This is the blockorder participants actually saw"
-    blockorder = [["random1", "trainblock1", "random2", "trainblock2", "random3", "trainblock3", "trainblock4", "random4", "trainblock5", "random5", "trainblock6", "random6", "trainblock7", "random7"],\
-             ["trainblock1", "random1", "trainblock2", "random2", "trainblock3", "random3", "random4", "trainblock4", "random5", "trainblock5", "random6", "trainblock6", "random7", "trainblock7"],\
-              ["mirror_random1", "mirror_trainblock1", "mirror_random2", "mirror_trainblock2", "mirror_random3", "mirror_trainblock3", "mirror_trainblock4", "mirror_random4", "mirror_trainblock5", "mirror_random5", "mirror_trainblock6", "mirror_random6", "mirror_trainblock7", "mirror_random7"],\
-              ["mirror_trainblock1", "mirror_random1", "mirror_trainblock2", "mirror_random2", "mirror_trainblock3", "mirror_random3", "mirror_random4", "mirror_trainblock4", "mirror_random5", "mirror_trainblock5", "mirror_random6", "mirror_trainblock6", "mirror_random7", "mirror_trainblock7"]]    
+    blockorder = [["random1", "trainblock1", 
+                   "random2", "trainblock2", 
+                   "random3", "trainblock3", 
+                   "trainblock4", "random4", 
+                   "trainblock5", "random5", 
+                   "trainblock6", "random6", 
+                   "trainblock7", "random7"],
+                  
+                  ["trainblock1", "random1", 
+                   "trainblock2", "random2", 
+                   "trainblock3", "random3", 
+                   "random4", "trainblock4", 
+                   "random5", "trainblock5", 
+                   "random6", "trainblock6", 
+                   "random7", "trainblock7"],
+                  
+                  ["mirror_random1", "mirror_trainblock1", 
+                   "mirror_random2", "mirror_trainblock2", 
+                   "mirror_random3", "mirror_trainblock3", 
+                   "mirror_trainblock4", "mirror_random4", 
+                   "mirror_trainblock5", "mirror_random5", 
+                   "mirror_trainblock6", "mirror_random6", 
+                   "mirror_trainblock7", "mirror_random7"],
+                  
+                  ["mirror_trainblock1", "mirror_random1", 
+                   "mirror_trainblock2", "mirror_random2", 
+                   "mirror_trainblock3", "mirror_random3", 
+                   "mirror_random4", "mirror_trainblock4", 
+                   "mirror_random5", "mirror_trainblock5", 
+                   "mirror_random6", "mirror_trainblock6", 
+                   "mirror_random7", "mirror_trainblock7"]]    
 
     if published_results:
         "Published"
-        mat = scipy.io.loadmat("/home/sascha/Desktop/vb_model/vbm_torch/matlabcode/published/%s.mat"%blockorder[group][block_no])
+        mat = scipy.io.loadmat("/home/sascha/Desktop/vbm_torch/matlabcode/published/%s.mat"%blockorder[group][block_no])
         
     else:
         "Clipre"
-        mat = scipy.io.loadmat("/home/sascha/Desktop/vb_model/vbm_torch/matlabcode/clipre/%s.mat"%blockorder[group][block_no])
+        mat = scipy.io.loadmat("/home/sascha/Desktop/vbm_torch/matlabcode/clipre/%s.mat"%blockorder[group][block_no])
         
-    types = [["r", "s", "r", "s", "r", "s", "s", "r", "s", "r", "s", "r", "s", "r"],\
-             ["s", "r", "s", "r", "s", "r", "r", "s", "r", "s", "r", "s", "r", "s"],\
-              ["r", "s", "r", "s", "r", "s", "s", "r", "s", "r", "s", "r", "s", "r"],\
-              ["s", "r", "s", "r", "s", "r", "r", "s", "r", "s", "r", "s", "r", "s"]]    
+    types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],\
+             [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0],\
+              [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],\
+              [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0]]    
     
     return torch.tensor(np.squeeze(mat["sequence"])), types[group][block_no], \
         torch.tensor(np.squeeze(mat["sequence_without_jokers"]))
@@ -214,7 +319,7 @@ def arrange_data_for_plot(i, df, **kwargs):
             "Random Block"
             
             if "Qdiff" in df.columns:
-                data_Q["blocktype"].append("r")
+                data_Q["blocktype"].append(1)
                 data_Q["blockidx"].append(block)
                 
             data_new["blockidx"].append(block)
@@ -234,7 +339,7 @@ def arrange_data_for_plot(i, df, **kwargs):
             "Sequential Block"
             
             if "Qdiff" in df.columns:
-                data_Q["blocktype"].append("s")
+                data_Q["blocktype"].append(0)
                 data_Q["blockidx"].append(block)
             
             "Congruent Jokers"
@@ -516,8 +621,8 @@ def init_agent(model, Q_init, num_agents=1, params = None):
     model : str
         The model class to simulate data with.
 
-    Q_init : list, len 4
-        Initial Q-Values of the agent.
+    Q_init : tensor, shape [num_agents, 4]
+        Initial Q-Values of the agent(s).
 
     num_agents : int
         Number of agents in a single agent object.
@@ -533,6 +638,8 @@ def init_agent(model, Q_init, num_agents=1, params = None):
     newagent : obj of class model
 
     '''
+    
+    assert(Q_init.shape == (num_agents, 4))
     
     import models_torch as models
     
@@ -555,7 +662,7 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                               lr = lr,
                               
                               k=torch.tensor([k]),
-                              Q_init=torch.tensor([[Q_init]]))
+                              Q_init=Q_init[None, ...])
         
         
     elif model == 'B':
@@ -585,7 +692,7 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                               theta_rep_day2 = theta_rep_day2,
                               
                               k=torch.tensor([k]),
-                              Q_init=torch.tensor([[Q_init]]))
+                              Q_init=Q_init[None, ...])
         
     else:
         raise Exception("No model specified")
@@ -609,7 +716,7 @@ def simulate_data(model,
     num_agents : int
         Number of agents for simulation.
         
-    Q_init : list, len 4
+    Q_init : tensor, shape [num_agents, 4]
         Initial Q-Values of the agent.
         
     sequence : list, len num_agents
@@ -630,11 +737,11 @@ def simulate_data(model,
         Contains 1 dictionary per agent, with experimental data.
         Keys: 
             choices
-            outcomes
-            trialsequence
+            outcomes : 0/1 reward/ no reward
+            trialsequence : stimuli as seen by participants
             blocktype
-            Jokertypes
-            blockidx
+            jokertypes
+            blockidx : number of block as experienced by participants
             
     params_true : torch tensor, shape [num_params, num_agents]
         Contains the parameter values with which the simulations were performed.
@@ -644,8 +751,13 @@ def simulate_data(model,
 
     '''
     
+    assert(torch.is_tensor(Q_init))
+    
     if sequence is None:
         sequence = [1]*num_agents
+        
+    else: 
+        raise Exception("Not implemented.")
         
     if blockorder is None:
         blockorder = [1]*num_agents
@@ -661,20 +773,17 @@ def simulate_data(model,
     
     groupdata = []
     params_true = torch.zeros((num_params, num_agents))
-    
-    Q_init_group = []
-    
+        
     "Simulate with random parameters"
     for ag_idx in range(num_agents):
         
         print("Simulating agent no. %d"%ag_idx)
-        Q_init_group.append(Q_init)
         
         if params == None:
-            newagent = init_agent('original', Q_init, num_agents = 1)
+            newagent = init_agent('original', Q_init[ag_idx, :], num_agents = 1)
         
         else:
-            newagent = init_agent('original', Q_init, num_agents = 1, params = params[:, ag_idx:ag_idx+1])
+            newagent = init_agent('original', Q_init[ag_idx, :], num_agents = 1, params = params[:, ag_idx:ag_idx+1])
         
         for param_idx in range(len(newagent.param_names)):
             params_true[param_idx, ag_idx] = newagent.par_dict[newagent.param_names[param_idx]]

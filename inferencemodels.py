@@ -28,16 +28,27 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 class GeneralGroupInference(object):
     
-    def __init__(self, agent, num_agents, group_data):
+    def __init__(self, agent, group_data):
         '''
         General Group inference..
         
-        agents : list of agents
-        group_data : list of data dicts 
+        agent : obj
+            Initialization of agent class with num_agents parallel agents.
+
+        groupdata : dict
+            Contains experimental data.
+            Keys
+                trialsequence : nested list, 'shape' [num_trials, num_agents]
+                choices : nested list, 'shape' [num_trials, num_agents]
+                outcomes : nested list, 'shape' [num_trials, num_agents]
+                blocktype : nested list, 'shape' [num_trials, num_agents]
+                blockidx : nested list, 'shape' [num_trials, num_agents]
+                RT : nested list, 'shape' [num_trials, num_agents]
+                group : list, len [num_agents]
         '''
         self.agent = agent
         self.trials = agent.trials # length of experiment
-        self.num_agents = num_agents # no. of participants
+        self.num_agents = agent.num_agents # no. of participants
         self.data = group_data # list of dictionaries
         self.num_parameters = len(self.agent.param_names) # number of parameters
         self.loss = []
@@ -77,71 +88,6 @@ class GeneralGroupInference(object):
             # print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
             
             env.Env.run_loop(None, self.agent, self.data, num_particles, infer = 1)
-        
-    # def run_loop(self, agent, num_particles):
-            
-    #     t = -1
-    #     for tau in pyro.markov(range(self.trials)):
-    
-    #         trial = torch.tensor(self.data["trialsequence"][tau])
-    #         blocktype = torch.tensor(self.data["blocktype"][tau])
-            
-    #         if all([self.data["blockidx"][tau][i] <= 5 for i in range(self.num_agents)]):
-    #             day = 1
-                
-    #         elif all([self.data["blockidx"][tau][i] > 5 for i in range(self.num_agents)]):
-    #             day = 2
-                
-    #         else:
-    #             raise Exception("Da isch a Fehla!")
-            
-    #         if all(trial == -1):
-    #             "Beginning of new block"
-    #             self.agent.update(torch.tensor([-1]*self.agent.num_agents), 
-    #                               torch.tensor([-1]*self.agent.num_agents), 
-    #                               torch.tensor([-1]*self.agent.num_agents), 
-    #                               day = day, 
-    #                               trialstimulus = trial)
-                
-    #         else:
-    #             current_choice = self.data["choices"][tau]
-    #             outcome = self.data["outcomes"][tau]
-            
-    #             if any(trial > 10):
-    #                 "Dual-Target Trial"
-    #                 t+=1
-    #                 option1, option2 = self.agent.find_resp_options(trial)
-    #                 # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
-    #                 # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
-    #                 # RHS comes out as [1, n_actions] or [num_particles, n_actions]
-                    
-    #                 "==========================================="
-    #                 probs = self.agent.compute_probs(trial, day)
-    #                 "==========================================="
-                    
-    #                 choices = (current_choice != option1).type(torch.int).broadcast_to(num_particles, self.num_agents)
-    #                 obs_mask = (current_choice != -2).broadcast_to(num_particles, self.num_agents)
-    
-    #                 if any(current_choice == -10):
-    #                     raise Exception("Fehla!")
-                        
-    #                 if torch.any(obs_mask == False):
-    #                     dfgh
-    
-    #             "Update (trial == -1 means this is the beginning of a block -> participants didn't see this trial')"
-    #             self.agent.update(current_choice, 
-    #                               outcome, 
-    #                               blocktype, 
-    #                               day = day, 
-    #                               trialstimulus = trial)
-    
-    #             if any(trial > 10):
-    #                 "STT are 0.5 0.5"
-    #                 "errors are obs_masked"
-    #                 pyro.sample('res_{}'.format(t), 
-    #                             dist.Categorical(probs = probs),
-    #                             obs = choices,
-    #                             obs_mask = obs_mask)
 
     def guide(self):
         trns = torch.distributions.biject_to(dist.constraints.positive)
@@ -605,6 +551,7 @@ class SingleInference_modelB(object):
                     choice = torch.tensor([1])
                     
                 elif current_choice == -10:
+                    raise Exception("Fehla! Error should be -2.")
                     "Error"
                     pass
                     
@@ -917,6 +864,7 @@ class SingleInference_modelB_2(object):
                     choice = torch.tensor([1])
                     
                 elif current_choice == -10:
+                    raise Exception("Fehla! Error should be -2.")
                     "Error"
                     pass
                     
@@ -1239,6 +1187,7 @@ class SingleInference_modelB_3(object):
                     choice = torch.tensor([1])
                     
                 elif current_choice == -10:
+                    raise Exception("Fehla! Error should be -2.")
                     "Error"
                     pass
                     
@@ -1541,6 +1490,7 @@ class SingleInference_modelF(object):
                     choice = torch.tensor([1])
                     
                 elif current_choice == -10:
+                    raise Exception("Fehla! Error should be -2.")
                     "Error"
                     pass
                     
@@ -1821,6 +1771,7 @@ class GroupInference(object):
                             obs_mask[pb] = True
                             
                         elif current_choice == -10:
+                            raise Exception("Fehla! Error should be -2.")
                             "Error"
                             obs_mask[pb] = False
                             
@@ -2100,6 +2051,7 @@ class GroupInference_modelB(object):
                             obs_mask[pb] = True
                             
                         elif current_choice == -10:
+                            raise Exception("Fehla! Error should be -2.")
                             "Error"
                             obs_mask[pb] = False
                             

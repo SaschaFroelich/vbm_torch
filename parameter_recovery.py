@@ -48,7 +48,7 @@ plt.style.use("classic")
 model = 'original'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 40
+num_agents = 3
 # k = 4.
 print(f"Running model {model}")
 
@@ -61,7 +61,7 @@ if resim:
     raise Exception("Not implemented yet, buddy!")
     
 "----- Simulate data"
-Q_init=[0.2, 0., 0., 0.2]
+Q_init=torch.tensor([[0.2, 0., 0., 0.2]])
 groupdata, params, params_df = utils.simulate_data(model, 
                                                    num_agents, 
                                                    Q_init = Q_init,
@@ -79,8 +79,7 @@ Inference
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          Q_init, 
-                         num_agents = num_agents, 
-                         params = params)
+                         num_agents = num_agents)
 
 # df_true = pd.DataFrame({'lr_day1_true' : lr_day1_true,
 #                         'theta_Q_day1_true' : theta_Q_day1_true,
@@ -93,7 +92,7 @@ agent = utils.init_agent(model,
 
 print("===== Starting inference =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, num_agents, newgroupdata)
+infer = inferencemodels.GeneralGroupInference(agent, newgroupdata)
 infer.infer_posterior(iter_steps = 12_500, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
@@ -128,13 +127,12 @@ button = tk.Button(root, text="Open Files", command=open_files)
 print(button)
 button.pack()
 root.mainloop()
-# root.destroy()
 
+df_all, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
 #%%
 '''
 Plot ELBO and Parameter Estimates
 '''
-df_all, infer.loss, param_names = pickle.load(open( filenames[0], "rb" ))
 
 fig, ax = plt.subplots()
 plt.plot(infer.loss)
@@ -151,12 +149,11 @@ for param in param_names:
 
 
 #%%
-
 '''
 Simulate data from inferred parameters
 '''
 groupdata, params, params_df = utils.simulate_data(model, 
                                                    num_agents, 
                                                    Q_init = Q_init,
-                                                   blockorder = np.random.randint(1,3,size=num_agents).tolist(),
+                                                   blockorder = [1]*num_agents,
                                                    params = torch.tensor(np.array(df_all.iloc[:, 0:len(param_names)]).T))

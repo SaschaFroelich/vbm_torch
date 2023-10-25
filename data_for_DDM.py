@@ -19,6 +19,7 @@ import models_torch as models
 import utils
 
 def prepare_ddm_data(data_dir, file_day1, group, pb, kk):
+    raise Exception("OCode is out of date.")
     "INPUT: group (0-indexed)"
     "OUTPUT: 1-indexed DataFrame (1 because of R)"
     

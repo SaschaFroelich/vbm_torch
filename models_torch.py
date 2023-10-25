@@ -63,7 +63,6 @@ class Vbm():
 
         '''
         
-        
         if num_blocks != 1:
             if num_blocks%2 != 0:
                 raise Exception("num_blocks must be an even value.")
@@ -71,6 +70,7 @@ class Vbm():
         "Setup"
         self.num_particles = omega.shape[0]
         self.num_agents = omega.shape[1]
+        assert(Q_init.shape == (self.num_particles, self.num_agents, 4))
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
