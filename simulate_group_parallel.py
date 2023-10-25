@@ -3,7 +3,10 @@
 """
 Created on Thu Jul 27 16:26:59 2023
 
-Simulation and parallel group-level inference.
+Parameter Recovery 
+1. Simulation
+2. Group-Level Inference
+3. Analysis
 
 @author: sascha
 """
