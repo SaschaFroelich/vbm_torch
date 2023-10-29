@@ -3,7 +3,7 @@
 """
 Created on Wed Oct 25 11:05:13 2023
 
-Fit model to behaviour
+Fit model to behaviour.
 
 @author: sascha
 """
@@ -41,13 +41,15 @@ infer = inferencemodels.GeneralGroupInference(agent, groupdata)
 infer.infer_posterior(iter_steps = 3, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
-inference_df = infer.sample_posterior()
-df = inference_df.groupby(['subject']).mean()
+post_sample = infer.sample_posterior()
+df = post_sample.groupby(['subject']).mean()
+post_sample['group'] = post_sample['subject'].map(lambda x: groupdata['group'][x])
+post_sample['model'] = [model]*len(post_sample)
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # pickle.dump( infer.loss, open(f"parameter_recovery/loss_{timestamp}.p", "wb" ) )
-pickle.dump( (df, infer.loss, agent.param_names), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
+pickle.dump( (post_sample, df, infer.loss, agent.param_names), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -75,11 +77,11 @@ print(button)
 button.pack()
 root.mainloop()
 
-df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
+post_sample, df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
 
-num_agents = len(df)
+num_agents = len(post_sample['subject'].unique())
 num_params = len(param_names)
-params = torch.tensor(df.values.T, requires_grad = False)
+params = torch.tensor(df.iloc[:,0:-3].values.T, requires_grad = False)
 groupdata_exp = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in groupdata_exp['group']]
 blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in groupdata_exp['group']]
@@ -104,10 +106,10 @@ plt.show()
 
 for param in param_names:
     fig, ax = plt.subplots()
-    sns.kdeplot(df[param])
+    sns.kdeplot(post_sample[param])
     # plt.plot(df[param+'_true'], df[param+'_true'])
     plt.show()
-    
+
 #%%
 '''
 Violin Plot
@@ -117,7 +119,7 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-npar = len(df.columns)
+npar = len(post_sample.columns)
 
 fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=0)
 
@@ -193,7 +195,7 @@ for par in range(npar):
             g1.set(ylabel=None)
             g2.set(ylabel=None)
         ax[par].legend([],[], frameon=False)
-    
+
 plt.show()
 #%%
 '''
@@ -201,11 +203,17 @@ Simulate data from inferred parameters,
 and plot group-level results
 '''
 
-groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
-                                                   num_agents,
-                                                   Q_init = Q_init_behav_fit,
-                                                   sequence = sequence_behav_fit,
-                                                   blockorder = blockorder_behav_fit,
-                                                   params = params)
+# groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
+#                                                                     num_agents,
+#                                                                     Q_init = Q_init_behav_fit,
+#                                                                     sequence = sequence_behav_fit,
+#                                                                     blockorder = blockorder_behav_fit,
+#                                                                     params = params)
 
-utils.plot_grouplevel(groupdata_df)
+# utils.plot_grouplevel(groupdata_df)
+
+#%%
+'''
+Posterior Predictives
+'''
+complete_df = utils.posterior_predictives(post_sample)

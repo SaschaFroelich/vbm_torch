@@ -70,7 +70,7 @@ class Vbm():
         "Setup"
         self.num_particles = omega.shape[0]
         self.num_agents = omega.shape[1]
-        assert(Q_init.shape == (self.num_particles, self.num_agents, 4))
+        # assert(Q_init.shape == (self.num_particles, self.num_agents, 4))
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
@@ -153,7 +153,8 @@ class Vbm():
         ----------
         Qin : tensor with shape [num_particles, num_agents, 4]
             DESCRIPTION.
-        choices : TYPE
+            
+        choices : tensor, shape (num_agents)
             DESCRIPTION.
 
         Raises
@@ -173,6 +174,9 @@ class Vbm():
         """Returns a tensor with the same shape as Qin, with zeros everywhere except for the relevant places
         as indicated by 'choices', where the values of Qin are retained. Q positions for agents with an error choice
         are replaced by 0."""
+        
+        # assert torch.is_tensor(choices), "choices must be a tensor."
+        # assert choices.shape == (self.num_agents,), "choices must have shape (num_agents)."
         
         Qin = Qin.type(torch.double)
         
@@ -237,7 +241,7 @@ class Vbm():
 
         '''
         
-        #assert(torch.is_tensor(stimulus_mat))
+        # assert(torch.is_tensor(stimulus_mat))
         option2_python = ((stimulus_mat % 10) - 1).type(torch.int)
         option1_python = (((stimulus_mat - (stimulus_mat % 10)) / 10) -1).type(torch.int)
         
@@ -245,19 +249,17 @@ class Vbm():
         #     option1_python = torch.squeeze(option1_python)
         #     option2_python = torch.squeeze(option2_python)
             
-        #assert(option1_python.ndim == 1)
-        #assert(option2_python.ndim == 1)
+        # assert(option1_python.ndim == 1)
+        # assert(option2_python.ndim == 1)
         return option1_python, option2_python
 
     def choose_action(self, trial, day):
         '''
-        This method is choose_action always only executed for a single agent, since
-        simulation of data should NOT be done in batch (could break some functions).
-        ALso only execute for num_particles == 1.
+        Only execute for num_particles == 1.
         
         Parameters
         ----------
-        trial : tensor with shape [1] 
+        trial : tensor with shape (num_agents) 
             Contains stimulus trial. 1-indexed.
             
         day : int
@@ -265,33 +267,60 @@ class Vbm():
 
         Returns
         -------
-        tensor with shape ()
+        tensor with shape (num_agents)
             Chosen action of agent. 0-indexed.
             -2 = error
 
         '''
         
-        if trial < 10:
-            "Single-target trial"
-            choice_python = trial-1
-            cond = (torch.rand(1) < self.errorrates_stt) 
-            choice_python = cond * self.BAD_CHOICE + ~cond * choice_python
-                            
+        "New Code"
+        "STT"
+        choice_python_stt = torch.where(trial < 10, trial-1, trial)
+        cond_stt = (torch.rand(self.num_agents) < self.errorrates_stt) 
+        choice_python_stt = cond_stt * self.BAD_CHOICE + ~cond_stt * choice_python_stt
         
-        elif trial > 10:
-            "Dual-target trial"
+        "DTT"
+        if torch.any(trial>10):
+            # dfgh #test whether probs correct fr stt
             option1, option2 = self.find_resp_options(trial)
-            
             "[0, :] to choose 0th particle"
             choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()[0, :]
+    
+            choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
+            
+            cond_dtt = (torch.rand(self.num_agents) < self.errorrates_dtt)
+            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + ~cond_dtt * choice_python_dtt
+            
+            "Combine choices"
+            choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
+            # dfgh #test whether result correct
+            return choice_python.clone().detach()
+        
+        else:
+            return choice_python_stt.clone().detach()
+        
+        # "Old Code"
+        # if trial < 10:
+        #     "Single-target trial"
+        #     choice_python = trial-1
+        #     cond = (torch.rand(1) < self.errorrates_stt) 
+        #     choice_python = cond * self.BAD_CHOICE + ~cond * choice_python
+                            
+        
+        # elif trial > 10:
+        #     "Dual-target trial"
+        #     option1, option2 = self.find_resp_options(trial)
+            
+        #     "[0, :] to choose 0th particle"
+        #     choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()[0, :]
 
-            choice_python = option2*choice_sample + option1*(1-choice_sample)
+        #     choice_python = option2*choice_sample + option1*(1-choice_sample)
             
-            cond = (torch.rand(1) < self.errorrates_dtt)
-            choice_python =  cond * self.BAD_CHOICE + ~cond * choice_python
+        #     cond = (torch.rand(1) < self.errorrates_dtt)
+        #     choice_python =  cond * self.BAD_CHOICE + ~cond * choice_python
             
-        "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
-        return torch.squeeze(choice_python.clone().detach()).type('torch.LongTensor')
+        # "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
+        # return torch.squeeze(choice_python.clone().detach()).type('torch.LongTensor')
 
     def update(self, choices, outcomes, blocktype, **kwargs):
         '''
@@ -326,7 +355,7 @@ class Vbm():
 
         '''
         
-        assert choices.ndim == 1, "choices must have shape (num_agents)."
+        # assert choices.ndim == 1, "choices must have shape (num_agents)."
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
@@ -515,10 +544,10 @@ class Vbm_B(Vbm):
             -2, 0, 1, 2, or 3
             -2 = error
             
-        outcomes : torch.tensor or list with shape [num_agents]
+        outcomes : torch.tensor with shape [num_agents]
             no reward (0) or reward (1).
             
-        blocktype : torch.tensor or list with shape [num_agents]
+        blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
                         
         day : int
@@ -537,7 +566,10 @@ class Vbm_B(Vbm):
         None.
 
         '''
-
+        # assert torch.is_tensor(choices)
+        # assert torch.is_tensor(outcomes)
+        # assert torch.is_tensor(blocktype)
+        
         if day == 1:
             lr = self.lr_day1
             theta_Q = self.theta_Q_day1

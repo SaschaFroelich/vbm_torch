@@ -37,7 +37,6 @@ import pickle
 
 import numpy as np 
 
-plt.style.use("classic")
 
 #%%
 # model = sys.argv[1]
@@ -45,29 +44,68 @@ plt.style.use("classic")
 # method = sys.argv[3] # "svi" or "mcmc"
 # num_agents = 50
 
-model = 'original'
+model = 'B'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 3
+num_agents = 52
+
+assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
 print(f"Running model {model}")
 
 #%%
 '''
-Simulate data
+Simulate data in parallel
 '''
 
-if resim:
-    raise Exception("Not implemented yet, buddy!")
-    
-"----- Simulate data"
-Q_init = torch.ones((num_agents, 4)) * torch.tensor([[0.2, 0., 0., 0.2]])
-groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
-                                                   num_agents, 
-                                                   Q_init = Q_init,
-                                                   blockorder = [1]*num_agents)
+sequence = ([1]*(num_agents//2))
+sequence.extend(([2]*(num_agents//2)))
 
-newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
+blockorder = np.ones((1, num_agents//4), dtype=int)
+blockorder = np.concatenate((blockorder,np.ones((1, num_agents//4), dtype=int)*2),axis=1)
+blockorder = np.concatenate((blockorder,blockorder),axis=1).tolist()[0]
+
+# blockorder.extend(np.asarray([1]*(num_agents//4)).tolist())
+
+Qs = torch.tensor([[0.2, 0., 0., 0.2],
+                   [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
+Q_init = Qs[range(num_agents),torch.tensor(sequence)-1, :]
+
+# blockorder = np.random.randint(1, 3, size=num_agents).tolist()
+
+# params = torch.tensor(np.ones((6, num_agents))*(np.array([[0.05, 1., 0.1, 0, 1., 0.2]]).T))
+groupdata_dict, params, params_df = utils.simulate_data(model, 
+                                                    num_agents,
+                                                   Q_init = Q_init,
+                                                    sequence = sequence,
+                                                    blockorder = blockorder)
+
+groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
+
+utils.plot_grouplevel(groupdata_df)
+
+# #%%
+# import time
+# start = time.time()
+# utils.plot_grouplevel(groupdata_df)
+# print("Executed in $.4f seconds"%(time.time()-start))
+
+# #%%
+# '''
+# Simulate data
+# '''
+
+# if resim:
+#     raise Exception("Not implemented yet, buddy!")
+    
+# "----- Simulate data"
+# Q_init = torch.ones((num_agents, 4)) * torch.tensor([[0.2, 0., 0., 0.2]])
+# groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
+#                                                    num_agents, 
+#                                                    Q_init = Q_init,
+#                                                    blockorder = [1]*num_agents)
+
+# newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
 
 
 #%%
@@ -90,19 +128,21 @@ agent = utils.init_agent(model,
 
 print("===== Starting inference =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, newgroupdata)
-infer.infer_posterior(iter_steps = 12_500, num_particles = 10)
+infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
+infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
-inference_df = infer.sample_posterior()
-df = inference_df.groupby(['subject']).mean()
+post_sample = infer.sample_posterior()
+df = post_sample.groupby(['subject']).mean()
+post_sample['group'] = post_sample['subject'].map(lambda x: groupdata_dict['group'][0][x])
+post_sample['model'] = [model]*len(post_sample)
 
 "----- Save results to file"
 df_all = pd.concat([df, params_df], axis = 1)
 
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # pickle.dump( infer.loss, open(f"parameter_recovery/loss_{timestamp}.p", "wb" ) )
-pickle.dump( (df_all, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
+pickle.dump((post_sample, df_all, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -119,14 +159,14 @@ def open_files():
     print(f'File paths: {filenames}')
     # return filenames
     root.destroy()
-    
+
 root = tk.Tk()
 button = tk.Button(root, text="Open Files", command=open_files)
 print(button)
 button.pack()
 root.mainloop()
 
-df_all, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
+post_sample, df_all, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
 #%%
 '''
 Plot ELBO and Parameter Estimates

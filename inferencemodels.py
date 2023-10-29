@@ -152,7 +152,7 @@ class GeneralGroupInference(object):
 
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
-    def sample_posterior(self, n_samples=1_000):
+    def sample_posterior(self, n_samples = 1_000):
         # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
         param_names = self.agent.param_names

@@ -487,3 +487,34 @@ plt.show()
 #%% 
 
 Qout, mask = Qoutcomp(Qin, choices)
+
+#%%
+
+def mult_func(x):
+    mylist = [None]
+    
+    for i in range(1_000_000_000):
+        mylist[0] = i
+
+    return mylist[-1]
+
+import multiprocessing as mp
+with mp.Pool(mp.cpu_count()) as pool:
+    results = pool.map(mult_func, range(10))
+
+print(results)
+
+#%%
+
+import pandas as pd
+
+# Assuming 'df' is your DataFrame and 'column' is the column with lists
+df = pd.DataFrame({
+    'column_A': [['a', 'b'], ['c', 'd'], ['e', 'f']],
+    'column_B': [[1, 2], [3,4], [5,6]]
+})
+
+# Use explode to transform the DataFrame
+df_transformed = df.explode(['column_A', 'column_B'])
+
+print(df_transformed)
