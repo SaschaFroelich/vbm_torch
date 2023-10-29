@@ -59,20 +59,52 @@ class Env():
                       blocknr, 
                       blocktype, 
                       sequence = 1):
-        
-        "blocknr : num. of block of given type (not same as blockidx in experiment)"
-        
+        '''
+        Gets stimulus sequences from .mat-files.
+
+        Parameters
+        ----------
+        matfile_dir : str
+            Storage directory of the .mat-files.
+            
+        blocknr : int
+            Number of block of a given type (1-7). Not the same as blockidx.
+            
+        blocktype : int
+            0/1 sequential/ random
+            
+        sequence : int, optional
+            1/2 sequence/ mirror sequence. The default is 1.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        tensor
+            Stimulus sequence as seen by participants in experiment (1-indexed.)
+            
+        TYPE
+            Sequence without jokers (i.e. without DTT). 1-indexed.
+            
+        jokertypes : DTT Types
+            -1/0/1/2 : no joker/random/congruent/incongruent
+        '''
+
         if sequence == 2:
             prefix = "mirror_"
+            
         else:
             prefix = ""
                         
         if blocktype == 0:
             "sequential"
-            mat = scipy.io.loadmat(matfile_dir + prefix +'trainblock' + str(blocknr+1) + '.mat')
+            mat = scipy.io.loadmat(matfile_dir + prefix + 'trainblock' + str(blocknr+1) + '.mat')
         elif blocktype == 1:
             "random"
-            mat = scipy.io.loadmat(matfile_dir + prefix +'random' + str(blocknr+1) + '.mat')
+            mat = scipy.io.loadmat(matfile_dir + prefix + 'random' + str(blocknr+1) + '.mat')
         else:
             raise Exception("Problem with los blocktypos.")
 
@@ -85,7 +117,7 @@ class Env():
         # 1 congruent 
         # 2 incongruent
         
-        "---- Map Neutral Jokers to 'No Joker' ---"
+        "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
         seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]    
         
         if blocktype == 0:
@@ -144,29 +176,28 @@ class Env():
         else:
             raise Exception("Fehla!")
         
-        Context = "all"
         num_blocks = self.agent.num_blocks
         assert(num_blocks == 14)
         
-        tb_idxs = [1,3,5,6,8,10,12] # tb idxs for blockorder == 1
-        rand_idxs = [0,2,4,7,9,11,13] # random idxs for blockorder == 1
+        seq_idxs = [1, 3, 5, 6, 8, 10, 12] # seq idxs for blockorder == 1
+        rand_idxs = [0, 2, 4, 7, 9, 11, 13] # random idxs for blockorder == 1
         
         blocktype = torch.ones((num_blocks, 480))*-1;
         
         if blockorder == 1:
-            blocktype[tb_idxs[0:num_blocks//2], :] = 0 # fixed sequence condition
+            blocktype[seq_idxs[0:num_blocks//2], :] = 0 # fixed sequence condition
             blocktype[rand_idxs[0:num_blocks//2], :] = 1 # random condition
                         
         elif blockorder == 2:
-            blocktype[tb_idxs[0:num_blocks//2], :] = 1
+            blocktype[seq_idxs[0:num_blocks//2], :] = 1
             blocktype[rand_idxs[0:num_blocks//2], :] = 0
             
         else:
-            raise Exception(print("Problem with blockorder."))
+            raise Exception("blockorder must be 1 or 2.")
     
         block_no = -100*torch.ones((num_blocks, 480), dtype=torch.int8); # The index of the block in the current experiment
 
-        tb_block = 0
+        seq_block = 0
         random_block = 0  
         self.data['trialsequence'] = []
         self.data['blocktype'] = []
@@ -174,10 +205,10 @@ class Env():
         self.data['blockidx'] = []
         for block in range(num_blocks):
             "New block!"
-            self.data["trialsequence"].append([-1])
-            self.data["jokertypes"].append([-1])
-            self.data["blockidx"].append([block])
-            self.data["blocktype"].append([-1])
+            self.data['trialsequence'].append([-1])
+            self.data['jokertypes'].append([-1])
+            self.data['blockidx'].append([block])
+            self.data['blocktype'].append([-1])
             block_no[block, :] = block # The index of the block in the current experiment
             
             current_blocktype = blocktype[block, 0]
@@ -186,12 +217,12 @@ class Env():
                 "Sequential block"
                 seq_matlab, seq_no_jokers_matlab, jokertypes = \
                     self.load_matfiles(self.matfile_dir, 
-                                       tb_block, 
+                                       seq_block, 
                                        current_blocktype, 
                                        sequence = sequence)
                     
-                self.data["blocktype"].extend([[0]]*len(seq_matlab))
-                tb_block += 1
+                self.data['blocktype'].extend([[0]]*len(seq_matlab))
+                seq_block += 1
                 
             elif current_blocktype == 1:
                 "Random block"
@@ -201,15 +232,15 @@ class Env():
                                        current_blocktype, 
                                        sequence = sequence)
                     
-                self.data["blocktype"].extend([[1]]*len(seq_matlab))
+                self.data['blocktype'].extend([[1]]*len(seq_matlab))
                 random_block += 1
                 
             else:
                 raise Exception("Problem with los blocktypos.")
             
-            self.data["trialsequence"].extend([[s] for s in seq_matlab])
-            self.data["jokertypes"].extend([[j] for j in jokertypes])
-            self.data["blockidx"].extend([[block]]*480)
+            self.data['trialsequence'].extend([[s] for s in seq_matlab])
+            self.data['jokertypes'].extend([[j] for j in jokertypes])
+            self.data['blockidx'].extend([[block]]*480)
         
         self.run_loop(self.agent, self.data, 1, infer = 0)
         
@@ -274,7 +305,7 @@ class Env():
                 else:
                     "Simulation"
                     # assert(torch.is_tensor(trial))
-                    current_choice = torch.tensor(agent.choose_action(trial, day).item(), requires_grad = False)
+                    current_choice = torch.tensor([agent.choose_action(trial, day).item()], requires_grad = False)
                     outcome = torch.bernoulli(data['rewprobs'][current_choice])
                     self.choices.append(torch.tensor([current_choice.item()]))
                     self.outcomes.append(torch.tensor([outcome.item()]))
@@ -298,7 +329,7 @@ class Env():
     
                     if any(current_choice == -10):
                         raise Exception("Fehla!")
-                        
+                
                 agent.update(current_choice, 
                                 outcome, 
                                 blocktype, 
@@ -312,72 +343,3 @@ class Env():
                                 dist.Categorical(probs = probs),
                                 obs = choices_bin,
                                 obs_mask = obs_mask)
-            
-        # t_day1 = -1
-        # t_day2 = -1
-        # for tau in range(len(self.data["trialsequence"])):
-        #     trial = torch.tensor(self.data["trialsequence"][tau])
-        #     blocktype = torch.tensor(self.data["blocktype"][tau])
-                      
-        #     if self.data["blockidx"][tau][0] <= 5:
-        #         day = 1
-                
-        #     elif self.data["blockidx"][tau][0] > 5:
-        #         day = 2
-                
-        #     else:
-        #         raise Exception("Da isch a Fehla!")
-                
-        #     if self.data["blockidx"][tau][0] <= 1:
-        #         exp_part = 1
-                
-        #     elif self.data["blockidx"][tau][0] > 1 and self.data["blockidx"][tau][0] <= 5:
-        #         exp_part = 2
-                
-        #     elif self.data["blockidx"][tau][0] > 5:
-        #         exp_part = 3
-                
-        #     else:
-        #         raise Exception("Da isch a Fehla!")
-            
-        #     if trial == -1:
-        #         "Beginning of a new block"
-        #         self.agent.update(torch.tensor([-1]), 
-        #                           torch.tensor([-1]), 
-        #                           torch.tensor([-1]), 
-        #                           day=day, 
-        #                           trialstimulus = trial, 
-        #                           t = 0, 
-        #                           exp_part = exp_part)
-                
-        #         self.choices.append(torch.tensor([-1]))
-        #         self.outcomes.append(torch.tensor([-1]))
-                
-        #     else:
-        #         current_choice = self.agent.choose_action(trial, day)
-        #         outcome = torch.bernoulli(self.rewprobs[current_choice])
-        #         self.choices.append(torch.tensor([current_choice.item()]))
-        #         self.outcomes.append(torch.tensor([outcome.item()]))
-                    
-        #         if day == 1:
-        #             if trial > 10:
-        #                 t_day1 += 1
-        #             self.agent.update(torch.tensor([current_choice]), 
-        #                               torch.tensor([outcome]), 
-        #                               blocktype, 
-        #                               day = day, 
-        #                               trialstimulus = trial, 
-        #                               t = t_day1, 
-        #                               exp_part = exp_part)
-                    
-        #         elif day == 2:
-        #             if trial > 10:
-        #                 t_day2 += 1
-        #             self.agent.update(torch.tensor([current_choice]), 
-        #                               torch.tensor([outcome]), 
-        #                               blocktype, 
-        #                               day = day, 
-        #                               trialstimulus = trial, 
-        #                               t = t_day2,
-        #                               exp_part = exp_part)
-                

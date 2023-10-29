@@ -15,7 +15,7 @@ import pickle
 import analysis as anal
 import inferencemodels
 import utils
-
+#%%
 groupdata = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 
 num_agents = len(groupdata['trialsequence'][0])
@@ -55,6 +55,8 @@ Analysis
 '''
 #%%
 "----- Open Files"
+import pandas as pd
+import utils
 import torch
 import tkinter as tk
 from tkinter import filedialog
@@ -78,9 +80,9 @@ df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
 num_agents = len(df)
 num_params = len(param_names)
 params = torch.tensor(df.values.T, requires_grad = False)
-groupdata = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
-sequence_behav_fit  = [1 if group==1 or group==2 else 2 for group in groupdata['group']]
-blockorder_behav_fit  = [1 if group==1 or group==3 else 2 for group in groupdata['group']]
+groupdata_exp = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in groupdata_exp['group']]
+blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in groupdata_exp['group']]
 Q_init_behav_fit = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
                     torch.tensor([[0, 0.2, 0.2, 0.]]).tile((num_agents//2, 1))))
 
@@ -94,7 +96,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 fig, ax = plt.subplots()
-plt.plot(infer.loss)
+plt.plot(infer_loss)
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -119,7 +121,13 @@ npar = len(df.columns)
 
 fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=0)
 
-ylims = []
+if model == 'B':
+    ylims = [[0, 0.03], # lr
+             [0.5, 7.5], # theta_Q
+             [0.5, 1.8], # theta_rep
+             [0, 0.03], # lr
+             [0.5, 7.5], # theta_Q
+             [0.5, 1.8]] # theta_rep
 
 for par in range(npar):
 
@@ -150,7 +158,7 @@ for par in range(npar):
                           chartBox.width,
                           chartBox.height])
         
-        # ax[par].set_ylim([0,1])
+        ax[par].set_ylim(ylims[par])
     
         "Colorbar"
         # variance = df[param_names[par]].std()**2
@@ -189,13 +197,15 @@ for par in range(npar):
 plt.show()
 #%%
 '''
-Simulate data from inferred parameters
+Simulate data from inferred parameters,
+and plot group-level results
 '''
 
-groupdata, params, params_df = utils.simulate_data(model, 
-                                                   num_agents, 
+groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
+                                                   num_agents,
                                                    Q_init = Q_init_behav_fit,
                                                    sequence = sequence_behav_fit,
                                                    blockorder = blockorder_behav_fit,
                                                    params = params)
 
+utils.plot_grouplevel(groupdata_df)

@@ -265,7 +265,7 @@ class Vbm():
 
         Returns
         -------
-        tensor with shape []
+        tensor with shape ()
             Chosen action of agent. 0-indexed.
             -2 = error
 
@@ -325,6 +325,8 @@ class Vbm():
         None.
 
         '''
+        
+        assert choices.ndim == 1, "choices must have shape (num_agents)."
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"

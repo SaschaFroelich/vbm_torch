@@ -61,14 +61,13 @@ if resim:
     raise Exception("Not implemented yet, buddy!")
     
 "----- Simulate data"
-Q_init=torch.tensor([[0.2, 0., 0., 0.2]])
-groupdata, params, params_df = utils.simulate_data(model, 
+Q_init = torch.ones((num_agents, 4)) * torch.tensor([[0.2, 0., 0., 0.2]])
+groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
                                                    num_agents, 
                                                    Q_init = Q_init,
                                                    blockorder = [1]*num_agents)
 
 newgroupdata = utils.comp_groupdata(groupdata, for_ddm = 0)
-
 
 
 #%%
@@ -88,7 +87,6 @@ agent = utils.init_agent(model,
 #                         'lr_day2_true' : lr_day2_true,
 #                         'theta_Q_day2_true' : theta_Q_day2_true,
 #                         'theta_rep_day2_true' : theta_rep_day2_true})
-
 
 print("===== Starting inference =====")
 "----- Start Inference"
