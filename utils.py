@@ -44,7 +44,7 @@ def get_groupdata(data_dir):
             blocktype : nested list, 'shape' [num_trials, num_agents]
             blockidx : nested list, 'shape' [num_trials, num_agents]
             RT : nested list, 'shape' [num_trials, num_agents]
-            group : list, len [num_agents]. 0-indexed
+            group : list, len [num_trials, num_agents]. 0-indexed
 
     '''
     
@@ -66,8 +66,8 @@ def get_groupdata(data_dir):
             groupdata.append(data)
                 
     newgroupdata = comp_groupdata(groupdata, for_ddm = 0)
-    newgroupdata['group'] = group
-    
+    num_trials = len(newgroupdata['trialsequence'])
+    newgroupdata['group'] = [group]*num_trials
     return newgroupdata
 
 def get_participant_data(file_day1, group, data_dir, published_results = 0):
@@ -76,8 +76,8 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
     
     Parameters
     ----------
-    file_day1 : TYPE
-        DESCRIPTION.
+    file_day1 : str
+        File of 1st part of experiment.
         
     group : int
         Experimental Group
@@ -85,24 +85,24 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
     data_dir : str
         Where experimental data is stored.
         
-    published_results : int, optional
+    published_results : bool, optional
         0/1 get unpublished/ published results. The default is 0.
 
     Returns
     -------
     data : dict
-        DESCRIPTION.
+        Contains experimental data.
+        Keys:
+            trialsequence : list of list of ints
+            trialsequence no jokers
+            choices : list, len num_trials, -2,-1,0,1,2, or 3
+            outcomes : list of list of ints
+            blocktype : list of list of ints
+            blockidx
+            RT
         
     ID : str
         Participant-specific ID.
-        Keys:
-            trialsequence
-            trialsequence no jokers
-            choices : list, len num_trials, -2,-1,0,1,2, or 3
-            outcomes
-            blocktype
-            blockidx
-            RT
 
     '''
     
@@ -188,7 +188,7 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
         "Mark the beginning of a new block"
         trialsequence.append(torch.tensor(-1))
         trialsequence_wo_jokers.append(torch.tensor(-1))
-        blocktype.append(torch.tensor(-1))
+        blocktype.append(-1)
         blockidx.append(block)
         
         seq, btype, seq_wo_jokers = get_trialseq(group, 
@@ -212,14 +212,14 @@ def get_participant_data(file_day1, group, data_dir, published_results = 0):
     blockidx = [[blockidx[i]] for i in range(len(blockidx))]
     RT = [[RT[i]] for i in range(len(RT))]
         
-    data = {"trialsequence": trialsequence, \
-            "trialsequence no jokers": trialsequence_wo_jokers, \
-            "choices": choices, \
-            "outcomes": outcomes, \
-            "blocktype": blocktype, \
-            "blockidx": blockidx, \
+    data = {"trialsequence": trialsequence,
+            "trialsequence no jokers": trialsequence_wo_jokers,
+            "choices": choices,
+            "outcomes": outcomes,
+            "blocktype": blocktype,
+            "blockidx": blockidx,
             "RT": RT}
-            
+    
     return data, ID
     
 def get_trialseq(group, block_no, published_results = 0):
@@ -275,323 +275,28 @@ def get_trialseq(group, block_no, published_results = 0):
         torch.tensor(np.squeeze(mat["sequence_without_jokers"]))
 
 def replace_single_element_lists(value):
+    '''
+    if value is list and length 1, return its element.
+
+    Parameters
+    ----------
+    value : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    
     if isinstance(value, list):
         if len(value) == 1:
             return value[0]
     return value
 
-def arrange_data_for_plot(dat_type, df):     
-    '''
-    Prepares dataframe of behaviour a single agent for plotting.
-    Among other things, it computes the Optimal Response Rate (HPCF) of an agent.
-
-    Parameters
-    ----------
-    dat_type : str
-        'sim'/'exp': simulated/ experimental data
-        
-    df : DataFrame with data.
-        Columns:
-            choices
-            choices_GD
-            outcomes
-            trialsequence
-            blocktype
-            jokertypes : -1/0/1/2 no joker/random/congruent/incongruent
-            blockidx
-            ag_idx (opt)
-            group
-
-    Raises
-    ------
-    Exception
-        DESCRIPTION.
-
-    Returns
-    -------
-    data_new : dict
-        Data arranged for plotting.
-        
-    data_Q : TYPE
-        DESCRIPTION.
-
-    '''
-    group = df['group'][1]
-    assert dat_type == 'sim' or dat_type =='exp', "Specified dat_type not recognized."
-    assert group > -1 and group < 5
-    assert not torch.is_tensor(group), "Group must not be tensor."
-
-    df = df.applymap(replace_single_element_lists)
-    
-    "Only retain rows pertaining to joker trial"
-    df = df[df['jokertypes'] > -1]
-    
-    "Get rid of tensors"
-    df = df.applymap(lambda x: x.item() if torch.is_tensor(x) else x)
-    
-    # '''
-    # choices -> Goal-Directed choices.
-    # 0: Low-Reward Choice, 1: High-Reward Choice 
-    # groups 0 & 1: (from High-Rew: 0 & 3, Low-Rew: 1 & 2)
-    # groups 2 & 3: (from High-Rew: 1 & 2, Low-Rew: 0 & 3)
-    # '''
-    # if group == 0 or group == 1:
-    #     df['choices'] = df['choices'].map(lambda x: 1 if x==0 else 0 if x==1 else 0 if x==2 else 1)
-        
-    # elif group == 2 or group == 3:
-    #     df['choices'] = df['choices'].map(lambda x: 0 if x==0 else 1 if x==1 else 1 if x==2 else 0)
-    
-    data_new = {'HPCF': [], 
-                'trialtype': [], 
-                'blockidx': [], 
-                'datatype' : [],
-                'group' : []}
-    
-    data_Q = {'Qdiff': [], 
-              'blocktype':[], 
-              'blockidx': []}
-    
-    for block in df["blockidx"].unique():
-        
-        if "Qdiff" in df.columns:
-            data_Q["Qdiff"].append(df[df["blockidx"]==block]["Qdiff"].mean())
-        
-        if df[df["blockidx"] == block]["blocktype"].unique()[0] == 1:
-            "Random Block"
-            
-            if "Qdiff" in df.columns:
-                data_Q["blocktype"].append(1)
-                data_Q["blockidx"].append(block)
-                
-            data_new["blockidx"].append(block)
-            data_new["trialtype"].append("random")
-            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["jokertypes"] == 0)]["choices_GD"].mean())
-            
-            if dat_type == 'exp':
-                data_new["datatype"].append("experimental (Group %s)"%group)
-                
-            elif dat_type == 'sim':
-                data_new["datatype"].append("simulated (Group %s)"%group)
-                
-        elif df[df["blockidx"] == block]["blocktype"].unique()[0] == 0:
-            "Sequential Block"
-            
-            if "Qdiff" in df.columns:
-                data_Q["blocktype"].append(0)
-                data_Q["blockidx"].append(block)
-            
-            "Congruent Jokers"
-            data_new["blockidx"].append(block)
-            data_new["trialtype"].append("congruent")
-            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["jokertypes"] == 1)]["choices_GD"].mean())
-            
-            if dat_type == 'exp':
-                data_new["datatype"].append("experimental (Group %s)"%group)
-                
-            elif dat_type == 'sim':
-                data_new["datatype"].append("simulated (Group %s)"%group)
-            
-            "Incongruent Jokers"
-            data_new["blockidx"].append(block)
-            data_new["trialtype"].append("incongruent")
-            data_new["HPCF"].append(df[(df["blockidx"] == block) & (df["jokertypes"] == 2)]["choices_GD"].mean())
-            
-            if dat_type == 'exp':
-                data_new["datatype"].append("experimental (Group %s)"%group)
-                
-            elif dat_type == 'sim':
-                data_new["datatype"].append("simulated (Group %s)"%group)
-                
-        else:
-            raise Exception("Fehla!")
-    
-    data_new['group'] = [group]*len(data_new['blockidx'])
-    return data_new, data_Q
-
-def plot_results(data_sim, *args, **kwargs):
-    '''
-    Plots behaviour of a single agent.
-    
-    Parameters
-    ----------
-    data_sim : DataFrame
-        DataFrame with data of single agent to be plotted.
-        Columns:
-            choices
-            outcomes
-            trialsequence
-            blocktype
-            jokertypes
-            blockidx
-            group
-            
-    group : int
-        Experimental group of agent.
-        
-    *args : DataFrame
-        DataFrame with second set of data to be plotted (for comparison with first DataFrame).
-        
-    **kwargs :  group (int)
-                    Experimental group.
-                title (str)
-                    Title of the plot
-                omega_true (float)
-                omega_inf (float)
-                ymin (float)
-                savedir (str)
-                plotname (str)
-
-    Raises
-    ------
-    Exception
-        DESCRIPTION.
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-    TYPE
-        DESCRIPTION.
-
-    '''
-    
-
-    '''
-    Jokertypes 
-    ----------
-    -1 no joker
-    0 random
-    1 congruent
-    2 incongruent
-    '''
-    
-    group = data_sim['group'][1]
-    assert not torch.is_tensor(group), "Group must not be tensor."
-    
-    if args:
-        datas = (data_sim, args[0])
-    
-    elif not args: 
-        datas = (data_sim,)
-        
-    else:
-        raise Exception("Fehla!")
-        
-    "Create df_new, which will contain modified results for plotting and will contain column 'datatype' for simulated data and experimental data"
-    df_new = pd.DataFrame()
-    
-    dat_type = ['exp', 'sim']
-    for i in range(len(datas)):
-        df = pd.DataFrame(data=datas[i])
-        
-        data_new, data_Q = arrange_data_for_plot(dat_type[i], df)
-        
-        df_temp = pd.DataFrame(data=data_new)
-        df_new = pd.concat([df_new, df_temp])
-        # df_Q = pd.DataFrame(data=data_Q)
-
-    # fig, ax = plt.subplots()
-    if group == 0 or group == 2:
-        custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
-        
-    elif group == 1 or group == 3:
-        custom_palette = ['g', 'b', 'r'] # congruent, incongruent, random
-    # dfgh        
-    # custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
-    sns.relplot(x='blockidx',
-                y='HPCF',
-                hue = 'trialtype',
-                data=df_new,
-                kind='line',
-                col='datatype',
-                palette = custom_palette)
-    
-    # plt.plot([5.5, 5.5], [0.5,1], color='black') # plot Day1/Day2 line
-    
-    "----- UNCOMMENT THESE TWO LINES TO PLOT QDIFF ------------"
-    # if "Qdiff" in df.columns:
-    #     sns.relplot(x='blockidx', y="Qdiff", hue ="blocktype", data=df_Q, kind = 'line')
-    "----- --------------------------------------- ------------"
-
-    if "ymin" in kwargs:
-        ylim = kwargs["ymin"]
-    else:
-        ylim = 0
-
-    plt.ylim([ylim, 1])
-    
-    if "omega_true" in kwargs:
-        plt.text(0.05, ylim+0.14, "omega = %.2f, inf:%.2f"%(kwargs["omega_true"], kwargs["omega_inf"]))
-        plt.text(0.05, ylim+0.08, "dectemp = %.2f, inf:%.2f"%(kwargs["dectemp_true"], kwargs["dectemp_inf"]))
-        plt.text(0.05, ylim+0.02, "lr = %.2f, inf:%.2f"%(kwargs["lr_true"], kwargs["lr_inf"]))
-        
-    else:
-        if "omega_inf" in kwargs:
-            plt.text(0.05, ylim+0.14, "omega inf:%.2f"%(kwargs["omega_inf"]))
-            plt.text(0.05, ylim+0.08, "dectemp inf:%.2f"%(kwargs["dectemp_inf"]))
-            plt.text(0.05, ylim+0.02, "lr inf:%.2f"%(kwargs["lr_inf"]))
-    
-    if "savedir" in kwargs:
-        
-        if "plotname" in kwargs:
-            plt.savefig(kwargs["savedir"]+"/%s.png"%kwargs["plotname"])
-        else:
-            plt.savefig(kwargs["savedir"]+"/plot_%d.png"%(np.random.randint(10e+9)))
-        
-    if 'title' in kwargs:
-        plt.title("Simulated data.")
-        
-    plt.show()    
-    
-    return df_new[df_new["datatype"] == "simulated (Group %d)"%group], \
-        df_new[df_new["datatype"] == "experimental (Group %d)"%group]
-
 def cohens_d(c0,c1):
     return (mean(c0) - mean(c1)) / (sqrt((stdev(c0) ** 2 + stdev(c1) ** 2) / 2))
-
-def simulate_model_behaviour(num_agents, model, **kwargs):
-
-    assert model == 'B'
-    
-    if 'k' in kwargs:
-        k = kwargs['k']
-        
-    else:
-        k = 4.
-
-    df_all = pd.DataFrame()
-
-    for agent in range(num_agents):
-        print("Simulating agent no. %d"%agent)
-        newagent = models.Vbm_B(theta_rep_day1 = kwargs['theta_rep_day1'], \
-                      theta_rep_day2 = kwargs['theta_rep_day2'], \
-                      lr_day1 = kwargs['lr_day1'], \
-                      lr_day2 = kwargs['lr_day2'], \
-                      theta_Q_day1 = kwargs['theta_Q_day1'], \
-                      theta_Q_day2 = kwargs['theta_Q_day2'], \
-                      k=k,\
-                      Q_init=[0.2, 0., 0., 0.2])
-
-        newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
-
-        newenv.run()
-        data = {"choices": newenv.choices, "outcomes": newenv.outcomes,\
-                "trialsequence": newenv.data["trialsequence"], "blocktype": newenv.data["blocktype"],\
-                "jokertypes": newenv.data["jokertypes"], "blockidx": newenv.data["blockidx"], \
-                "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-
-        df = pd.DataFrame(data)
-
-        data_new, data_Q = arrange_data_for_plot('sim', df, group = 0)
-        
-        df_new = pd.DataFrame(data_new)
-        
-        df_all = pd.concat((df_all, df_new))
-        
-    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
-    sns.relplot(x="blockidx", y="HPCF", hue = "trialtype", data=df_all, kind="line", palette=custom_palette)
-    plt.plot([5.5, 5.5],[0.5,1], color='black')
-    plt.show()
     
 def comp_groupdata(groupdata, for_ddm = 1):
     '''
@@ -970,6 +675,7 @@ def plot_grouplevel(groupdata_df):
     Parameters
     ----------
     groupdata_df : DataFrame
+        Contains each trial for all participants.
         columns
             choices
             choices_GD
@@ -1002,110 +708,6 @@ def plot_grouplevel(groupdata_df):
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     sns.relplot(x="block_num", y="choices_GD", hue = "jokertypes", data=groupdata_df, kind="line", palette=custom_palette)
     plt.show()
-    
-    # "----- Plot Group-Level behaviour"
-    # all_ag_df = pd.DataFrame()
-    # for ag_idx in range(len(groupdata_df['ag_idx'].unique())):
-    #     df = groupdata_df[groupdata_df['ag_idx']==ag_idx]
-    #     ag_dict, _ = arrange_data_for_plot('sim', df)
-    #     ag_df = pd.DataFrame(ag_dict)
-    #     ag_df['ag_idx'] = [ag_idx]*len(ag_df)
-    #     all_ag_df = pd.concat((all_ag_df, ag_df))
-    
-    
-    # "---------- Create new column block_num"
-    # blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
-    # all_ag_df['block_num'] = all_ag_df.apply(lambda row: \
-    #                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
-    #                                          else row['blockidx'], axis=1)
-    # all_ag_df.drop(['datatype', 'group', 'blockidx', 'ag_idx'], axis = 1, inplace = True)
-    # # grouped = all_ag_df.groupby(['block_num', 'trialtype'])
-    
-    # # fig, ax = plt.subplots()
-    # custom_palette = ['g', 'b', 'r'] # congruent, incongruent, random
-    # sns.relplot(x='block_num', 
-    #             y='HPCF', 
-    #             hue='trialtype', 
-    #             data = all_ag_df, 
-    #             kind='line', 
-    #             palette = custom_palette)
-    # plt.title('Group-Level behaviour')
-    # # plt.show()
-    
-# def simulate_data_parallel(model, 
-#                             Q_init,
-#                             sequence,
-#                             blockorder,
-#                             params):
-#     '''
-    
-
-#     Parameters
-#     ----------
-#     model : TYPE
-#         DESCRIPTION.
-        
-#     Q_init : tensor, shape [num_agents, 4]
-#         Initial Q-Values of the agent.
-        
-#     sequence : list, len num_agents
-#         Whether sequence or mirror sequence.
-#         1/2 : sequence/ mirror sequence
-#         Mirror sequence has reversed reward probabilities.
-        
-#     blockorder : list, len num_agents
-#         Which blockorder
-#         1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
-        
-#     params : tensor, shape (num_params, num_agents)
-#         DESCRIPTION.
-
-#     Returns
-#     -------
-#     None.
-
-#     '''
-#     assert isinstance(sequence, list), "sequence must be list"
-#     assert isinstance(blockorder, list), "blockorder must be list"
-#     assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
-#     assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
-    
-#     num_agents = params.shape[1]
-#     num_cpus = 10
-#     assert num_agents%num_cpus == 0, "num_agents must be a multiple of num_cpus."
-    
-#     print("Simulating %d agents across %d cores.\n"%(num_agents, 10))
-    
-#     num_agents_per_cpu = num_agents//num_cpus
-    
-#     args = []
-#     for ag_idx in range(0, num_agents, num_agents_per_cpu):
-#         args.append((model, 
-#                  num_agents_per_cpu, 
-#                  Q_init[ag_idx:ag_idx+num_agents_per_cpu,:],
-#                  sequence[ag_idx:ag_idx+num_agents_per_cpu],
-#                  blockorder[ag_idx:ag_idx+num_agents_per_cpu],
-#                  params[:, ag_idx:ag_idx+num_agents_per_cpu],
-#                  False))
-    
-#     with mp.Pool(num_cpus) as pool:
-#         result = pool.starmap(simulate_data, args)
-        
-#     dfgh
-
-
-# def grouplevel_dict_to_df(groupdict):
-    
-#     num_agents = len(groupdict['choices'][0])
-#     num_trials = len(groupdict['choices'])
-    
-#     df_data = {}
-#     "Define columns"
-#     for key in groupdict.keys():
-#         df_data[key] = []
-    
-#     df_data['trialidx']
-#     for trial in range(num_trials):
 
 def posterior_predictives(post_sample, plot_single = True):
     '''
@@ -1175,7 +777,7 @@ def posterior_predictives(post_sample, plot_single = True):
         
         if plot_single:
             sns.relplot(x='block_num', y= 'choices_GD', hue='jokertypes', kind='line', data = grouped_df)
-            plt.title('Agent %d'%ag_idx)
+            plt.title('Post Pred for agent %d'%ag_idx)
             plt.show()
         complete_df = pd.concat((complete_df, grouped_df))
     
@@ -1183,5 +785,6 @@ def posterior_predictives(post_sample, plot_single = True):
         
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     sns.relplot(x="block_num", y="choices_GD", hue = "jokertypes", data=complete_df, kind="line", palette=custom_palette)
+    plt.title('Group-Level Posterior Predictive.')
     print("Finished posterior predictives.")
     return complete_df
