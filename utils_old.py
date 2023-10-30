@@ -25,89 +25,6 @@ from math import sqrt
 # np.random.seed(123)
 # torch.manual_seed(123)
 
-def load_matfiles(matfile_dir, 
-                  blocknr, 
-                  blocktype, 
-                  sequence = 1):
-    '''
-    Gets stimulus sequences from .mat-files.
-
-    Parameters
-    ----------
-    matfile_dir : str
-        Storage directory of the .mat-files.
-        
-    blocknr : int
-        Number of block of a given type (1-7). Not the same as blockidx.
-        
-    blocktype : int
-        0/1 sequential/ random
-        
-    sequence : int, optional
-        1/2 sequence/ mirror sequence. The default is 1.
-
-    Raises
-    ------
-    Exception
-        DESCRIPTION.
-
-    Returns
-    -------
-    seq: list
-        Stimulus sequence as seen by participants in experiment (1-indexed.)
-        
-    seq_no_jokers: list
-        Sequence without jokers (i.e. without DTT). 1-indexed.
-        
-    jokertypes : list
-        DTT Types
-        -1/0/1/2 : no joker/random/congruent/incongruent
-    '''
-
-    if sequence == 2:
-        prefix = "mirror_"
-        
-    else:
-        prefix = ""
-                    
-    if blocktype == 0:
-        "sequential"
-        mat = scipy.io.loadmat(matfile_dir + prefix + 'trainblock' + str(blocknr+1) + '.mat')
-        
-    elif blocktype == 1:
-        "random"
-        mat = scipy.io.loadmat(matfile_dir + prefix + 'random' + str(blocknr+1) + '.mat')
-        
-    else:
-        raise Exception("Problem with los blocktypos.")
-
-    seq = mat['sequence'][0]
-    seq_no_jokers = mat['sequence_without_jokers'][0]
-    
-    "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
-    seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]    
-    
-    "----- Determine congruent/ incongruent jokers"
-    if blocktype == 0:
-        "sequential"
-        jokers = [-1 if seq_noneutral[tidx]<10 else seq_no_jokers[tidx] for tidx in range(len(seq))]
-        if sequence == 1:
-            jokertypes = [j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 for j in jokers]
-            
-        elif sequence == 2:
-            jokertypes = [j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 for j in jokers]
-            
-        else:
-            raise Exception("Fehla!!")
-                    
-    elif blocktype == 1:
-        "random"
-        jokertypes = [-1 if seq_noneutral[tidx]<10 else 0 for tidx in range(len(seq_noneutral))]
-    
-    return torch.squeeze(torch.tensor(seq)).tolist(), \
-        torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
-            jokertypes
-
 def get_groupdata(data_dir):
     '''
 
@@ -121,18 +38,13 @@ def get_groupdata(data_dir):
     newgroupdata : dict
         Contains experimental data.
         Keys
-            choices : nested list, 'shape' [num_trials, num_agents]
-            choices_GD
-            outcomes : nested list, 'shape' [num_trials, num_agents]
             trialsequence : nested list, 'shape' [num_trials, num_agents]
+            choices : nested list, 'shape' [num_trials, num_agents]
+            outcomes : nested list, 'shape' [num_trials, num_agents]
             blocktype : nested list, 'shape' [num_trials, num_agents]
-            jokertypes
             blockidx : nested list, 'shape' [num_trials, num_agents]
             RT : nested list, 'shape' [num_trials, num_agents]
             group : list, len [num_trials, num_agents]. 0-indexed
-            ag_idx
-            
-    groupdata_df : DataFrame
 
     '''
     
@@ -148,20 +60,17 @@ def get_groupdata(data_dir):
             group.append(grp)
             data, _ = get_participant_data(file1, 
                                             grp, 
-                                            data_dir)
+                                            data_dir,
+                                            published_results = 0)
             
             groupdata.append(data)
-
-    newgroupdata = comp_groupdata(groupdata)
+                
+    newgroupdata = comp_groupdata(groupdata, for_ddm = 0)
     num_trials = len(newgroupdata['trialsequence'])
-    num_agents = len(newgroupdata['trialsequence'][0])
     newgroupdata['group'] = [group]*num_trials
-    newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
-    groupdata_df = pd.DataFrame(newgroupdata).explode(list(newgroupdata.keys()))
-    
-    return newgroupdata, groupdata_df
+    return newgroupdata
 
-def get_participant_data(file_day1, group, data_dir):
+def get_participant_data(file_day1, group, data_dir, published_results = 0):
     '''
     Get data of an individual participant.
     
@@ -175,6 +84,9 @@ def get_participant_data(file_day1, group, data_dir):
         
     data_dir : str
         Where experimental data is stored.
+        
+    published_results : bool, optional
+        0/1 get unpublished/ published results. The default is 0.
 
     Returns
     -------
@@ -182,14 +94,12 @@ def get_participant_data(file_day1, group, data_dir):
         Contains experimental data.
         Keys:
             trialsequence : list of list of ints
-            trialsequence_no_jokers : list of list of ints
+            trialsequence no jokers
             choices : list, len num_trials, -2,-1,0,1,2, or 3
-            choices_GD :
             outcomes : list of list of ints
             blocktype : list of list of ints
-            jokertypes : list
             blockidx
-            RT : list of list of floats (RT in ms)
+            RT
         
     ID : str
         Participant-specific ID.
@@ -198,7 +108,11 @@ def get_participant_data(file_day1, group, data_dir):
     
     assert group < 4
     
-    ID = file_day1.split("/")[-1][4:28] # Prolific ID
+    if published_results:
+        ID = file_day1.split("/")[-1][4:9]
+        
+    else:
+        ID = file_day1.split("/")[-1][4:28] # Prolific ID
 
     print(data_dir)
     print(glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID)))
@@ -268,24 +182,21 @@ def get_participant_data(file_day1, group, data_dir):
     
     trialsequence = []
     trialsequence_wo_jokers = []
-    jokertypes = []
     blocktype = []
     blockidx = []
     for block in range(14):
         "Mark the beginning of a new block"
-        trialsequence.append(-1)
-        trialsequence_wo_jokers.append(-1)
-        jokertypes.append(-1)
+        trialsequence.append(torch.tensor(-1))
+        trialsequence_wo_jokers.append(torch.tensor(-1))
         blocktype.append(-1)
         blockidx.append(block)
         
-        seq, seq_wo_jokers, jtypes, btype = get_trialseq('./matlabcode/clipre/',
-                                                 group, 
-                                                 block)
+        seq, btype, seq_wo_jokers = get_trialseq(group, 
+                                                 block, 
+                                                 published_results = published_results)
         
         trialsequence.extend(seq)
         trialsequence_wo_jokers.extend(seq_wo_jokers)
-        jokertypes.extend(jtypes)
         blocktype.extend([btype]*len(seq))
         blockidx.extend([block]*len(seq))
     
@@ -293,76 +204,28 @@ def get_participant_data(file_day1, group, data_dir):
     assert len(outcomes) == len(choices)
     assert len(outcomes) == len(blocktype)
     
-    num_trials = len(choices)
-    
-    assert len(trialsequence) == num_trials and len(trialsequence_wo_jokers) == num_trials and len(jokertypes) == num_trials and \
-        len(outcomes) == num_trials and len(blocktype) == num_trials and len(blockidx) == num_trials and len(RT) == num_trials
-    
-    jokertypes = [[jokertypes[i]] for i in range(num_trials)]
-    trialsequence = [[trialsequence[i]] for i in range(num_trials)]
-    trialsequence_wo_jokers = [[trialsequence_wo_jokers[i]] for i in range(num_trials)]
-    choices = [[choices[i]] for i in range(num_trials)]
-    outcomes = [[outcomes[i]] for i in range(num_trials)]
-    blocktype = [[blocktype[i]] for i in range(num_trials)]
-    blockidx = [[blockidx[i]] for i in range(num_trials)]
-    RT = [[RT[i]] for i in range(num_trials)]
+    trialsequence = [[trialsequence[i].item()] for i in range(len(trialsequence))]
+    trialsequence_wo_jokers = [[trialsequence_wo_jokers[i].item()] for i in range(len(trialsequence_wo_jokers))]
+    choices = [torch.tensor([choices[i]]) for i in range(len(choices))]
+    outcomes = [torch.tensor([outcomes[i]]) for i in range(len(outcomes))]
+    blocktype = [[blocktype[i]] for i in range(len(blocktype))]
+    blockidx = [[blockidx[i]] for i in range(len(blockidx))]
+    RT = [[RT[i]] for i in range(len(RT))]
         
-    if group == 0 or group == 1:
-        choices_GD = torch.where(torch.logical_or(torch.tensor(choices) == 0, torch.tensor(choices) == 3), torch.ones(torch.tensor(choices).shape), torch.zeros(torch.tensor(choices).shape))
-        
-    elif group == 2 or group == 3:
-        choices_GD = torch.where(torch.logical_or(torch.tensor(choices) == 1, torch.tensor(choices) == 2), torch.ones(torch.tensor(choices).shape), torch.zeros(torch.tensor(choices).shape))
-        
-    choices_GD = torch.where(torch.tensor(outcomes) == -1, -1*torch.ones(torch.tensor(choices).shape), choices_GD)
-    assert torch.all(choices_GD <= 1)
+    data = {"trialsequence": trialsequence,
+            "trialsequence no jokers": trialsequence_wo_jokers,
+            "choices": choices,
+            "outcomes": outcomes,
+            "blocktype": blocktype,
+            "blockidx": blockidx,
+            "RT": RT}
     
-    data = {'trialsequence': trialsequence,
-            'trialsequence_no_jokers': trialsequence_wo_jokers,
-            'jokertypes' : jokertypes,
-            'choices': choices,
-            'choices_GD' : choices_GD.type(torch.int).tolist(),
-            'outcomes': outcomes,
-            'blocktype': blocktype,
-            'blockidx': blockidx,
-            'RT': RT}
     return data, ID
     
-def get_trialseq(matfile_dir, 
-                 group, 
-                 blockidx):
-    '''
-
-    Parameters
-    ----------
-    matfile_dir : str
-        Storage directory of the .mat-files.
-        
-    group : int
-        Experimental group.
-        
-    blockidx : int
-        Number of block as seen by agent. Not the same as blocknr in load_matfiles().
-
-    Returns
-    -------
-    seq: list
-        Stimulus sequence as seen by participants in experiment (1-indexed.)
-        
-    seq_no_jokers: list
-        Sequence without jokers (i.e. without DTT). 1-indexed.
-
-    jokertypes : list
-        DTT Types
-        -1/0/1/2 : no joker/random/congruent/incongruent
-
-    blocktype : int
-        0/1 : sequential/ random block
-
-    '''
-    
+def get_trialseq(group, block_no, published_results = 0):
     "NB: in mat-files, the block order was already swapped, as if all participants saw the first group's block order! Have to correct for this!"
     
-    "This is the blockorder participants actually saw in the 4 groups."
+    "This is the blockorder participants actually saw"
     blockorder = [["random1", "trainblock1", 
                    "random2", "trainblock2", 
                    "random3", "trainblock3", 
@@ -395,44 +258,21 @@ def get_trialseq(matfile_dir,
                    "mirror_random6", "mirror_trainblock6", 
                    "mirror_random7", "mirror_trainblock7"]]    
 
-    types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
-             [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0],
-              [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
-              [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0]]
+    if published_results:
+        "Published"
+        mat = scipy.io.loadmat("/home/sascha/Desktop/vbm_torch/matlabcode/published/%s.mat"%blockorder[group][block_no])
+        
+    else:
+        "Clipre"
+        mat = scipy.io.loadmat("/home/sascha/Desktop/vbm_torch/matlabcode/clipre/%s.mat"%blockorder[group][block_no])
+        
+    types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],\
+             [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0],\
+              [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],\
+              [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0]]    
     
-    seqs = [1, 1, 2, 2]
-    sequence = seqs[group]
-
-    blocktype = types[group][blockidx]
-
-    mat = scipy.io.loadmat(matfile_dir + "%s.mat"%blockorder[group][blockidx])
-    
-    seq = mat['sequence'][0]
-    seq_no_jokers = mat['sequence_without_jokers'][0]
-    
-    "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
-    seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]    
-    
-    "----- Determine congruent/ incongruent jokers"
-    if blocktype == 0:
-        "sequential"
-        jokers = [-1 if seq_noneutral[tidx]<10 else seq_no_jokers[tidx] for tidx in range(len(seq))]
-        if sequence == 1:
-            jokertypes = [j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 for j in jokers]
-            
-        elif sequence == 2:
-            jokertypes = [j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 for j in jokers]
-            
-        else:
-            raise Exception("Fehla!!")
-                    
-    elif blocktype == 1:
-        "random"
-        jokertypes = [-1 if seq_noneutral[tidx]<10 else 0 for tidx in range(len(seq_noneutral))]
-    
-    return torch.squeeze(torch.tensor(seq)).tolist(), \
-        torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
-            jokertypes, blocktype
+    return torch.tensor(np.squeeze(mat["sequence"])), types[group][block_no], \
+        torch.tensor(np.squeeze(mat["sequence_without_jokers"]))
 
 def replace_single_element_lists(value):
     '''
@@ -458,21 +298,22 @@ def replace_single_element_lists(value):
 def cohens_d(c0,c1):
     return (mean(c0) - mean(c1)) / (sqrt((stdev(c0) ** 2 + stdev(c1) ** 2) / 2))
     
-def comp_groupdata(groupdata):
+def comp_groupdata(groupdata, for_ddm = 1):
     '''
     Parameters
     ----------
-    groupdata : list of dicts, len num_agents
+    groupdata : list of len num_agents
         Contains 1 dictionary per agent, with experimental data.
         Keys: 
             choices
-            choices_GD
             outcomes
             trialsequence
             blocktype
             jokertypes
             blockidx
-            RT
+            
+    for_ddm : TYPE, optional
+        DESCRIPTION. The default is 1.
 
     Returns
     -------
@@ -483,47 +324,52 @@ def comp_groupdata(groupdata):
 
     '''
     
-    newgroupdata = {'choices' : [],
-                    'choices_GD' : [],
-                    'outcomes' : [],
-                    'trialsequence' : [],
-                    'blocktype' : [],
-                    'jokertypes' : [],
-                    'blockidx' : [],
-                    'RT': []}
-
-        
-    num_trials = len(groupdata[0]["trialsequence"])
-    for trial in range(num_trials):
+    if for_ddm:
+        newgroupdata = {"trialsequence" : [],\
+                        #"trialsequence no jokers" : [],\
+                        "choices" : [],\
+                        "outcomes" : [],\
+                        "blocktype" : [],\
+                        "blockidx" : [],\
+                        "RT": []}
+            
+    else:
+        newgroupdata = {"trialsequence" : [],\
+                        #"trialsequence no jokers" : [],\
+                        "choices" : [],\
+                        "outcomes" : [],\
+                        "blocktype" : [],\
+                        "blockidx" : []}
+    
+    for trial in range(len(groupdata[0]["trialsequence"])):
         trialsequence = []
+        # trialseq_no_jokers = []
         choices = []
-        choices_GD = []
         outcomes = []
         blocktype = []
-        jokertypes = []
         blockidx = []
-        RT = []
+        if for_ddm:
+            RT = []
 
         for dt in groupdata:
-            choices.append(dt['choices'][trial][0])
-            choices_GD.append(dt['choices_GD'][trial][0])
-            outcomes.append(dt['outcomes'][trial][0])
-            trialsequence.append(dt['trialsequence'][trial][0])
-            blocktype.append(dt['blocktype'][trial][0])
-            jokertypes.append(dt['jokertypes'][trial][0])
-            blockidx.append(dt['blockidx'][trial][0])
-            RT.append(dt['RT'][trial][0])
+            trialsequence.append(dt["trialsequence"][trial][0])
+            # trialseq_no_jokers.append(dt["trialsequence no jokers"][trial][0])
+            choices.append(dt["choices"][trial][0].item())
+            outcomes.append(dt["outcomes"][trial][0].item())
+            blocktype.append(dt["blocktype"][trial][0])
+            blockidx.append(dt["blockidx"][trial][0])
+            if for_ddm:
+                RT.append(dt["RT"][trial][0])
             
-        
-        newgroupdata["choices"].append(choices)
-        newgroupdata["choices_GD"].append(choices_GD)
-        newgroupdata["outcomes"].append(outcomes)
         newgroupdata["trialsequence"].append(trialsequence)
+        # newgroupdata["trialsequence no jokers"].append(trialseq_no_jokers)
+        newgroupdata["choices"].append(choices)
+        newgroupdata["outcomes"].append(outcomes)
         newgroupdata["blocktype"].append(blocktype)
-        newgroupdata["jokertypes"].append(jokertypes)
         newgroupdata["blockidx"].append(blockidx)
-        newgroupdata["RT"].append(RT)
-    
+        if for_ddm:
+            newgroupdata["RT"].append(RT)
+
     return newgroupdata
 
 def init_agent(model, Q_init, num_agents=1, params = None):
@@ -705,6 +551,24 @@ def simulate_data(model,
     if params is not None:
         assert params.shape[0] == num_params, "Number of parameters incorrect for selected model."
     
+    # groupdata_list = []
+    # groupdata_df = pd.DataFrame(columns = ['choices',
+    #                                        'outcomes',
+    #                                        'trialsequence',
+    #                                        'blocktype',
+    #                                        'jokertypes',
+    #                                        'blockidx',
+    #                                        'ag_idx',
+    #                                        'group'])
+    
+    
+    "New Code"
+    # print("Simulating %d agents in parallel"%num_agents)
+    # print("sequence:")
+    # print(sequence)
+    # print("blockorder:")
+    # print(blockorder)
+    
     "----- Initialize agent"
     if params == None:
         params_true = torch.zeros((num_params, num_agents))
@@ -744,12 +608,64 @@ def simulate_data(model,
     
     for key in data:
         assert(len(data[key])==6734)
+    # dfgh
+    # "Old Code"
+    # "Simulate with random parameters"
+    # for ag_idx in range(num_agents):
+        
+    #     print("Simulating agent no. %d.\n"%ag_idx)
+        
+    #     "----- Initialize agent"
+    #     if params == None:
+    #         newagent = init_agent(model, 
+    #                               Q_init[ag_idx:ag_idx+1, :], 
+    #                               num_agents = 1)
+        
+    #     else:
+    #         newagent = init_agent(model, 
+    #                               Q_init[ag_idx:ag_idx+1, :], 
+    #                               num_agents = 1, 
+    #                               params = params[:, ag_idx:ag_idx+1])
+        
+    #     for param_idx in range(len(newagent.param_names)):
+    #         params_true[param_idx, ag_idx] = newagent.par_dict[newagent.param_names[param_idx]]
+
+    #     "----- Set environment for agent"
+    #     newenv = env.Env(newagent, matfile_dir = './matlabcode/clipre/')
+    #     "----- Simulate"
+    #     newenv.run(sequence = sequence[ag_idx],
+    #                blockorder = blockorder[ag_idx])
+    #     "----- Save Data"
+    #     data = {'choices': newenv.choices, 
+    #             'outcomes': newenv.outcomes,
+    #             'trialsequence': newenv.data['trialsequence'], 
+    #             'blocktype': newenv.data['blocktype'],
+    #             'jokertypes': newenv.data['jokertypes'], 
+    #             'blockidx': newenv.data['blockidx'],
+    #             'ag_idx': [ag_idx]*len(newenv.choices),
+    #             'group': [groups[ag_idx].item()]*len(newenv.choices)}
+    #     groupdata_list.append(data)    
+    #     groupdata_df = pd.concat((groupdata_df, pd.DataFrame(data)))
+    # if plotres:
+    #     plot_results(pd.DataFrame(data), group = groups[ag_idx].item(), title = 'Simulated Data')
         
     "----- Create DataFrame containing the parameters."
     columns = []
     for key in newagent.par_dict.keys():
         columns.append(key + '_true')
     params_true_df = pd.DataFrame(params_true.numpy().T, columns = columns)
+    
+    # "----- Create DataFrame with simulated data of whole group."
+    # groupdata_df = groupdata_df.applymap(replace_single_element_lists)
+
+    # if plotres:
+    #     plot_grouplevel(groupdata_df)
+
+
+    # if 0:
+    #     return groupdata_list, groupdata_df, params_true, params_true_df
+    # else:
+    #     return groupdata_list
     
     print("Simulation took %.4f seconds."%(time.time()-start))
     return data, params_true, params_true_df
@@ -777,26 +693,19 @@ def plot_grouplevel(groupdata_df):
 
     '''
     
-    "----- Remove newblock trials (where choices == -1)"
+    "Remove -1"
     groupdata_df = groupdata_df[groupdata_df['choices'] != -1]
-    
-    "----- Remove STT (where jokertypes == -1)"
     groupdata_df = groupdata_df[groupdata_df['jokertypes'] != -1]
-    
-    "----- Remove errortrials (where choices_GD == -2)"
-    groupdata_df = groupdata_df[groupdata_df['choices_GD'] != -2]
     
     "---------- Create new column block_num for different blockorders"
     blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
     groupdata_df['block_num'] = groupdata_df.apply(lambda row: \
                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                          else row['blockidx'], axis=1)
-        
-    groupdata_df.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1, inplace = True)
+    groupdata_df.drop(['group', 'blockidx', 'ag_idx', 'trialsequence', 'outcomes', 'choices'], axis = 1, inplace = True)
     groupdata_df['jokertypes']=groupdata_df['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
-    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     
-    "----- Remove error trials (where choices_GD == -2"
+    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     sns.relplot(x="block_num", y="choices_GD", hue = "jokertypes", data=groupdata_df, kind="line", palette=custom_palette)
     plt.show()
 
@@ -839,6 +748,8 @@ def posterior_predictives(post_sample, plot_single = True):
         Q_init = Qs[range(num_reps),torch.tensor(sequence)-1,:]
         blockorder = [blockorders[post_sample_agent['group'].unique()[0]]]*num_reps
         
+        
+        # params = torch.tensor(np.random.rand(3, num_agents))
         params = torch.tensor(post_sample_agent.iloc[:, 0:-3].to_numpy().T)
         # dfgh #test whether correct
         ag_data_dict, params, params_df = simulate_data(model, 
@@ -868,7 +779,6 @@ def posterior_predictives(post_sample, plot_single = True):
             sns.relplot(x='block_num', y= 'choices_GD', hue='jokertypes', kind='line', data = grouped_df)
             plt.title('Post Pred for agent %d'%ag_idx)
             plt.show()
-            
         complete_df = pd.concat((complete_df, grouped_df))
     
         assert list(post_sample_agent.columns[0:-3]) == [col[0:-5] for col in params_df.columns]

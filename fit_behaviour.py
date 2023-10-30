@@ -16,7 +16,9 @@ import analysis as anal
 import inferencemodels
 import utils
 #%%
-groupdata = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+groupdata, groupdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+
+utils.plot_grouplevel(groupdata_df)
 
 num_agents = len(groupdata['trialsequence'][0])
 #%%
@@ -38,7 +40,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata)
-infer.infer_posterior(iter_steps = 3, num_particles = 10)
+infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample = infer.sample_posterior()
@@ -48,7 +50,6 @@ post_sample['model'] = [model]*len(post_sample)
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-# pickle.dump( infer.loss, open(f"parameter_recovery/loss_{timestamp}.p", "wb" ) )
 pickle.dump( (post_sample, df, infer.loss, agent.param_names), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
 
 #%%
@@ -68,7 +69,6 @@ def open_files():
     global filenames
     filenames = filedialog.askopenfilenames()
     print(f'File paths: {filenames}')
-    # return filenames
     root.destroy()
     
 root = tk.Tk()
@@ -83,6 +83,7 @@ num_agents = len(post_sample['subject'].unique())
 num_params = len(param_names)
 params = torch.tensor(df.iloc[:,0:-3].values.T, requires_grad = False)
 groupdata_exp = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+groupdata_df = pd.DataFrame(groupdata_exp).explode(list(groupdata_exp.keys()))
 sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in groupdata_exp['group']]
 blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in groupdata_exp['group']]
 Q_init_behav_fit = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
@@ -90,6 +91,26 @@ Q_init_behav_fit = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agent
 
 'Makes ure order of parameters is preserved'
 assert(all([param_names[par_idx] == df.columns[par_idx] for par_idx in range(num_params)]))
+
+#%%
+'''
+Plot ELBO
+'''
+import matplotlib.pyplot as plt
+import seaborn as sns
+fig, ax = plt.subplots()
+plt.plot(infer_loss)
+plt.title("ELBO")
+ax.set_xlabel("Number of iterations")
+ax.set_ylabel("ELBO")
+plt.show()
+
+#%%
+'''
+Plot Experimental Data
+'''
+utils.plot_grouplevel(groupdata_df)
+
 #%%
 '''
 Plot ELBO and Parameter Estimates
@@ -197,20 +218,6 @@ for par in range(npar):
         ax[par].legend([],[], frameon=False)
 
 plt.show()
-#%%
-'''
-Simulate data from inferred parameters,
-and plot group-level results
-'''
-
-# groupdata_list, groupdata_df, params, params_df = utils.simulate_data(model, 
-#                                                                     num_agents,
-#                                                                     Q_init = Q_init_behav_fit,
-#                                                                     sequence = sequence_behav_fit,
-#                                                                     blockorder = blockorder_behav_fit,
-#                                                                     params = params)
-
-# utils.plot_grouplevel(groupdata_df)
 
 #%%
 '''

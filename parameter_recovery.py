@@ -141,7 +141,6 @@ post_sample['model'] = [model]*len(post_sample)
 df_all = pd.concat([df, params_df], axis = 1)
 
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-# pickle.dump( infer.loss, open(f"parameter_recovery/loss_{timestamp}.p", "wb" ) )
 pickle.dump((post_sample, df_all, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
 
 #%%
@@ -173,7 +172,7 @@ Plot ELBO and Parameter Estimates
 '''
 
 fig, ax = plt.subplots()
-plt.plot(infer.loss)
+plt.plot(infer_loss)
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")

@@ -7,6 +7,7 @@ Created on Fri May 19 10:16:01 2023
 """
 
 
+import utils
 import torch
 import ipdb
 import scipy
@@ -27,7 +28,6 @@ class Env():
         
         Methods
         ----------
-        load_matfiles()
         run()
         run_loop()
         
@@ -53,92 +53,6 @@ class Env():
         self.choices = []
         self.outcomes = []
         self.choices_GD = []
-        
-    def load_matfiles(self, 
-                      matfile_dir, 
-                      blocknr, 
-                      blocktype, 
-                      sequence = 1):
-        '''
-        Gets stimulus sequences from .mat-files.
-
-        Parameters
-        ----------
-        matfile_dir : str
-            Storage directory of the .mat-files.
-            
-        blocknr : int
-            Number of block of a given type (1-7). Not the same as blockidx.
-            
-        blocktype : int
-            0/1 sequential/ random
-            
-        sequence : int, optional
-            1/2 sequence/ mirror sequence. The default is 1.
-
-        Raises
-        ------
-        Exception
-            DESCRIPTION.
-
-        Returns
-        -------
-        tensor
-            Stimulus sequence as seen by participants in experiment (1-indexed.)
-            
-        TYPE
-            Sequence without jokers (i.e. without DTT). 1-indexed.
-            
-        jokertypes : DTT Types
-            -1/0/1/2 : no joker/random/congruent/incongruent
-        '''
-
-        if sequence == 2:
-            prefix = "mirror_"
-            
-        else:
-            prefix = ""
-                        
-        if blocktype == 0:
-            "sequential"
-            mat = scipy.io.loadmat(matfile_dir + prefix + 'trainblock' + str(blocknr+1) + '.mat')
-        elif blocktype == 1:
-            "random"
-            mat = scipy.io.loadmat(matfile_dir + prefix + 'random' + str(blocknr+1) + '.mat')
-        else:
-            raise Exception("Problem with los blocktypos.")
-
-        seq = mat['sequence'][0]
-        seq_no_jokers = mat['sequence_without_jokers'][0]
-        
-        "----- Determine congruent/ incongruent jokers ------"
-        # -1 no joker
-        # 0 random 
-        # 1 congruent 
-        # 2 incongruent
-        
-        "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
-        seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]    
-        
-        if blocktype == 0:
-            "sequential"
-            jokers = [-1 if seq_noneutral[tidx]<10 else seq_no_jokers[tidx] for tidx in range(len(seq))]
-            if sequence == 1:
-                jokertypes = [j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 for j in jokers]
-                
-            elif sequence == 2:
-                jokertypes = [j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 for j in jokers]
-                
-            else:
-                raise Exception("Fehla!!")
-                        
-        elif blocktype == 1:
-            "random"
-            jokertypes = [-1 if seq_noneutral[tidx]<10 else 0 for tidx in range(len(seq_noneutral))]
-        
-        return torch.squeeze(torch.tensor(seq)).tolist(), \
-            torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
-                jokertypes
         
     def run(self, 
             sequence = None,
@@ -251,7 +165,7 @@ class Env():
                 if current_blocktype[ag_idx] == 0:
                     "Sequential block"
                     seq_matlab, seq_no_jokers_matlab, seq_jokertypes = \
-                        self.load_matfiles(self.matfile_dir, 
+                        utils.load_matfiles(self.matfile_dir, 
                                            blocktype_counter[ag_idx, current_blocktype[ag_idx]].item(), 
                                            current_blocktype[ag_idx], 
                                            sequence = sequence[ag_idx])
@@ -262,7 +176,7 @@ class Env():
                 elif current_blocktype[ag_idx] == 1:
                     "Random block"
                     seq_matlab, seq_no_jokers_matlab, seq_jokertypes = \
-                        self.load_matfiles(self.matfile_dir, 
+                        utils.load_matfiles(self.matfile_dir, 
                                            blocktype_counter[ag_idx, current_blocktype[ag_idx]].item(), 
                                            current_blocktype[ag_idx], 
                                            sequence = sequence[ag_idx])
@@ -280,51 +194,6 @@ class Env():
         self.data['blocktype'] = blocktype.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['jokertypes'] = jokertypes.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['blockidx'] = blockidx.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
-        # "Old Code"
-        # seq_block = 0
-        # random_block = 0  
-        # self.data['trialsequence'] = []
-        # self.data['blocktype'] = []
-        # self.data['jokertypes'] = []
-        # self.data['blockidx'] = []
-        # for block in range(num_blocks):
-        #     "New block!"
-        #     self.data['trialsequence'].append([-1]*self.agent.num_agents)
-        #     self.data['jokertypes'].append([-1]*self.agent.num_agents)
-        #     self.data['blockidx'].append([block]*self.agent.num_agents)
-        #     self.data['blocktype'].append([-1]*self.agent.num_agents)
-        #     # block_no[block, :] = block # The index of the block in the current experiment
-            
-        #     current_blocktype = blocktype[block, 0]
-            
-        #     if current_blocktype == 0:
-        #         "Sequential block"
-        #         seq_matlab, seq_no_jokers_matlab, jokertypes = \
-        #             self.load_matfiles(self.matfile_dir, 
-        #                                seq_block, 
-        #                                current_blocktype, 
-        #                                sequence = sequence)
-                    
-        #         self.data['blocktype'].extend([[0]]*len(seq_matlab))
-        #         seq_block += 1
-                
-        #     elif current_blocktype == 1:
-        #         "Random block"
-        #         seq_matlab, seq_no_jokers_matlab, jokertypes = \
-        #             self.load_matfiles(self.matfile_dir, 
-        #                                random_block, 
-        #                                current_blocktype, 
-        #                                sequence = sequence)
-                    
-        #         self.data['blocktype'].extend([[1]]*len(seq_matlab))
-        #         random_block += 1
-                
-        #     else:
-        #         raise Exception("Problem with los blocktypos.")
-            
-        #     self.data['trialsequence'].extend([[s] for s in seq_matlab])
-        #     self.data['jokertypes'].extend([[j] for j in jokertypes])
-        #     self.data['blockidx'].extend([[block]]*480)
         
         self.run_loop(self.agent, self.data, 1, infer = 0)
         
