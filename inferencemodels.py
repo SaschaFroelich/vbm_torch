@@ -72,7 +72,7 @@ class GeneralGroupInference(object):
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
-        with pyro.plate('subject', self.num_agents) as ind:
+        with pyro.plate('ag_idx', self.num_agents):
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_parameters]).to_event(1)
             transform = dist.transforms.AffineTransform(mu, sig)
@@ -120,7 +120,7 @@ class GeneralGroupInference(object):
                         torch.eye(self.num_parameters).repeat(self.num_agents, 1, 1),
                         constraint=dist.constraints.lower_cholesky)
         
-        with pyro.plate('subject', self.num_agents):
+        with pyro.plate('ag_idx', self.num_agents):
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
         return {'tau': tau, 'mu': mu, 'locs': locs}
@@ -157,7 +157,7 @@ class GeneralGroupInference(object):
 
         param_names = self.agent.param_names
         sample_dict = {param: [] for param in param_names}
-        sample_dict["subject"] = []
+        sample_dict["ag_idx"] = []
 
         for i in range(n_samples):
             sample = self.guide()
@@ -169,7 +169,7 @@ class GeneralGroupInference(object):
             for param in param_names:
                 sample_dict[param].extend(list(par_sample[param].detach().numpy()))
 
-            sample_dict["subject"].extend(list(range(self.num_agents)))
+            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
 
         sample_df = pd.DataFrame(sample_dict)
 
@@ -1696,7 +1696,7 @@ class GroupInference(object):
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
-        with pyro.plate('subject', self.num_agents) as ind:
+        with pyro.plate('ag_idx', self.num_agents):
 
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([npar]).to_event(1)
@@ -1821,7 +1821,7 @@ class GroupInference(object):
                         torch.eye(npar).repeat(self.num_agents, 1, 1),
                         constraint=dist.constraints.lower_cholesky)
     
-        with pyro.plate('subject', self.num_agents):
+        with pyro.plate('ag_idx', self.num_agents):
             # sample unconstrained parameters from multivariate normal
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
     
@@ -1900,7 +1900,7 @@ class GroupInference(object):
     
         subs_flat = np.array([n for i in range(n_samples) for n in range(self.num_agents)])
     
-        sample_dict = {"lr": lr_flat, "omega": omega_flat, "dectemp": dectemp_flat, "subject": subs_flat}
+        sample_dict = {"lr": lr_flat, "omega": omega_flat, "dectemp": dectemp_flat, "ag_idx": subs_flat}
     
         # make a pandas dataframe, better for analyses and plotting later (pandas is pythons R equivalent)
         sample_df = pd.DataFrame(sample_dict)
@@ -1946,7 +1946,7 @@ class GroupInference_modelB(object):
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
-        with pyro.plate('subject', self.num_agents) as ind:
+        with pyro.plate('ag_idx', self.num_agents):
 
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([npar]).to_event(1)
@@ -2102,7 +2102,7 @@ class GroupInference_modelB(object):
                         torch.eye(npar).repeat(self.num_agents, 1, 1),
                         constraint=dist.constraints.lower_cholesky)
     
-        with pyro.plate('subject', self.num_agents):
+        with pyro.plate('ag_idx', self.num_agents):
             # sample unconstrained parameters from multivariate normal
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
     
@@ -2214,7 +2214,7 @@ class GroupInference_modelB(object):
                        "lr_day2": lr_day2_flat, \
                        "theta_Q_day2": theta_Q_day2_flat, \
                        "theta_rep_day2": theta_rep_day2_flat, \
-                       "subject": subs_flat}
+                       "ag_idx": subs_flat}
     
         # make a pandas dataframe, better for analyses and plotting later (pandas is pythons R equivalent)
         sample_df = pd.DataFrame(sample_dict)

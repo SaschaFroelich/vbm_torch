@@ -93,15 +93,6 @@ class Env():
         
         self.data['rewprobs'] = torch.tensor(rewprobs)[torch.tensor(sequence)-1,:]
         
-        # if torch.allsequence == 1:
-        #     self.data['rewprobs'] = torch.ones((self.agent.num_agents, 4))*torch.tensor()
-            
-        # elif sequence == 2:
-        #     self.data['rewprobs'] = torch.ones((self.agent.num_agents, 4))*torch.tensor()
-            
-        # else:
-        #     raise Exception("Fehla!")
-        
         num_blocks = self.agent.num_blocks
         # assert(num_blocks == 14)
         
@@ -126,21 +117,6 @@ class Env():
         blocktype[(torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0].repeat_interleave(7), 
                   rand_idxs*len((torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0]), :] = 0 # random condition
         
-        # "Old Code"
-        # blocktype = -100*torch.ones((num_blocks, 480));
-        # if blockorder == 1:
-        #     blocktype[seq_idxs, :] = 0 # fixed sequence condition
-        #     blocktype[rand_idxs, :] = 1 # random condition
-                        
-        # elif blockorder == 2:
-        #     blocktype[seq_idxs, :] = 1
-        #     blocktype[rand_idxs, :] = 0
-            
-        # else:
-        #     raise Exception("blockorder must be 1 or 2.")
-    
-        # block_no = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8) # The index of the block in the current experiment
-        # blocktype = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
         jokertypes = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
         blockidx = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
         trialsequence = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
@@ -262,13 +238,9 @@ class Env():
             
                 else:
                     "Simulation"
-                    # # assert(torch.is_tensor(trial))
+                    # assert(torch.is_tensor(trial))
                     current_choice = agent.choose_action(trial, day)
-                    # dfgh # test whether current_choice and outcome are correct
-                    # if torch.any(trial>10):
-                        # dfgh
                     outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
-                    # dfgh
                     self.choices_GD.append((data['rewprobs'][range(agent.num_agents), current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                     self.choices.append(current_choice.tolist())
                     self.outcomes.append(outcome.tolist())

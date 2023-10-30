@@ -31,7 +31,6 @@ class Vbm():
     def __init__(self, omega, dectemp, lr, k, Q_init, num_blocks = 14):
         '''
         
-
         Parameters
         ----------
         omega : torch tensor, shape [num_particles, num_agents]
@@ -70,7 +69,7 @@ class Vbm():
         "Setup"
         self.num_particles = omega.shape[0]
         self.num_agents = omega.shape[1]
-        # assert(Q_init.shape == (self.num_particles, self.num_agents, 4))
+        # # assert(Q_init.shape == (self.num_particles, self.num_agents, 4))
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
@@ -175,21 +174,11 @@ class Vbm():
         as indicated by 'choices', where the values of Qin are retained. Q positions for agents with an error choice
         are replaced by 0."""
         
-        # assert torch.is_tensor(choices), "choices must be a tensor."
-        # assert choices.shape == (self.num_agents,), "choices must have shape (num_agents)."
+        # # assert torch.is_tensor(choices), "choices must be a tensor."
+        # # assert choices.shape == (self.num_agents,), "choices must have shape (num_agents)."
+        # # assert Qin.ndim == 3
         
         Qin = Qin.type(torch.double)
-        
-        # print(Qin.ndim)
-        # if len(Qin.shape) == 2:
-        #     Qin = Qin[None, ...]
-            
-        # elif len(Qin.shape) == 3:
-        #     pass
-        
-        # else:
-        #     ipdb.set_trace()
-        #     raise Exception("Fehla, digga!")
         
         "np_error_mask will be True for those subjects that performed no error"  
         no_error_mask = choices != self.BAD_CHOICE
@@ -222,7 +211,8 @@ class Vbm():
     def find_resp_options(self, stimulus_mat):
         '''
         Given a dual-target stimulus (e.g. 12, 1-indexed), this function returns the two response
-        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3
+        options in 0-indexing. E.g.: stimulus_mat=14 -> option1_python = 0, option1_python = 3.
+        Returns twice the same option in case of STT.
 
         Parameters
         ----------
@@ -241,16 +231,13 @@ class Vbm():
 
         '''
         
-        # assert(torch.is_tensor(stimulus_mat))
+        # # assert(torch.is_tensor(stimulus_mat))
         option2_python = ((stimulus_mat % 10) - 1).type(torch.int)
         option1_python = (((stimulus_mat - (stimulus_mat % 10)) / 10) -1).type(torch.int)
         
-        # if option2_python.ndim == 2 and option2_python.shape[0] == 1:
-        #     option1_python = torch.squeeze(option1_python)
-        #     option2_python = torch.squeeze(option2_python)
-            
-        # assert(option1_python.ndim == 1)
-        # assert(option2_python.ndim == 1)
+        "Make sure to return option2 twice in case of STT"
+        option1_python = torch.where(stimulus_mat > 10, option1_python, option2_python)
+        
         return option1_python, option2_python
 
     def choose_action(self, trial, day):
@@ -273,58 +260,46 @@ class Vbm():
 
         '''
         
+        # assert trial.ndim == 1 and trial.shape[0] == self.num_agents
+        # assert isinstance(day, int)
+        
         "New Code"
         "STT"
         choice_python_stt = torch.where(trial < 10, trial-1, trial)
-        cond_stt = (torch.rand(self.num_agents) < self.errorrates_stt) 
+        cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_stt) 
         choice_python_stt = cond_stt * self.BAD_CHOICE + ~cond_stt * choice_python_stt
         
         "DTT"
         if torch.any(trial>10):
-            # dfgh #test whether probs correct fr stt
             option1, option2 = self.find_resp_options(trial)
             "[0, :] to choose 0th particle"
             choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()[0, :]
-    
+
             choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
             
-            cond_dtt = (torch.rand(self.num_agents) < self.errorrates_dtt)
+            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
             choice_python_dtt =  cond_dtt * self.BAD_CHOICE + ~cond_dtt * choice_python_dtt
             
             "Combine choices"
             choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
-            # dfgh #test whether result correct
+            
+            # print('day = %d'%day)
+            # print('self.Q[-1] = ...')
+            # print(self.Q[-1])
+            # print('self.V[-1] = ...')
+            # print(self.V[-1])
+            
+            # assert choice_python.ndim == 1
             return choice_python.clone().detach()
         
         else:
+            # assert choice_python_stt.ndim == 1
             return choice_python_stt.clone().detach()
-        
-        # "Old Code"
-        # if trial < 10:
-        #     "Single-target trial"
-        #     choice_python = trial-1
-        #     cond = (torch.rand(1) < self.errorrates_stt) 
-        #     choice_python = cond * self.BAD_CHOICE + ~cond * choice_python
-                            
-        
-        # elif trial > 10:
-        #     "Dual-target trial"
-        #     option1, option2 = self.find_resp_options(trial)
-            
-        #     "[0, :] to choose 0th particle"
-        #     choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day)).sample()[0, :]
-
-        #     choice_python = option2*choice_sample + option1*(1-choice_sample)
-            
-        #     cond = (torch.rand(1) < self.errorrates_dtt)
-        #     choice_python =  cond * self.BAD_CHOICE + ~cond * choice_python
-            
-        # "Squeeze because if trial > 10 ndim of choice_python is 1 (and not 0)"
-        # return torch.squeeze(choice_python.clone().detach()).type('torch.LongTensor')
-
+    
     def update(self, choices, outcomes, blocktype, **kwargs):
         '''
-
+        Class Vbm().
+        
         Parameters
         ----------
         choices : torch.tensor with shape [num_agents]
@@ -355,7 +330,7 @@ class Vbm():
 
         '''
         
-        # assert choices.ndim == 1, "choices must have shape (num_agents)."
+        # # assert choices.ndim == 1, "choices must have shape (num_agents)."
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
@@ -371,10 +346,10 @@ class Vbm():
             self.V.append((1-self.omega)[..., None]*self.rep[-1] + self.omega[..., None]*self.Q[-1])
             
         else:
+            print("Update!!")
             "----- Update GD-values -----"
             Qout, mask = self.Qoutcomp(self.Q[-1], choices)
             Qnew = self.Q[-1] + self.lr[..., None]*(outcomes[None,...,None]-Qout)*mask
-            
             self.Q.append(Qnew)
             
             "--- The following is executed in case of correct and inocrrect responses ---"
@@ -398,7 +373,7 @@ class Vbm():
                                         self.ppchoice, 
                                         self.pchoice, 
                                         choices, 
-                                        0:4] / seqs_sum[...,None]
+                                        0:4] / seqs_sum[..., None]
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
@@ -446,7 +421,6 @@ class Vbm():
         
         self.seq_counter = self.init_seq_counter.clone().detach()
         
-        
 class Vbm_B(Vbm):
     
     num_params = 6
@@ -482,8 +456,8 @@ class Vbm_B(Vbm):
         self.trials = 480*num_blocks
         self.num_blocks = num_blocks
         
-        self.errorrates_stt = torch.rand(1)*0.1
-        self.errorrates_dtt = torch.rand(1)*0.2
+        self.errorrates_stt = torch.zeros((1, self.num_agents))
+        self.errorrates_dtt = torch.zeros((1, self.num_agents))
         
         "Latent Variables"
         self.par_dict = {}
@@ -536,7 +510,8 @@ class Vbm_B(Vbm):
 
     def update(self, choices, outcomes, blocktype, day, **kwargs):
         '''
-
+        Class Vbm_B(Vbm).
+        
         Parameters
         ----------
         choices : torch.tensor or list with shape [num_agents]
@@ -569,6 +544,8 @@ class Vbm_B(Vbm):
         # assert torch.is_tensor(choices)
         # assert torch.is_tensor(outcomes)
         # assert torch.is_tensor(blocktype)
+        # assert day == 1 or day == 2
+
         
         if day == 1:
             lr = self.lr_day1
@@ -579,8 +556,8 @@ class Vbm_B(Vbm):
             lr = self.lr_day2
             theta_Q = self.theta_Q_day2
             theta_rep = self.theta_rep_day2
-
-        if all([ch == -1 for ch in choices]) and all([out == -1 for out in outcomes]) and all([bb == -1 for bb in blocktype]):
+        
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
             self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
@@ -594,7 +571,9 @@ class Vbm_B(Vbm):
             
         else:
             "----- Update GD-values -----"
-            # outcome is either 0 or 1
+            # outcome is either -2 (error), 0, or 1
+            # assert torch.all(outcomes <= 1)
+            # # assert torch.all(outcomes > -1)
             
             "--- Group!!! ----"
             "mask contains 1s where Qoutcomp() contains non-zero entries"
@@ -629,6 +608,7 @@ class Vbm_B(Vbm):
             
             "----- Compute new V-values for next trial -----"
             self.V.append(theta_rep[..., None]*self.rep[-1] + theta_Q[..., None]*self.Q[-1])
+            # dfgh
 
             if len(self.Q) > 10:
                 "Free up some memory space"
@@ -657,6 +637,182 @@ class Vbm_B(Vbm):
         self.lr_day2 = self.par_dict["lr_day2"]
         self.theta_Q_day2 = self.par_dict["theta_Q_day2"]
         self.theta_rep_day2 = self.par_dict["theta_rep_day2"]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and rep"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)*1./self.NA] # habitual values (repetition values)
+        
+        "Compute V"
+        self.V.append(self.theta_rep_day1[..., None]*self.rep[-1] + self.theta_Q_day1[..., None]*self.Q[-1])
+        
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-2 in seq_counter for errors"
+        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
+        self.init_seq_counter = self.k / 4 * np.ones((self.num_agents, 2, 6, 6, 6, 6))
+        
+        self.seq_counter = self.init_seq_counter.clone().detach()
+        
+        
+class conflictmodel(Vbm_B):
+    
+    num_params = 8
+    param_names = ['lr_day1',
+                    'theta_Q_day1',
+                    'theta_rep_day1',
+                    'conflict_param_day1',
+                    'lr_day2',
+                    'theta_Q_day2',
+                    'theta_rep_day2',
+                    'conflict_param_day2']
+    
+    NA = 4 # no. of possible actions
+    
+    def __init__(self,
+                 lr_day1,
+                 theta_Q_day1,
+                 theta_rep_day1,
+                 conflict_param_day1,
+                 lr_day2,
+                 theta_Q_day2,
+                 theta_rep_day2,
+                 conflict_param_day2,
+                 k,
+                 Q_init,
+                 num_blocks = 14):
+        
+        if num_blocks != 1:
+            if num_blocks%2 != 0:
+                raise Exception("num_blocks must be an even value.")
+
+        "Setup"
+        self.num_particles = lr_day1.shape[0]
+        self.num_agents = lr_day1.shape[1]
+        self.dectemp = torch.tensor([[1.]]) # For softmax function
+        
+        self.trials = 480*num_blocks
+        self.num_blocks = num_blocks
+        
+        self.errorrates_stt = torch.zeros((1, self.num_agents))
+        self.errorrates_dtt = torch.zeros((1, self.num_agents))
+        
+        "Latent Variables"
+        self.par_dict = {}
+        self.par_dict['lr_day1'] = lr_day1
+        self.par_dict['theta_Q_day1'] = theta_Q_day1 # dectemp > 0
+        self.par_dict['theta_rep_day1'] = theta_rep_day1
+        self.par_dict['conflict_param_day1'] = conflict_param_day1
+        
+        self.par_dict['lr_day2'] = lr_day2
+        self.par_dict['theta_Q_day2'] = theta_Q_day2 # dectemp > 0
+        self.par_dict['theta_rep_day2'] = theta_rep_day2
+        self.par_dict['conflict_param_day2'] = conflict_param_day2
+        
+        self.lr_day1 = lr_day1
+        self.theta_Q_day1 = theta_Q_day1 # dectemp > 0
+        self.theta_rep_day1 = theta_rep_day1
+        self.conflict_param_day1 = conflict_param_day1
+        
+        self.lr_day2 = lr_day2
+        self.theta_Q_day2 = theta_Q_day2 # dectemp > 0
+        self.theta_rep_day2 = theta_rep_day2
+        self.conflict_param_day2 = conflict_param_day2
+        
+        "K"
+        self.k = k
+        self.BAD_CHOICE = -2
+        
+        "Q and rep"
+        self.Q_init = Q_init
+        self.Q = [Q_init] # Goal-Directed Q-Values
+        self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA] # habitual values (repetition values)
+        
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        self.V = [(self.theta_rep_day1[..., None]*self.rep[-1] + self.theta_Q_day1[..., None]*self.Q[-1])]
+        
+        # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
+        # Compute prior over sequences of length 4
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-2 in seq_counter for errors"
+        "Dimensions are [agent, blocktypes, pppchoice, ppchoice, pchoice, choice]"
+        self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6))
+        
+        self.seq_counter = self.init_seq_counter.clone().detach()
+    
+    def locs_to_pars(self, locs):
+        self.par_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
+                    "theta_Q_day1": torch.exp(locs[..., 1]),
+                    "theta_rep_day1": torch.exp(locs[..., 2]),
+                    "conflict_param_day1": locs[..., 3],
+                    
+                    "lr_day2": torch.sigmoid(locs[..., 4]),
+                    "theta_Q_day2": torch.exp(locs[..., 5]),
+                    "theta_rep_day2": torch.exp(locs[..., 6]),
+                    "conflict_param_day2": locs[..., 7]}
+    
+        return self.par_dict
+    
+    def compute_probs(self, trial, day):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        if day == 1:
+            conflict_param = self.conflict_param_day1
+            
+        else:
+            conflict_param = self.conflict_param_day2
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        DeltaQ = self.Q[-1][0, torch.arange(self.num_agents), option1] - self.Q[-1][0, torch.arange(self.num_agents), option2]
+        DeltaRep = self.rep[-1][0, torch.arange(self.num_agents), option1] - self.rep[-1][0, torch.arange(self.num_agents), option2]
+        conflict_bool = ((torch.sign(DeltaQ).type(torch.int) * torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
+        conflict_amount = torch.abs(DeltaQ - DeltaRep)
+        
+        probs = self.softmax(torch.stack((Vopt1 + (DeltaQ > 0)*conflict_bool*conflict_amount*conflict_param, 
+                                          Vopt2 + (DeltaQ < 0)*conflict_bool*conflict_amount*conflict_param), 2))
+        
+        return probs
+    
+    def reset(self, locs):   
+        _ = self.locs_to_pars(locs)
+        
+        "Setup"
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "Latent Variables"
+        self.lr_day1 = self.par_dict["lr_day1"]
+        self.theta_Q_day1 = self.par_dict["theta_Q_day1"]
+        self.theta_rep_day1 = self.par_dict["theta_rep_day1"]    
+        self.conflict_parameter_day1 = self.par_dict["conflict_param_day1"]
+        
+        self.lr_day2 = self.par_dict["lr_day2"]
+        self.theta_Q_day2 = self.par_dict["theta_Q_day2"]
+        self.theta_rep_day2 = self.par_dict["theta_rep_day2"]
+        self.conflict_parameter_day2 = self.par_dict["conflict_param_day2"]
         
         "K"
         # self.k = kwargs["k"]

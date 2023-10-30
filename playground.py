@@ -518,3 +518,65 @@ df = pd.DataFrame({
 df_transformed = df.explode(['column_A', 'column_B'])
 
 print(df_transformed)
+
+#%%
+'''
+Simulate data
+'''
+import numpy as np
+import torch
+
+import utils
+import models_torch as models
+import env 
+import utils
+
+import pandas as pd# model = sys.argv[1]
+# resim =  int(sys.argv[2]) # whether to simulate agents with inferred parameters
+# method = sys.argv[3] # "svi" or "mcmc"
+# num_agents = 50
+
+model = 'B'
+resim =  0 # whether to simulate agents with inferred parameters
+method = 'svi' # "svi" or "mcmc"
+num_agents = 4
+
+assert num_agents%4 == 0, "num_agents must be divisible by 4."
+# k = 4.
+print(f"Running model {model}")
+
+sequence = ([1]*(num_agents//2))
+sequence.extend(([2]*(num_agents//2)))
+
+blockorder = np.ones((1, num_agents//4), dtype=int)
+blockorder = np.concatenate((blockorder,np.ones((1, num_agents//4), dtype=int)*2),axis=1)
+blockorder = np.concatenate((blockorder,blockorder),axis=1).tolist()[0]
+
+Qs = torch.tensor([[0.2, 0., 0., 0.2],
+                   [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
+Q_init = Qs[range(num_agents),torch.tensor(sequence)-1, :]
+
+# params = {'omega': torch.tensor([0.2]*num_agents),
+#           'dectemp': torch.tensor([1.5]*num_agents),
+#           'lr': torch.tensor([0.01]*num_agents)}
+
+params = {'lr_day1': torch.tensor([0.01]*num_agents),
+          'theta_Q_day1': torch.tensor([2.]*num_agents),
+          'theta_rep_day1': torch.tensor([1.]*num_agents),
+          
+          'lr_day2': torch.tensor([0]*num_agents),
+          'theta_Q_day2': torch.tensor([2.]*num_agents),
+          'theta_rep_day2': torch.tensor([1.]*num_agents)}
+
+# params = torch.tensor((np.ones((4,6))*np.array([[0.01, 2., 1., 0, 2., 1.]])).T)
+# params = torch.tensor((np.ones((4,3))*np.array([[0.01, 2., 1.]])).T)
+groupdata_dict, params, params_df = utils.simulate_data(model, 
+                                                    num_agents,
+                                                   Q_init = Q_init,
+                                                    sequence = sequence,
+                                                    params = params,
+                                                    blockorder = blockorder)
+
+groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
+
+utils.plot_grouplevel(groupdata_df)

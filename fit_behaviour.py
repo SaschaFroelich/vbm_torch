@@ -31,7 +31,7 @@ Q_init = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
 '''
 Inference
 '''
-model = 'B'
+model = 'conflictmodel'
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          Q_init, 
@@ -40,12 +40,12 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata)
-infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample = infer.sample_posterior()
-df = post_sample.groupby(['subject']).mean()
-post_sample['group'] = post_sample['subject'].map(lambda x: groupdata['group'][x])
+df = post_sample.groupby(['ag_idx']).mean()
+post_sample['group'] = post_sample['ag_idx'].map(lambda x: groupdata['group'][x])
 post_sample['model'] = [model]*len(post_sample)
 
 "----- Save results to file"
@@ -77,20 +77,30 @@ print(button)
 button.pack()
 root.mainloop()
 
-post_sample, df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
+# post_sample, df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
+res = pickle.load(open( filenames[0], "rb" ))
 
-num_agents = len(post_sample['subject'].unique())
+if len(res) == 3:
+    inf_mean_df, infer_loss, param_names = res
+    model ='B'
+    
+elif len(res) == 4:
+    post_sample, inf_mean_df, infer_loss, param_names = res
+    model = post_sample['model'][0]
+
+post_sample.rename(columns={'subject': 'ag_idx'})
+num_agents = len(post_sample['ag_idx'].unique())
 num_params = len(param_names)
-params = torch.tensor(df.iloc[:,0:-3].values.T, requires_grad = False)
-groupdata_exp = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
-groupdata_df = pd.DataFrame(groupdata_exp).explode(list(groupdata_exp.keys()))
-sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in groupdata_exp['group']]
-blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in groupdata_exp['group']]
+params = torch.tensor(inf_mean_df.iloc[:,0:-3].values.T, requires_grad = False)
+expdata_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+groupdata_df = pd.DataFrame(expdata_dict).explode(list(expdata_dict.keys()))
+sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in expdata_dict['group']]
+blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in expdata_dict['group']]
 Q_init_behav_fit = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
                     torch.tensor([[0, 0.2, 0.2, 0.]]).tile((num_agents//2, 1))))
 
-'Makes ure order of parameters is preserved'
-assert(all([param_names[par_idx] == df.columns[par_idx] for par_idx in range(num_params)]))
+# "Makes ure order of parameters is preserved"
+# assert(all([param_names[par_idx] == df.columns[par_idx] for par_idx in range(num_params)]))
 
 #%%
 '''
@@ -109,6 +119,21 @@ plt.show()
 '''
 Plot Experimental Data
 '''
+utils.plot_grouplevel(expdata_df)
+
+#%%
+'''
+Simulate only from means
+'''
+groupdata_dict, params, params_df = utils.simulate_data(model, 
+                                                    num_agents,
+                                                   Q_init = Q_init,
+                                                    sequence = sequence,
+                                                    blockorder = blockorder,
+                                                    params = inf_mean_df)
+
+groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
+
 utils.plot_grouplevel(groupdata_df)
 
 #%%
@@ -140,7 +165,7 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-npar = len(post_sample.columns)
+npar = len(post_sample.columns[0:-3])
 
 fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=0)
 
@@ -160,12 +185,12 @@ for par in range(npar):
         sns.violinplot(ax = ax[par], 
                        x = 'variable',
                        y = 'value',
-                       data = df.melt()[df.melt()['variable'] == param_names[par]],
+                       data = inf_mean_df.melt()[inf_mean_df.melt()['variable'] == param_names[par]],
                        color=".8")
         
         sns.stripplot(x = 'variable',
                       y = 'value',
-                      data = df.melt()[df.melt()['variable'] == param_names[par]],
+                      data = inf_mean_df.melt()[inf_mean_df.melt()['variable'] == param_names[par]],
                       edgecolor = 'gray',
                       linewidth = 1,
                       jitter=True,
@@ -201,16 +226,16 @@ for par in range(npar):
         g1 = sns.violinplot(ax=ax[par], 
                             x="parameter", 
                             y="inferred", 
-                            data=df[df["parameter"]==df["parameter"].unique()[par]], 
+                            data=inf_mean_df[inf_mean_df["parameter"]==inf_mean_df["parameter"].unique()[par]], 
                             color=".8")
         
         g2 = sns.stripplot(x="parameter",
                       y="inferred",
                       edgecolor = 'gray',
                       linewidth = 1,
-                      data=df[df["parameter"]==df["parameter"].unique()[par]],
-                      jitter=True,
-                      ax=ax[par])
+                      data = inf_mean_df[inf_mean_df["parameter"]==inf_mean_df["parameter"].unique()[par]],
+                      jitter = True,
+                      ax = ax[par])
             
         if par > 0:
             g1.set(ylabel=None)
@@ -219,8 +244,10 @@ for par in range(npar):
 
 plt.show()
 
+
+
 #%%
 '''
 Posterior Predictives
 '''
-complete_df = utils.posterior_predictives(post_sample)
+complete_df = utils.posterior_predictives(post_sample, exp_data = expdata_df)
