@@ -15,12 +15,21 @@ import pickle
 import analysis as anal
 import inferencemodels
 import utils
+
+'''
+Modelle:
+Vbm
+B
+Conflict
+'''
+
+model = 'Conflict'
 #%%
-groupdata, groupdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+exp_behav_dict, exp_behav_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 
-utils.plot_grouplevel(groupdata_df)
+utils.plot_grouplevel(exp_behav_df)
 
-num_agents = len(groupdata['trialsequence'][0])
+num_agents = len(exp_behav_dict['trialsequence'][0])
 #%%
 '''
 Prepare Inference
@@ -31,7 +40,7 @@ Q_init = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
 '''
 Inference
 '''
-model = 'conflictmodel'
+
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          Q_init, 
@@ -39,18 +48,17 @@ agent = utils.init_agent(model,
 
 print("===== Starting inference =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, groupdata)
-infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
+infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
+infer.infer_posterior(iter_steps = 3, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
-post_sample = infer.sample_posterior()
-df = post_sample.groupby(['ag_idx']).mean()
-post_sample['group'] = post_sample['ag_idx'].map(lambda x: groupdata['group'][x])
-post_sample['model'] = [model]*len(post_sample)
+post_sample_df = infer.sample_posterior()
+post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: exp_behav_dict['group'][0][x])
+post_sample_df['model'] = [model]*len(post_sample_df)
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-pickle.dump( (post_sample, df, infer.loss, agent.param_names), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
+pickle.dump( (post_sample_df, exp_behav_df, infer.loss, agent.param_names), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -58,6 +66,9 @@ Analysis
 '''
 #%%
 "----- Open Files"
+# import sys
+# sys.modules[__name__].__dict__.clear() # Clear variables
+# del model
 import pandas as pd
 import utils
 import torch
@@ -77,30 +88,39 @@ print(button)
 button.pack()
 root.mainloop()
 
-# post_sample, df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
+# post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
 res = pickle.load(open( filenames[0], "rb" ))
 
 if len(res) == 3:
-    inf_mean_df, infer_loss, param_names = res
+    inf_mean_df, loss, param_names = res
+    inf_mean_df['ag_idx'] = range(len(inf_mean_df))
+    gruppe = [0]*9
+    gruppe.extend([1]*9)
+    gruppe.extend([2]*9)
+    gruppe.extend([3]*9)
+    inf_mean_df['group'] = gruppe
     model ='B'
+    num_agents = len(inf_mean_df)
     
 elif len(res) == 4:
-    post_sample, inf_mean_df, infer_loss, param_names = res
-    model = post_sample['model'][0]
-
-post_sample.rename(columns={'subject': 'ag_idx'})
-num_agents = len(post_sample['ag_idx'].unique())
+    post_sample_df, inf_mean_df, loss, param_names = res
+    model = post_sample_df['model'][0]
+    post_sample_df.rename(columns={'subject': 'ag_idx'}, inplace=True)
+    num_agents = len(post_sample_df['ag_idx'].unique())
+    
 num_params = len(param_names)
 params = torch.tensor(inf_mean_df.iloc[:,0:-3].values.T, requires_grad = False)
 expdata_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
-groupdata_df = pd.DataFrame(expdata_dict).explode(list(expdata_dict.keys()))
-sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in expdata_dict['group']]
-blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in expdata_dict['group']]
+# groupdata_df = pd.DataFrame(expdata_dict).explode(list(expdata_dict.keys()))
+# sequence_behav_fit  = [1 if group==0 or group==1 else 2 for group in expdata_dict['group']]
+# blockorder_behav_fit  = [1 if group==0 or group==2 else 2 for group in expdata_dict['group']]
 Q_init_behav_fit = torch.cat((torch.tensor([[0.2, 0., 0., 0.2]]).tile((num_agents//2, 1)),
                     torch.tensor([[0, 0.2, 0.2, 0.]]).tile((num_agents//2, 1))))
 
-# "Makes ure order of parameters is preserved"
-# assert(all([param_names[par_idx] == df.columns[par_idx] for par_idx in range(num_params)]))
+# # "Makes ure order of parameters is preserved"
+# # assert(all([param_names[par_idx] == df.columns[par_idx] for par_idx in range(num_params)]))
+# if model == 'conflictmodel':
+#     model= 'Conflict'
 
 #%%
 '''
@@ -109,7 +129,7 @@ Plot ELBO
 import matplotlib.pyplot as plt
 import seaborn as sns
 fig, ax = plt.subplots()
-plt.plot(infer_loss)
+plt.plot(loss)
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -125,16 +145,14 @@ utils.plot_grouplevel(expdata_df)
 '''
 Simulate only from means
 '''
-groupdata_dict, params, params_df = utils.simulate_data(model, 
-                                                    num_agents,
-                                                   Q_init = Q_init,
-                                                    sequence = sequence,
-                                                    blockorder = blockorder,
-                                                    params = inf_mean_df)
+groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
+                                                                        num_agents,
+                                                                        Q_init = Q_init_behav_fit,
+                                                                        group = list(inf_mean_df['group']),
+                                                                        params = inf_mean_df)
 
-groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
-
-utils.plot_grouplevel(groupdata_df)
+utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+# utils.plot_grouplevel(expdata_df, plot_single = True)
 
 #%%
 '''
@@ -144,7 +162,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 fig, ax = plt.subplots()
-plt.plot(infer_loss)
+plt.plot(loss)
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -152,7 +170,7 @@ plt.show()
 
 for param in param_names:
     fig, ax = plt.subplots()
-    sns.kdeplot(post_sample[param])
+    sns.kdeplot(post_sample_df[param])
     # plt.plot(df[param+'_true'], df[param+'_true'])
     plt.show()
 
@@ -165,7 +183,7 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-npar = len(post_sample.columns[0:-3])
+npar = len(post_sample_df.columns[0:-3])
 
 fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=0)
 
@@ -176,6 +194,17 @@ if model == 'B':
              [0, 0.03], # lr
              [0.5, 7.5], # theta_Q
              [0.5, 1.8]] # theta_rep
+    
+elif model == 'Conflict'or model =='conflictmodel':
+    ylims = [[0, 0.03], # lr
+             [0.5, 7.5], # theta_Q
+             [0.5, 5], # theta_rep
+             [-0.4, 0.5], # conflict param
+             [0, 0.03], # lr
+             [0.5, 7.5], # theta_Q
+             [0.5, 5], # theta_rep
+             [-0.5, 0.5]] # conflict param
+    
 
 for par in range(npar):
 
@@ -244,10 +273,8 @@ for par in range(npar):
 
 plt.show()
 
-
-
 #%%
 '''
 Posterior Predictives
 '''
-complete_df = utils.posterior_predictives(post_sample, exp_data = expdata_df)
+complete_df = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)

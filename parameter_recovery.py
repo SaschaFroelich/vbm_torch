@@ -38,12 +38,8 @@ import pickle
 import numpy as np 
 
 #%%
-# model = sys.argv[1]
-# resim =  int(sys.argv[2]) # whether to simulate agents with inferred parameters
-# method = sys.argv[3] # "svi" or "mcmc"
-# num_agents = 50
 
-model = 'conflictmodel'
+model = 'Conflict'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 52
@@ -57,26 +53,34 @@ print(f"Running model {model}")
 Simulate data in parallel
 '''
 
-sequence = ([1]*(num_agents//2))
-sequence.extend(([2]*(num_agents//2)))
+group = [0]*(num_agents//4)
+group.extend([1]*(num_agents//4))
+group.extend([2]*(num_agents//4))
+group.extend([3]*(num_agents//4))
 
-blockorder = np.ones((1, num_agents//4), dtype=int)
-blockorder = np.concatenate((blockorder,np.ones((1, num_agents//4), dtype=int)*2),axis=1)
-blockorder = np.concatenate((blockorder,blockorder),axis=1).tolist()[0]
+# sequence = ([1]*(num_agents//2))
+# sequence.extend(([2]*(num_agents//2)))
+
+# blockorder = np.ones((1, num_agents//4), dtype=int)
+# blockorder = np.concatenate((blockorder,np.ones((1, num_agents//4), dtype=int)*2),axis=1)
+# blockorder = np.concatenate((blockorder,blockorder),axis=1).tolist()[0]
+# Qs = torch.tensor([[0.2, 0., 0., 0.2],
+#                    [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
+# Q_init = Qs[range(num_agents),torch.tensor(sequence)-1, :]
 
 Qs = torch.tensor([[0.2, 0., 0., 0.2],
+                   [0.2, 0., 0., 0.2],
+                   [0, 0.2, 0.2, 0],
                    [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
-Q_init = Qs[range(num_agents),torch.tensor(sequence)-1, :]
+Q_init = Qs[range(num_agents),torch.tensor(group), :]
 
-groupdata_dict, params, params_df = utils.simulate_data(model, 
-                                                    num_agents,
-                                                   Q_init = Q_init,
-                                                    sequence = sequence,
-                                                    blockorder = blockorder)
+groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model, 
+                                                                      num_agents,
+                                                                      Q_init = Q_init,
+                                                                      group = group)
 
-groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
+utils.plot_grouplevel(group_behav_df)
 
-utils.plot_grouplevel(groupdata_df)
 
 #%%
 '''
@@ -88,30 +92,19 @@ agent = utils.init_agent(model,
                          Q_init, 
                          num_agents = num_agents)
 
-# df_true = pd.DataFrame({'lr_day1_true' : lr_day1_true,
-#                         'theta_Q_day1_true' : theta_Q_day1_true,
-#                         'theta_rep_day1_true' : theta_rep_day1_true,
-                        
-#                         'lr_day2_true' : lr_day2_true,
-#                         'theta_Q_day2_true' : theta_Q_day2_true,
-#                         'theta_rep_day2_true' : theta_rep_day2_true})
-
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 2_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
-post_sample = infer.sample_posterior()
-df = post_sample.groupby(['subject']).mean()
-post_sample['group'] = post_sample['subject'].map(lambda x: groupdata_dict['group'][0][x])
-post_sample['model'] = [model]*len(post_sample)
+post_sample_df = infer.sample_posterior()
+post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: groupdata_dict['group'][0][x])
+post_sample_df['model'] = [model]*len(post_sample_df)
 
 "----- Save results to file"
-df_all = pd.concat([df, params_df], axis = 1)
-
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-pickle.dump((post_sample, df_all, groupdata_df, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
+pickle.dump((post_sample_df, params_sim_df, group_behav_df, infer.loss, agent.param_names), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -119,6 +112,13 @@ Analysis
 '''
 #%%
 "----- Open Files"
+# import sys
+# sys.modules[__name__].__dict__.clear() # Clear variables
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pylab as plt
+import pickle
 import tkinter as tk
 from tkinter import filedialog
 
@@ -135,24 +135,45 @@ print(button)
 button.pack()
 root.mainloop()
 
-post_sample, df_all, groupdata_df, infer_loss, param_names = pickle.load(open( filenames[0], "rb" ))
-# res = pickle.load(open( filenames[0], "rb" ))
+res=pickle.load(open( filenames[0], "rb" ))
+if len(res) == 5:
+    post_sample_df, params_sim_df, group_behav_df, loss, param_names = res
+    
+elif len(res) == 3:
+    all_params_df, loss, param_names = res
+    all_params_df
+    fig, ax = plt.subplots()
+    plt.plot(loss)
+    plt.title("ELBO")
+    ax.set_xlabel("Number of iterations")
+    ax.set_ylabel("ELBO")
+    plt.show()
+    
+    for param in param_names:
+        fig, ax = plt.subplots()
+        sns.scatterplot(x=param + '_true', y=param, data=all_params_df)
+        plt.plot(all_params_df[param+'_true'], all_params_df[param+'_true'])
+        plt.show()
+
+# post_sample_df, params_sim_df, group_behav_df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
 #%%
 '''
 Plot ELBO and Parameter Estimates
 '''
 
 fig, ax = plt.subplots()
-plt.plot(infer_loss)
+plt.plot(loss)
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
 plt.show()
 
+all_params_df = pd.concat((params_sim_df, pd.DataFrame(post_sample_df.iloc[:, 0:-2].groupby(['ag_idx'], as_index = False).mean())), axis = 1)
+
 for param in param_names:
     fig, ax = plt.subplots()
-    sns.scatterplot(x=param + '_true', y=param, data=df_all)
-    plt.plot(df_all[param+'_true'], df_all[param+'_true'])
+    sns.scatterplot(x=param + '_sim', y=param + '_postsample', data=all_params_df)
+    plt.plot(params_sim_df[param+'_sim'], params_sim_df[param+'_sim'])
     plt.show()
 
 
@@ -164,4 +185,4 @@ groupdata, params, params_df = utils.simulate_data(model,
                                                    num_agents, 
                                                    Q_init = Q_init,
                                                    blockorder = [1]*num_agents,
-                                                   params = torch.tensor(np.array(df_all.iloc[:, 0:len(param_names)]).T))
+                                                   params = torch.tensor(np.array(params_sim_df.iloc[:, 0:len(param_names)]).T))

@@ -156,7 +156,7 @@ class GeneralGroupInference(object):
         # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
         param_names = self.agent.param_names
-        sample_dict = {param: [] for param in param_names}
+        sample_dict = {param + '_postsample': [] for param in param_names}
         sample_dict["ag_idx"] = []
 
         for i in range(n_samples):
@@ -167,7 +167,7 @@ class GeneralGroupInference(object):
             par_sample = self.agent.locs_to_pars(sample["locs"])
 
             for param in param_names:
-                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
+                sample_dict[param + '_postsample'].extend(list(par_sample[param].detach().numpy()))
 
             sample_dict["ag_idx"].extend(list(range(self.num_agents)))
 

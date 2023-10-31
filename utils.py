@@ -157,6 +157,7 @@ def get_groupdata(data_dir):
     num_agents = len(newgroupdata['trialsequence'][0])
     newgroupdata['group'] = [group]*num_trials
     newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
+    newgroupdata['model'] = [['Experiment']*num_agents]*num_trials
     groupdata_df = pd.DataFrame(newgroupdata).explode(list(newgroupdata.keys()))
     
     return newgroupdata, groupdata_df
@@ -561,7 +562,7 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                 params[key] = torch.tensor(params[key])
             
     k = 4.
-    if model =='original':
+    if model =='Vbm':
         num_params = models.Vbm.num_params #number of latent model parameters
         
         if params is None:
@@ -578,10 +579,6 @@ def init_agent(model, Q_init, num_agents=1, params = None):
             omega = params['omega'][None,...]
             dectemp = params['dectemp'][None,...]
             lr = params['lr'][None,...]
-            
-            # print("Setting lr to %.4f"%lr)
-            # print("Setting omega to %.4f"%omega)
-            # print("Setting dectemp to %.4f"%dectemp)
         
         newagent = models.Vbm(omega = omega,
                               dectemp = dectemp,
@@ -589,7 +586,6 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
-        
         
     elif model == 'B':
         num_params = models.Vbm_B.num_params #number of latent model parameters
@@ -616,14 +612,6 @@ def init_agent(model, Q_init, num_agents=1, params = None):
             theta_Q_day2 = params['theta_Q_day2'][None,...]
             theta_rep_day2 = params['theta_rep_day2'][None,...]
             
-            # print("Setting lr_day1 to %.4f"%lr_day1)
-            # print("Setting theta_Q_day1 to %.4f"%theta_Q_day1)
-            # print("Setting theta_rep_day1 to %.4f"%theta_rep_day1)
-            
-            # print("Setting lr_day2 to %.4f"%lr_day2)
-            # print("Setting theta_Q_day2 to %.4f"%theta_Q_day2)
-            # print("Setting theta_rep_day2 to %.4f"%theta_rep_day2)
-        
         newagent = models.Vbm_B(lr_day1 = lr_day1,
                               theta_Q_day1 = theta_Q_day1,
                               theta_rep_day1 = theta_rep_day1,
@@ -635,8 +623,8 @@ def init_agent(model, Q_init, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'conflictmodel':
-        num_params = models.conflictmodel.num_params #number of latent model parameters
+    elif model == 'Conflict':
+        num_params = models.Conflict.num_params #number of latent model parameters
         
         if params is None:
             print("Setting random parameters.")
@@ -663,16 +651,8 @@ def init_agent(model, Q_init, num_agents=1, params = None):
             theta_Q_day2 = params['theta_Q_day2'][None,...]
             theta_rep_day2 = params['theta_rep_day2'][None,...]
             conflict_param_day2 = params['conflict_param_day2'][None,...]
-            
-            # print("Setting lr_day1 to %.4f"%lr_day1)
-            # print("Setting theta_Q_day1 to %.4f"%theta_Q_day1)
-            # print("Setting theta_rep_day1 to %.4f"%theta_rep_day1)
-            
-            # print("Setting lr_day2 to %.4f"%lr_day2)
-            # print("Setting theta_Q_day2 to %.4f"%theta_Q_day2)
-            # print("Setting theta_rep_day2 to %.4f"%theta_rep_day2)
         
-        newagent = models.conflictmodel(lr_day1 = lr_day1,
+        newagent = models.Conflict(lr_day1 = lr_day1,
                               theta_Q_day1 = theta_Q_day1,
                               theta_rep_day1 = theta_rep_day1,
                               conflict_param_day1 = conflict_param_day1,
@@ -695,6 +675,7 @@ def simulate_data(model,
                   Q_init, 
                   sequence = None, 
                   blockorder = None,
+                  group = None,
                   params = None,
                   plotres = True):
     '''
@@ -720,6 +701,10 @@ def simulate_data(model,
         Which blockorder
         1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
         
+    group : list, len num_agents
+        Experimental group.
+        Given group, sequence and blockorder can be inferred.
+        
     params : DataFrame or dict, values are tensors or list, shape [num_agents]
         Contains the latent model parameters with which to simulate data.
         
@@ -728,7 +713,8 @@ def simulate_data(model,
         
     Returns
     -------
-    data : dict of lists
+    data : dict of nested lists.
+        Needed for inference.
         Keys: 
             choices : list of len (num_trials). Each list element a list of len (num_agents).
             choices_GD : list
@@ -739,11 +725,14 @@ def simulate_data(model,
             blockidx : number of block as experienced by participants
             group : list
             ag_idx : 
+                
+                
+    group_behav_df: DataFrame
             
-    params_true : torch tensor, shape [num_params, num_agents]
+    params_sim : torch tensor, shape [num_params, num_agents]
         Contains the parameter values with which the simulations were performed.
 
-    params_true_df : DataFrame
+    params_sim_df : DataFrame
         Contains the parameter values with which the simulations were performed.
 
     '''
@@ -754,27 +743,48 @@ def simulate_data(model,
     assert torch.is_tensor(Q_init), "Q_init must be tensor."
     assert Q_init.shape == (num_agents, 4), "Q_init must have shape (num_agents, 4)."
     
-    
-    if sequence is None:
-        print("Setting sequence to ones.")
-        sequence = [1]*num_agents
+    # if sequence is None:
+    #     print("Setting sequence to ones.")
+    #     sequence = [1]*num_agents
+
+    # if blockorder is None:
+    #     blockorder = [1]*num_agents
+    #     print("Setting blockorder to ones.")
+
+    if sequence == None and blockorder == None and group == None:
+        "Neither seuqence nor blockorder nor group are set"
+        group = [0]*num_agents
+        print("Setting group to all 0.")
+        # raise Exception("Either group OR sequence and blockorder must be set.")
+
+    elif sequence == None and blockorder == None and group is not None:
+        "Only group is set"
+        print('Inferring sequence and blockorder from group.')
+        assert isinstance(group, list)
+        sequences = [1, 1, 2, 2]
+        blockorders = [1, 2, 1, 2]
+        sequence = [sequences[g] for g in group]
+        blockorder = [blockorders[g] for g in group]
         
-    if blockorder is None:
-        blockorder = [1]*num_agents
-        print("Setting blockorder to ones.")
+    elif sequence is not None and blockorder is not None and group == None:
+        "seuqence and blockorder are set."
+        print('Inferring group from sequence and blockorder.')
+        seq_torch = torch.tensor(sequence)
+        blockorder_torch = torch.tensor(blockorder)
+        group = (seq_torch == 1).type(torch.int) * (blockorder_torch == 1).type(torch.int)*0 +\
+        (seq_torch == 1).type(torch.int) * (blockorder_torch == 2).type(torch.int)*1 +\
+        (seq_torch == 2).type(torch.int) * (blockorder_torch == 1).type(torch.int)*2 +\
+        (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
+        group = group.tolist()
+        
+    elif sequence is not None and blockorder is not None and group is not None:
+        raise Exception("sequence, blockorder and group must not all be set.")
         
     assert len(blockorder) == num_agents
     assert len(sequence) == num_agents
     assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
     assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
-        
-    print('Inferring group.')
-    seq_torch = torch.tensor(sequence)
-    blockorder_torch = torch.tensor(blockorder)
-    groups = (seq_torch == 1).type(torch.int) * (blockorder_torch == 1).type(torch.int)*0 +\
-    (seq_torch == 1).type(torch.int) * (blockorder_torch == 2).type(torch.int)*1 +\
-    (seq_torch == 2).type(torch.int) * (blockorder_torch == 1).type(torch.int)*2 +\
-    (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
+
     
     if model == 'original':
         num_params = models.Vbm.num_params #number of latent model parameters
@@ -782,8 +792,8 @@ def simulate_data(model,
     elif model == 'B':
         num_params = models.Vbm_B.num_params #number of latent model parameters
         
-    elif model == 'conflictmodel':
-        num_params = models.conflictmodel.num_params #number of latent model parameters
+    elif model == 'Conflict':
+        num_params = models.Conflict.num_params #number of latent model parameters
     
     if params is not None:
         if isinstance(params, pd.DataFrame):
@@ -793,14 +803,14 @@ def simulate_data(model,
     
     "----- Initialize agent"
     if params == None:
-        # params_true = torch.zeros((num_params, num_agents))
+        # params_sim = torch.zeros((num_params, num_agents))
         newagent = init_agent(model, 
                               Q_init, 
                               num_agents = num_agents)
     
-        params_true = {}
+        params_sim = {}
         for key in newagent.par_dict.keys():
-            params_true[key] = torch.squeeze(newagent.par_dict[key])
+            params_sim[key] = torch.squeeze(newagent.par_dict[key])
         # for param_idx in range(len(newagent.param_names)):
             # [param_idx, :] = newagent.par_dict[newagent.param_names[param_idx]]
     
@@ -810,8 +820,7 @@ def simulate_data(model,
                               num_agents = num_agents, 
                               params = params)
     
-        params_true = params
-    
+        params_sim = params
 
     "----- Set environment for agent"
     newenv = env.Env(newagent, matfile_dir = './matlabcode/clipre/')
@@ -828,26 +837,35 @@ def simulate_data(model,
             'blocktype': newenv.data['blocktype'],
             'jokertypes': newenv.data['jokertypes'], 
             'blockidx': newenv.data['blockidx'],
-            'group': [groups.tolist()]*len(newenv.choices),
-            'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices)}
+            'group': [group]*len(newenv.choices),
+            'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
+            'model' : [[model]*num_agents]*len(newenv.choices)}
     
     for key in data:
         assert len(data[key])==6734
-        
+    
+    group_behav_df = pd.DataFrame(data).explode(list(data.keys()))    
+    
     "----- Create DataFrame containing the parameters."
-    params_true_df = pd.DataFrame(params_true)
-    params_true_df['ag_idx'] = [i for i in range(num_agents)]
+    params_sim_df = pd.DataFrame(params_sim)
+    for col in params_sim_df.columns:
+        params_sim_df.rename(columns={col : col+'_sim'}, inplace = True)
+    
+    params_sim_df['ag_idx'] = [i for i in range(num_agents)]
+    params_sim_df['group'] = group
+    params_sim_df['model'] = [model]*num_agents
     
     print("Simulation took %.4f seconds."%(time.time()-start))
-    return data, params_true, params_true_df
+    return data, group_behav_df, params_sim, params_sim_df
 
-def plot_grouplevel(groupdata_df,
-                    groupdata_df_2 = None):
+def plot_grouplevel(groupdata_df_1,
+                    groupdata_df_2 = None,
+                    plot_single = False):
     '''
     Parameters
     ----------
-    groupdata_df : DataFrame
-        Contains each trial for all participants.
+    groupdata_df_1 : DataFrame
+        Contains each trial for all agents.
         columns
             choices
             choices_GD
@@ -858,6 +876,8 @@ def plot_grouplevel(groupdata_df,
             blockidx
             group
             ag_idx
+            
+    plot_single : bool
 
     Returns
     -------
@@ -865,28 +885,127 @@ def plot_grouplevel(groupdata_df,
 
     '''
     
+    "----- Model 1"
+    model_1 = groupdata_df_1['model'].unique()[0]
+    
     "----- Remove newblock trials (where choices == -1)"
-    groupdata_df = groupdata_df[groupdata_df['choices'] != -1]
+    groupdata_df_1 = groupdata_df_1[groupdata_df_1['choices'] != -1]
     
     "----- Remove STT (where jokertypes == -1)"
-    groupdata_df = groupdata_df[groupdata_df['jokertypes'] != -1]
+    groupdata_df_1 = groupdata_df_1[groupdata_df_1['jokertypes'] != -1]
     
     "----- Remove errortrials (where choices_GD == -2)"
-    groupdata_df = groupdata_df[groupdata_df['choices_GD'] != -2]
+    groupdata_df_1 = groupdata_df_1[groupdata_df_1['choices_GD'] != -2]
     
     "---------- Create new column block_num for different blockorders"
     blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
-    groupdata_df['block_num'] = groupdata_df.apply(lambda row: \
+    groupdata_df_1['block_num'] = groupdata_df_1.apply(lambda row: \
                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                          else row['blockidx'], axis=1)
         
-    groupdata_df.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1, inplace = True)
-    groupdata_df['jokertypes']=groupdata_df['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
-    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
+    groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
     
-    "----- Remove error trials (where choices_GD == -2"
-    sns.relplot(x="block_num", y="choices_GD", hue = "jokertypes", data=groupdata_df, kind="line", palette=custom_palette)
-    plt.show()
+    if groupdata_df_2 is not None:
+        "----- Model 2"
+        model_2 = groupdata_df_2['model'].unique()[0]
+        
+        "----- Remove newblock trials (where choices == -1)"
+        groupdata_df_2 = groupdata_df_2[groupdata_df_2['choices'] != -1]
+        
+        "----- Remove STT (where jokertypes == -1)"
+        groupdata_df_2 = groupdata_df_2[groupdata_df_2['jokertypes'] != -1]
+        
+        "----- Remove errortrials (where choices_GD == -2)"
+        groupdata_df_2 = groupdata_df_2[groupdata_df_2['choices_GD'] != -2]
+        
+        "---------- Create new column block_num for different blockorders"
+        blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
+        groupdata_df_2['block_num'] = groupdata_df_2.apply(lambda row: \
+                                             blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
+                                             else row['blockidx'], axis=1)
+            
+        groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
+        
+    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
+    if plot_single:
+        for ag_idx in groupdata_df_1['ag_idx'].unique():
+            agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == ag_idx]
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            
+            if groupdata_df_2 is not None:
+                agent_df_2 = groupdata_df_2[groupdata_df_2['ag_idx'] == ag_idx]
+                agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            
+            if groupdata_df_2 is not None:
+                
+                # pass
+                # exp_grouped_df = create_grouped(exp_data[exp_data['ag_idx']==ag_idx], ag_idx)
+                
+                fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+                sns.lineplot(x='block_num', 
+                            y= 'choices_GD', 
+                            hue='jokertypes', 
+                            # kind='line', 
+                            data = agent_df_1,
+                            ax = ax1)
+                ax1.set_title(f'DF 1 (model {model_1}), agent {ag_idx}')
+                
+                sns.lineplot(x='block_num', 
+                            y= 'choices_GD', 
+                            hue='jokertypes', 
+                            # kind='line', 
+                            data = agent_df_2,
+                            ax = ax2)
+                ax2.set_title(f'DF 2 (model {model_2}), agent {ag_idx}')
+                plt.show()        
+            
+            else:
+                sns.lineplot(x='block_num',
+                            y= 'choices_GD',
+                            hue='jokertypes',
+                            # kind='line',
+                            data = agent_df_1,
+                            palette = custom_palette)
+                plt.title(f'Agent {ag_idx}, model {model_1}')
+                plt.show()
+    
+    
+    grouped_df_1 = pd.DataFrame(groupdata_df_1.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+    grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+    
+    if groupdata_df_2 is not None:
+        grouped_df_2 = pd.DataFrame(groupdata_df_2.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+        grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+    
+    if groupdata_df_2 is not None:
+        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+        sns.lineplot(x = 'block_num', 
+                    y = 'choices_GD', 
+                    hue = 'jokertypes', 
+                    data = grouped_df_1,
+                    ax = ax1)
+        ax1.set_title(f'Dataset 1 (model {model_1})')
+        
+        sns.lineplot(x = 'block_num', 
+                    y = 'choices_GD', 
+                    hue ='jokertypes', 
+                    data = grouped_df_2,
+                    ax = ax2)
+        ax2.set_title(f'Dataset 2 (model {model_2})')
+        plt.show()      
+
+    else:
+        "----- Remove error trials (where choices_GD == -2"
+        fig, ax = plt.subplots()
+        sns.relplot(x = "block_num",
+                    y = "choices_GD",
+                    hue = "jokertypes",
+                    data = grouped_df_1,
+                    kind = "line",
+                    palette = custom_palette,
+                    ax = ax)
+        plt.title(f'Group Behaviour for model {model_1}')
+        plt.show()
 
 def posterior_predictives(post_sample, 
                           exp_data = None,
@@ -920,6 +1039,7 @@ def posterior_predictives(post_sample,
     
     num_agents = len(post_sample['ag_idx'].unique())
     num_reps = len(post_sample[post_sample['ag_idx'] == 0])
+    model = post_sample['model'].unique()[0]
     assert num_reps <= 1000, "Number of repetitions must be less than 1000."
     sequences = [1, 1, 2, 2]
     blockorders = [1, 2, 1, 2]
@@ -927,6 +1047,9 @@ def posterior_predictives(post_sample,
                        [0, 0.2, 0.2, 0.]]).tile((num_reps, 1, 1))
     
     complete_df = pd.DataFrame()
+    
+    import seaborn
+    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     
     for ag_idx in range(num_agents):
         print("Simulating agent %d of %d with %d repetitions."%(ag_idx+1, num_agents, num_reps))
@@ -943,12 +1066,12 @@ def posterior_predictives(post_sample,
         for key in params.keys():
             params[key] = torch.tensor(params[key])
         
-        ag_data_dict, params, params_df = simulate_data(model, 
-                                                         num_reps,
-                                                        Q_init = Q_init,
-                                                         sequence = sequence,
-                                                         blockorder = blockorder,
-                                                        params = params)
+        ag_data_dict, ag_data_df, params, params_df = simulate_data(model, 
+                                                                    num_reps,
+                                                                    Q_init = Q_init,
+                                                                    sequence = sequence,
+                                                                    blockorder = blockorder,
+                                                                    params = params)
         
         agent_df = pd.DataFrame(ag_data_dict).explode(list(ag_data_dict.keys()))
         
@@ -964,6 +1087,7 @@ def posterior_predictives(post_sample,
                             hue='jokertypes', 
                             # kind='line', 
                             data = exp_grouped_df,
+                            palette = custom_palette,
                             ax = ax1)
                 ax1.set_title('Experimental Data')
                 
@@ -972,29 +1096,75 @@ def posterior_predictives(post_sample,
                             hue='jokertypes', 
                             # kind='line', 
                             data = grouped_df,
+                            palette = custom_palette,
                             ax = ax2)
-                ax2.set_title('Posterior Predictive')
+                ax2.set_title(f'Post Pred (model {model})')
                 plt.show()        
             
             else:
+                fig, ax = plt.subplots()
                 sns.lineplot(x='block_num', 
                             y= 'choices_GD', 
                             hue='jokertypes', 
                             # kind='line', 
-                            data = grouped_df)
-                plt.title('Post Pred for agent %d'%ag_idx)
+                            data = grouped_df,
+                            palette = custom_palette,
+                            ax = ax)
+                plt.title(f'Post Pred (agent {ag_idx}, model {model})')
                 plt.show()
         
         complete_df = pd.concat((complete_df, grouped_df))
     
-    import seaborn
-    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
-    sns.lineplot(x="block_num", 
-                 y="choices_GD", 
-                 hue = "jokertypes", 
-                 data = complete_df, 
-                 palette = custom_palette)
-    plt.title('Group-Level Posterior Predictive.')
+    if exp_data is not None:
+        "Remove new block trials"
+        exp_data = exp_data[exp_data['choices'] != -1]
+        "Remove error trials"
+        exp_data = exp_data[exp_data['choices'] != -2]
+        "Remove STT"
+        exp_data = exp_data[exp_data['jokertypes'] != -1]
+        
+        "---------- Create new column block_num for different blockorders"
+        blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
+        exp_data['block_num'] = exp_data.apply(lambda row: \
+                                             blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
+                                             else row['blockidx'], axis=1)
+        model_exp = exp_data['model'].unique()[0]
+        exp_data.drop(['group', 'blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
+        exp_data['jokertypes'] = exp_data['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+        exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes'], as_index = False).mean())
+        # exp_data_grouped_all = pd.DataFrame(exp_data_grouped.groupby(['block_num','jokertypes'], as_index = False).mean())
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+        
+        sns.lineplot(x = 'block_num', 
+                    y = 'choices_GD', 
+                    hue = 'jokertypes', 
+                    # kind='line', 
+                    data = exp_data_grouped,
+                    palette = custom_palette,
+                    ax = ax1)
+        ax1.set_title(f'Data model {model_exp}')
+        
+        sns.lineplot(x = 'block_num', 
+                    y = 'choices_GD', 
+                    hue ='jokertypes', 
+                    # kind='line', 
+                    data = complete_df,
+                    palette = custom_palette,
+                    ax = ax2)
+        ax2.set_title(f'Post Pred (model {model})')
+        
+        plt.show()
+    else:
+        fig, ax = plt.subplots()
+        sns.lineplot(x="block_num", 
+                     y="choices_GD", 
+                     hue = "jokertypes", 
+                     data = complete_df, 
+                     palette = custom_palette,
+                     ax = ax)
+        plt.title(f'Group-Level Post Pred (model {model})')
+        plt.show()
     print("Finished posterior predictives.")
     return complete_df
 
@@ -1027,6 +1197,8 @@ def create_grouped(agent_df, ag_idx):
     groupdata_df = agent_df
     "Remove new block trials"
     groupdata_df = groupdata_df[groupdata_df['choices'] != -1]
+    "Remove error trials"
+    groupdata_df = groupdata_df[groupdata_df['choices'] != -2]
     "Remove STT"
     groupdata_df = groupdata_df[groupdata_df['jokertypes'] != -1]
     
@@ -1036,7 +1208,7 @@ def create_grouped(agent_df, ag_idx):
                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                          else row['blockidx'], axis=1)
     
-    groupdata_df.drop(['group', 'blockidx', 'ag_idx', 'trialsequence', 'outcomes', 'choices'], axis = 1, inplace = True)
+    groupdata_df.drop(['group', 'blockidx', 'ag_idx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
     groupdata_df['jokertypes']=groupdata_df['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     grouped_df = pd.DataFrame(groupdata_df.groupby(['block_num','jokertypes'], as_index = False).mean())
     grouped_df['ag_idx'] = ag_idx
