@@ -527,7 +527,7 @@ def comp_groupdata(groupdata):
     
     return newgroupdata
 
-def init_agent(model, Q_init, num_agents=1, params = None):
+def init_agent(model, group, num_agents=1, params = None):
     '''
     
     Parameters
@@ -535,8 +535,9 @@ def init_agent(model, Q_init, num_agents=1, params = None):
     model : str
         The model class to simulate data with.
 
-    Q_init : tensor, shape [num_agents, 4]
-        Initial Q-Values of the agent(s).
+    group : list, len num_agents
+        Experimental group(s) of agent(s).
+        Determines Q_init.
 
     num_agents : int
         Number of agents in a single agent object.
@@ -553,13 +554,20 @@ def init_agent(model, Q_init, num_agents=1, params = None):
 
     '''
     
-    assert Q_init.shape == (num_agents, 4)
+    print("Setting Q_init.")
+    Qs = torch.tensor([[0.2, 0., 0., 0.2],
+                       [0.2, 0., 0., 0.2],
+                       [0, 0.2, 0.2, 0],
+                       [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
+    Q_init = Qs[range(num_agents),torch.tensor(group), :]
+    
     import models_torch as models
     
     if params is not None:
         for key in params.keys():
             if isinstance(params[key], list):
-                params[key] = torch.tensor(params[key])
+                if not isinstance(params[key][0], str):
+                    params[key] = torch.tensor(params[key])
             
     k = 4.
     if model =='Vbm':
@@ -672,9 +680,6 @@ def init_agent(model, Q_init, num_agents=1, params = None):
         
 def simulate_data(model, 
                   num_agents,
-                  Q_init, 
-                  sequence = None, 
-                  blockorder = None,
                   group = None,
                   params = None,
                   plotres = True):
@@ -688,22 +693,20 @@ def simulate_data(model,
 
     num_agents : int
         Number of agents for simulation.
-        
-    Q_init : tensor, shape [num_agents, 4]
-        Initial Q-Values of the agent.
-        
-    sequence : list, len num_agents
-        Whether sequence or mirror sequence.
-        1/2 : sequence/ mirror sequence
-        Mirror sequence has reversed reward probabilities.
-        
-    blockorder : list, len num_agents
-        Which blockorder
-        1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
-        
+
     group : list, len num_agents
         Experimental group.
         Given group, sequence and blockorder can be inferred.
+        
+        Determines sequence & blockorder.
+        sequence : list, len num_agents
+            Whether sequence or mirror sequence.
+            1/2 : sequence/ mirror sequence
+            Mirror sequence has reversed reward probabilities.
+            
+        blockorder : list, len num_agents
+            Which blockorder
+            1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
         
     params : DataFrame or dict, values are tensors or list, shape [num_agents]
         Contains the latent model parameters with which to simulate data.
@@ -740,33 +743,19 @@ def simulate_data(model,
     
     start = time.time()
     print("Simulating %d agents."%num_agents)
-    assert torch.is_tensor(Q_init), "Q_init must be tensor."
-    assert Q_init.shape == (num_agents, 4), "Q_init must have shape (num_agents, 4)."
-    
-    # if sequence is None:
-    #     print("Setting sequence to ones.")
-    #     sequence = [1]*num_agents
 
-    # if blockorder is None:
-    #     blockorder = [1]*num_agents
-    #     print("Setting blockorder to ones.")
-
-    if sequence == None and blockorder == None and group == None:
-        "Neither seuqence nor blockorder nor group are set"
-        group = [0]*num_agents
-        print("Setting group to all 0.")
-        # raise Exception("Either group OR sequence and blockorder must be set.")
-
-    elif sequence == None and blockorder == None and group is not None:
-        "Only group is set"
-        print('Inferring sequence and blockorder from group.')
-        assert isinstance(group, list)
-        sequences = [1, 1, 2, 2]
-        blockorders = [1, 2, 1, 2]
-        sequence = [sequences[g] for g in group]
-        blockorder = [blockorders[g] for g in group]
+    "Only group is set"
+    print('Inferring sequence and blockorder from group.')
+    if torch.is_tensor(group):
+        assert group.ndim == 1
+        group = list(group)
+    assert isinstance(group, list)
+    sequences = [1, 1, 2, 2]
+    blockorders = [1, 2, 1, 2]
+    sequence = [sequences[g] for g in group]
+    blockorder = [blockorders[g] for g in group]
         
-    elif sequence is not None and blockorder is not None and group == None:
+    if group == None:
         "seuqence and blockorder are set."
         print('Inferring group from sequence and blockorder.')
         seq_torch = torch.tensor(sequence)
@@ -777,15 +766,12 @@ def simulate_data(model,
         (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
         group = group.tolist()
         
-    elif sequence is not None and blockorder is not None and group is not None:
-        raise Exception("sequence, blockorder and group must not all be set.")
         
     assert len(blockorder) == num_agents
     assert len(sequence) == num_agents
     assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
     assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
 
-    
     if model == 'original':
         num_params = models.Vbm.num_params #number of latent model parameters
         
@@ -805,7 +791,7 @@ def simulate_data(model,
     if params == None:
         # params_sim = torch.zeros((num_params, num_agents))
         newagent = init_agent(model, 
-                              Q_init, 
+                              group, 
                               num_agents = num_agents)
     
         params_sim = {}
@@ -816,7 +802,7 @@ def simulate_data(model,
     
     else:
         newagent = init_agent(model, 
-                              Q_init, 
+                              group, 
                               num_agents = num_agents, 
                               params = params)
     
@@ -848,8 +834,6 @@ def simulate_data(model,
     
     "----- Create DataFrame containing the parameters."
     params_sim_df = pd.DataFrame(params_sim)
-    for col in params_sim_df.columns:
-        params_sim_df.rename(columns={col : col+'_sim'}, inplace = True)
     
     params_sim_df['ag_idx'] = [i for i in range(num_agents)]
     params_sim_df['group'] = group
@@ -1041,10 +1025,6 @@ def posterior_predictives(post_sample,
     num_reps = len(post_sample[post_sample['ag_idx'] == 0])
     model = post_sample['model'].unique()[0]
     assert num_reps <= 1000, "Number of repetitions must be less than 1000."
-    sequences = [1, 1, 2, 2]
-    blockorders = [1, 2, 1, 2]
-    Qs = torch.tensor([[0.2, 0., 0., 0.2],
-                       [0, 0.2, 0.2, 0.]]).tile((num_reps, 1, 1))
     
     complete_df = pd.DataFrame()
     
@@ -1055,9 +1035,6 @@ def posterior_predictives(post_sample,
         print("Simulating agent %d of %d with %d repetitions."%(ag_idx+1, num_agents, num_reps))
         post_sample_agent_df = post_sample[post_sample['ag_idx'] == ag_idx]
         model = post_sample_agent_df['model'].unique()[0]
-        sequence = [sequences[post_sample_agent_df['group'].unique()[0]]]*num_reps
-        Q_init = Qs[range(num_reps),torch.tensor(sequence)-1,:]
-        blockorder = [blockorders[post_sample_agent_df['group'].unique()[0]]]*num_reps
         
         
         # params = torch.tensor(post_sample_agent_df.iloc[:, 0:-3].to_numpy().T)
@@ -1068,9 +1045,7 @@ def posterior_predictives(post_sample,
         
         ag_data_dict, ag_data_df, params, params_df = simulate_data(model, 
                                                                     num_reps,
-                                                                    Q_init = Q_init,
-                                                                    sequence = sequence,
-                                                                    blockorder = blockorder,
+                                                                    group = params['group'],
                                                                     params = params)
         
         agent_df = pd.DataFrame(ag_data_dict).explode(list(ag_data_dict.keys()))
