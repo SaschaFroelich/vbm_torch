@@ -48,7 +48,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-infer.infer_posterior(iter_steps = 3, num_particles = 10)
+infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -60,7 +60,7 @@ timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 params_sim_df = pd.DataFrame(columns = agent.par_dict.keys())
 for col in params_sim_df.columns:
     params_sim_df[col] = ['unknown']
-pickle.dump( (post_sample_df, exp_behav_df, infer.loss, params_sim_df), open(f"behav_fit/behav_fit_{timestamp}.p", "wb" ) )
+pickle.dump( (post_sample_df, exp_behav_df, infer.loss, params_sim_df), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -115,24 +115,6 @@ plt.show()
 
 #%%
 '''
-Plot Experimental Data
-'''
-utils.plot_grouplevel(expdata_df, plot_single = False)
-
-#%%
-'''
-Simulate only from means
-'''
-groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
-                                                                        num_agents,
-                                                                        group = list(inf_mean_df['group']),
-                                                                        params = inf_mean_df)
-
-utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
-# utils.plot_grouplevel(expdata_df, plot_single = True)
-
-#%%
-'''
 Plot ELBO and Parameter Estimates
 '''
 
@@ -158,17 +140,17 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-npar = len(post_sample_df.columns[0:-3])
+num_params = len(post_sample_df.columns[0:-3])
 
-fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=0)
+fig, ax = plt.subplots(1, num_params, figsize=(15,5), sharey=0)
 
 if model == 'B':
     ylims = [[0, 0.03], # lr
              [0.5, 7.5], # theta_Q
-             [0.5, 1.8], # theta_rep
+             [0., 8.], # theta_rep
              [0, 0.03], # lr
              [0.5, 7.5], # theta_Q
-             [0.5, 1.8]] # theta_rep
+             [0., 8]] # theta_rep
     
 elif model == 'Conflict'or model =='conflictmodel':
     ylims = [[0, 0.03], # lr
@@ -181,7 +163,7 @@ elif model == 'Conflict'or model =='conflictmodel':
              [-0.5, 0.5]] # conflict param
     
 
-for par in range(npar):
+for par in range(num_params):
     
     if 1:    
         "With colorbar"
@@ -253,6 +235,27 @@ plt.show()
 
 #%%
 '''
+Plot Experimental Data
+'''
+utils.plot_grouplevel(expdata_df, plot_single = False)
+
+#%%
+'''
+Simulate only from means
+'''
+groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
+                                                                        num_agents,
+                                                                        group = list(inf_mean_df['group']),
+                                                                        params = inf_mean_df)
+
+utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
+# utils.plot_grouplevel(expdata_df, plot_single = True)
+
+
+#%%
+'''
 Posterior Predictives
 '''
 complete_df = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
+
+#%%

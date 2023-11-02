@@ -790,10 +790,10 @@ class Conflict(Vbm_B):
 
         DeltaRep = self.rep[-1][0, torch.arange(self.num_agents), option1] - self.rep[-1][0, torch.arange(self.num_agents), option2]
         conflict_bool = ((torch.sign(DeltaQ).type(torch.int) * torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
-        conflict_amount = torch.abs(DeltaQ - DeltaRep)
-        probs = self.softmax(torch.stack((Vopt1 + (DeltaQ > 0)*conflict_bool*conflict_amount*conflict_param, 
-                                          Vopt2 + (DeltaQ < 0)*conflict_bool*conflict_amount*conflict_param), 2))
-        
+        conflict_value = DeltaQ - DeltaRep
+        probs = self.softmax(torch.stack((Vopt1 + conflict_bool*conflict_value*conflict_param, 
+                                          Vopt2), 2))
+
         return probs
     
     def reset(self, locs):   

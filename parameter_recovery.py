@@ -58,9 +58,20 @@ group.extend([1]*(num_agents//4))
 group.extend([2]*(num_agents//4))
 group.extend([3]*(num_agents//4))
 
+params = {'lr_day1' : 0*torch.ones(num_agents),
+          'theta_Q_day1' : 4*torch.ones(num_agents),
+          'theta_rep_day1' : 1*torch.ones(num_agents),
+          'conflict_param_day1' : -10.*torch.ones(num_agents),
+          
+          'lr_day2' : 0*torch.ones(num_agents),
+          'theta_Q_day2' : 1*torch.ones(num_agents),
+          'theta_rep_day2' : 4*torch.ones(num_agents),
+          'conflict_param_day2' : 0.*torch.ones(num_agents)}
+
 groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model, 
                                                                       num_agents,
-                                                                      group = group)
+                                                                      group = group,
+                                                                      params = params)
 
 utils.plot_grouplevel(group_behav_df)
 
@@ -78,7 +89,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 3, num_particles = 10)
+infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -87,7 +98,7 @@ post_sample_df['model'] = [model]*len(post_sample_df)
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-pickle.dump((post_sample_df, group_behav_df, infer.loss, params_sim_df), open(f"parameter_recovery/param_recov_{timestamp}.p", "wb" ) )
+pickle.dump((post_sample_df, group_behav_df, infer.loss, params_sim_df), open(f"parameter_recovery/param_recov_model_{model}_{timestamp}.p", "wb" ) )
 
 #%%
 '''
@@ -148,8 +159,10 @@ for param in params_df.columns[0:-3]:
     fig, ax = plt.subplots()
     plt.scatter(params_df[param], inf_mean_df[param])
     plt.plot(params_df[param], params_df[param])
+    ax.set_xlabel('true value')
+    ax.set_ylabel('inferred value')
+    plt.title(param)
     plt.show()
-
 
 #%%
 '''
@@ -166,4 +179,11 @@ groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(
                                                                         group = list(inf_mean_df['group']),
                                                                         params = inf_mean_df)
 
-utils.plot_grouplevel(exp_data_df, group_behav_df, plot_single = False)
+utils.plot_grouplevel(exp_data_df, group_behav_df, plot_single = True)
+
+#%%
+'''
+Test Correlation between Parameters within and across participants
+'''
+
+"----- Within"
