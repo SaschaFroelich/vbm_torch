@@ -239,7 +239,7 @@ class Env():
                 else:
                     "Simulation"
                     # assert(torch.is_tensor(trial))
-                    current_choice = agent.choose_action(trial, day)
+                    current_choice = agent.choose_action(trial, day = day, blocktype = blocktype)
                     outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
                     self.choices_GD.append((data['rewprobs'][range(agent.num_agents), current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                     self.choices.append(current_choice.tolist())
@@ -254,7 +254,7 @@ class Env():
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, day)
+                    probs = agent.compute_probs(trial, day = day, blocktype = blocktype)
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)

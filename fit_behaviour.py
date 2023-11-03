@@ -48,7 +48,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -232,6 +232,48 @@ for par in range(num_params):
         ax[par].legend([],[], frameon=False)
 
 plt.show()
+
+#%%
+'''
+Model B specific analysis
+Ratios between parameters.
+'''
+
+Q_R_ratio_day1 = []
+Q_R_ratio_day2 = []
+for ag_idx in range(num_agents):
+    Q_R_ratio_day1.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day1'] / \
+        post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day1']).mean())
+        
+    Q_R_ratio_day2.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day2'] / \
+        post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day2']).mean())
+        
+diff = torch.tensor(Q_R_ratio_day1) - torch.tensor(Q_R_ratio_day2)
+sns.kdeplot(diff)
+plt.title('Ratio Differences Day 1 - Day 2')
+import scipy
+import numpy as np
+scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
+# post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
+
+#%%
+'''
+Correlations between subjects
+'''
+import analysis as anal
+anal.param_corr(inf_mean_df.iloc)
+
+
+#%%
+'''
+Correlations within subjects
+'''
+corr_dict = anal.within_subject_corr(post_sample_df.iloc)
+
+for key in corr_dict.keys():
+    sns.kdeplot(corr_dict[key])
+    plt.title(key)
+    plt.show()
 
 #%%
 '''

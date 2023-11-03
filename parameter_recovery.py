@@ -39,7 +39,7 @@ import numpy as np
 
 #%%
 
-model = 'Conflict'
+model = 'Random'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 52
@@ -58,20 +58,19 @@ group.extend([1]*(num_agents//4))
 group.extend([2]*(num_agents//4))
 group.extend([3]*(num_agents//4))
 
-params = {'lr_day1' : 0*torch.ones(num_agents),
-          'theta_Q_day1' : 4*torch.ones(num_agents),
-          'theta_rep_day1' : 1*torch.ones(num_agents),
-          'conflict_param_day1' : -10.*torch.ones(num_agents),
+# params = {'lr_day1' : 0*torch.ones(num_agents),
+#           'theta_Q_day1' : 4*torch.ones(num_agents),
+#           'theta_rep_day1' : 1*torch.ones(num_agents),
+#           'conflict_param_day1' : 0.*torch.ones(num_agents),
           
-          'lr_day2' : 0*torch.ones(num_agents),
-          'theta_Q_day2' : 1*torch.ones(num_agents),
-          'theta_rep_day2' : 4*torch.ones(num_agents),
-          'conflict_param_day2' : 0.*torch.ones(num_agents)}
+#           'lr_day2' : 0*torch.ones(num_agents),
+#           'theta_Q_day2' : 4*torch.ones(num_agents),
+#           'theta_rep_day2' : 1*torch.ones(num_agents),
+#           'conflict_param_day2' : 0.*torch.ones(num_agents)}
 
 groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model, 
                                                                       num_agents,
-                                                                      group = group,
-                                                                      params = params)
+                                                                      group = group)
 
 utils.plot_grouplevel(group_behav_df)
 
@@ -89,7 +88,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 16_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
