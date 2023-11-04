@@ -246,60 +246,77 @@ for key in corr_dict.keys():
 '''
 How close are subjects in correlation space?
 '''
-import ipdb
-import scipy.cluster.hierarchy as spc
-distance = np.zeros((num_agents, num_agents))
 
-for ag_idx1 in range(num_agents):
-    for ag_idx2 in range(num_agents):
-        v1 = np.zeros(len(corr_dict))
-        v2 = np.zeros(len(corr_dict))
-        
-        for key_idx in range(len(corr_dict.keys())):
-            key = list(corr_dict.keys())[key_idx]
-            v1[key_idx] = corr_dict[key][ag_idx1]
-            v2[key_idx] = corr_dict[key][ag_idx2]
+leavnodes = anal.cluster_analysis(corr_dict, title = 'all correlations')
 
-        distance[ag_idx1, ag_idx2] = np.sqrt(np.sum((v1 - v2)**2))
+# #%%
+# '''
+# Plot dual clusters together
+# '''
+# # utils.plot_grouplevel(expdata_df, plot_pairs = linkage[11:12, 0:2])
+# utils.plot_grouplevel(expdata_df, plot_pairs = np.array([leavnodes[-10:],leavnodes[-10:]]).T)
 
-def upper_tri_indexing(A):
-    m = A.shape[0]
-    r,c = np.triu_indices(m,1)
-    return A[r,c]
+#%%
+'''
+Plot one cluster against the other
+'''
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:13])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])])
 
-distance_vec = upper_tri_indexing(distance)
-linkage = spc.linkage(distance_vec, method='single')
-idx = spc.fcluster(linkage, 0.5 * distance_vec.max(), 'distance')
-dn = spc.dendrogram(linkage)
-plt.show()
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
 
-"----- With spc"
-pdist = spc.distance.pdist(pd.DataFrame(corr_dict))
-"Linkage matrix"
-linkage = spc.linkage(pdist, method='single')
-idx = spc.fcluster(linkage, 0.5 * pdist.max(), 'distance')
-dn = spc.dendrogram(linkage)
-plt.show()
-"---"
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:3])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
 
-# fig = plt.figure()
-# ax = fig.add_subplot(111)
-# cax = ax.matshow(distance)
-# fig.colorbar(cax)
+#%%
+'''
+Perform correlation analysis only within day 1
+'''
+post_sample_df_day1 = post_sample_df.drop(['lr_day1', 'theta_Q_day1', 'theta_rep_day1'], axis = 1)
+corr_dict_day1 = anal.within_subject_corr(post_sample_df_day1)
 
-# corr_prep_df = post_sample_df.drop(['group', 'model'], axis = 1)
+leavnodes_day1 = anal.cluster_analysis(corr_dict_day1, title='day 1')
 
-# "From Internet"
+inf_mean_df[inf_mean_df['ag_idx'].isin(leavnodes[0:16])]['group']
 
-# corrdf = pd.DataFrame(corr_dict)
-# corr = corrdf.corr().values
-# pdist = spc.distance.pdist(corr)
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:7])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[6:16])])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:16])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[16:])])
+
+#%%
+'''
+Perform correlation analysis only within day 2
+'''
+post_sample_df_day2 = post_sample_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
+corr_dict_day2 = anal.within_subject_corr(post_sample_df_day2)
+
+leavnodes_day2 = anal.cluster_analysis(corr_dict_day2, title = 'day 2')
+
+#%%
+'''
+Perform correlation analysis only between days
+'''
+
+corr_dict_day_between = corr_dict.copy()
+del corr_dict_day_between['lr_day1_vs_theta_Q_day1']
+del corr_dict_day_between['lr_day2_vs_theta_Q_day2']
+
+del corr_dict_day_between['lr_day1_vs_theta_rep_day1']
+del corr_dict_day_between['lr_day2_vs_theta_rep_day2']
+
+del corr_dict_day_between['theta_Q_day1_vs_theta_rep_day1']
+del corr_dict_day_between['theta_Q_day2_vs_theta_rep_day2']
+
+leavnodes_betweendays = anal.cluster_analysis(corr_dict_day2, title = 'between days')
 
 #%%
 '''
 Plot Experimental Data
 '''
-utils.plot_grouplevel(expdata_df, plot_single = False)
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx']==35], plot_single = False)
 
 #%%
 '''

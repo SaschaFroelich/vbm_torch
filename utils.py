@@ -975,7 +975,8 @@ def simulate_data(model,
 
 def plot_grouplevel(groupdata_df_1,
                     groupdata_df_2 = None,
-                    plot_single = False):
+                    plot_single = False,
+                    plot_pairs = None):
     '''
     Parameters
     ----------
@@ -1020,7 +1021,7 @@ def plot_grouplevel(groupdata_df_1,
                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                          else row['blockidx'], axis=1)
         
-    groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
+    groupdata_df_1 = groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
     
     if groupdata_df_2 is not None:
         "----- Model 2"
@@ -1041,7 +1042,7 @@ def plot_grouplevel(groupdata_df_1,
                                              blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                              else row['blockidx'], axis=1)
             
-        groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
+        groupdata_df_2 = groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
         
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     if plot_single:
@@ -1057,30 +1058,7 @@ def plot_grouplevel(groupdata_df_1,
                 
                 # pass
                 # exp_grouped_df = create_grouped(exp_data[exp_data['ag_idx']==ag_idx], ag_idx)
-                
-                fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-                sns.lineplot(x='block_num', 
-                            y= 'choices_GD', 
-                            hue='jokertypes', 
-                            # kind='line', 
-                            data = agent_df_1,
-                            ax = ax1)
-                ax1.set_xticks(np.arange(15), minor = True)
-                ax1.grid(which='minor', alpha=0.5)
-                ax1.set_title(f'DF 1 (model {model_1}), agent {ag_idx}')
-                ax1.get_legend().remove()
-                
-                sns.lineplot(x='block_num', 
-                            y= 'choices_GD', 
-                            hue='jokertypes', 
-                            # kind='line', 
-                            data = agent_df_2,
-                            ax = ax2)
-                ax2.set_xticks(np.arange(15), minor = True)
-                ax2.grid(which='minor', alpha=0.5)
-                ax2.set_title(f'DF 2 (model {model_2}), agent {ag_idx}')
-                ax2.get_legend().remove()
-                plt.show()        
+                plot_dual_behav(agent_df_1, agent_df_2)
             
             else:
                 fig, ax = plt.subplots()
@@ -1095,10 +1073,30 @@ def plot_grouplevel(groupdata_df_1,
                 plt.show()
     
     
+    if plot_pairs is not None:
+        num_pairs = plot_pairs.shape[0]
+        
+        for pair in range(num_pairs):
+            agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 0]]
+            
+            if groupdata_df_2 is not None:
+                agent_df_2 = groupdata_df_2[groupdata_df_2['ag_idx'] == plot_pairs[pair, 1]]
+            
+            else:
+                agent_df_2 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 1]]
+            
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            
+            plot_dual_behav(agent_df_1, agent_df_2)
+            
+    "----- Plot grouplevel"
+    groupdata_df_1 = groupdata_df_1.drop(['model'], axis = 1)
     grouped_df_1 = pd.DataFrame(groupdata_df_1.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
     grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
     if groupdata_df_2 is not None:
+        groupdata_df_2 = groupdata_df_2.drop(['model'], axis = 1)
         grouped_df_2 = pd.DataFrame(groupdata_df_2.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
         grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
@@ -1136,6 +1134,56 @@ def plot_grouplevel(groupdata_df_1,
                     ax = ax)
         plt.title(f'Group Behaviour for model {model_1}')
         plt.show()
+        
+def plot_dual_behav(agent_df_1, agent_df_2):
+    '''
+    For plotting the behaviour of 2 agents side by side.
+
+    Parameters
+    ----------
+    agent_df_1 : TYPE
+        DESCRIPTION.
+    agent_df_2 : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    assert len(agent_df_1['ag_idx'].unique()) == 1
+    assert len(agent_df_2['ag_idx'].unique()) == 1
+    
+    ag_idx_1 = agent_df_1['ag_idx'].unique()[0]
+    ag_idx_2 = agent_df_2['ag_idx'].unique()[0]
+    
+    model_1 = agent_df_1['model'].unique()
+    model_2 = agent_df_2['model'].unique()
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+    sns.lineplot(x='block_num', 
+                y= 'choices_GD', 
+                hue='jokertypes', 
+                # kind='line', 
+                data = agent_df_1,
+                ax = ax1)
+    ax1.set_xticks(np.arange(15), minor = True)
+    ax1.grid(which='minor', alpha=0.5)
+    ax1.set_title(f'{model_1}, agent {ag_idx_1}')
+    ax1.get_legend().remove()
+    
+    sns.lineplot(x='block_num', 
+                y= 'choices_GD', 
+                hue='jokertypes', 
+                # kind='line', 
+                data = agent_df_2,
+                ax = ax2)
+    ax2.set_xticks(np.arange(15), minor = True)
+    ax2.grid(which='minor', alpha=0.5)
+    ax2.set_title(f'{model_2}, agent {ag_idx_2}')
+    ax2.get_legend().remove()
+    plt.show()        
 
 def posterior_predictives(post_sample, 
                           exp_data = None,

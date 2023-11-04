@@ -481,3 +481,65 @@ def within_subject_corr(df):
 #     # plt.plot([5.5, 5.5], [0.5, 1], color='k')
 #     # plt.title(f"Model {model}")
 #     plt.show()
+
+def cluster_analysis(corr_dict, title= ''):
+    import ipdb
+    import scipy.cluster.hierarchy as spc
+    keys = corr_dict.keys()
+    num_agents = len(corr_dict[list(keys)[0]])
+    num_corrs = len(corr_dict.keys())
+    
+    distance = np.zeros((num_agents, num_agents))
+    
+    for ag_idx1 in range(num_agents):
+        for ag_idx2 in range(num_agents):
+            v1 = np.zeros(len(corr_dict))
+            v2 = np.zeros(len(corr_dict))
+            
+            for key_idx in range(num_corrs):
+                key = list(corr_dict.keys())[key_idx]
+                v1[key_idx] = corr_dict[key][ag_idx1]
+                v2[key_idx] = corr_dict[key][ag_idx2]
+    
+            distance[ag_idx1, ag_idx2] = np.sqrt(np.sum((v1 - v2)**2))
+    
+    # plt.style.use('default')
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # cax = ax.matshow(distance)
+    # fig.colorbar(cax)
+    # plt.show()
+    
+    def upper_tri_indexing(A):
+        m = A.shape[0]
+        r,c = np.triu_indices(m,1)
+        return A[r,c]
+    
+    "----- Plot clusters"
+    distance_vec = upper_tri_indexing(distance)
+    linkage = spc.linkage(distance_vec, method='single')
+    idx = spc.fcluster(linkage, 0.5 * distance_vec.max(), 'distance')
+    dn = spc.dendrogram(linkage)
+    plt.title(f"Clusters ({title})")
+    plt.show()
+    
+    "----- Plot ordered matrix"
+    leavnodes = [int(node) for node in dn['ivl']]
+    plt.style.use('default')
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(distance[leavnodes,:][:, leavnodes])
+    fig.colorbar(cax)
+    plt.title(f"Similarity matrix ({title})")
+    plt.show()
+    
+    # "----- With spc"
+    # pdist = spc.distance.pdist(pd.DataFrame(corr_dict))
+    # "Linkage matrix"
+    # linkage = spc.linkage(pdist, method='single')
+    # idx = spc.fcluster(linkage, 0.5 * pdist.max(), 'distance')
+    # dn = spc.dendrogram(linkage)
+    # plt.show()
+    # "---"
+    
+    return leavnodes

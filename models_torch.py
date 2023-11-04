@@ -1387,7 +1387,7 @@ class Handedness(Vbm_B):
         ----------
         trial : tensor with shape (num_agents) 
             Contains stimulus trial. 1-indexed.
-            
+
         day : int
             Day of experiment.
 
