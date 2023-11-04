@@ -23,13 +23,41 @@ B
 Conflict
 '''
 
-model = 'Conflict'
+model = 'B'
 #%%
 exp_behav_dict, exp_behav_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 
 utils.plot_grouplevel(exp_behav_df)
 
 num_agents = len(exp_behav_dict['trialsequence'][0])
+
+
+#%%
+'''
+Compute Errorrates
+'''
+num_agents = len(exp_behav_df['ag_idx'].unique())
+errorrates = torch.zeros((3, num_agents)) # STT, DTT, Total
+
+for ag_idx in np.sort(exp_behav_df['ag_idx'].unique()):
+    ag_df = exp_behav_df[exp_behav_df['ag_idx'] == ag_idx]
+
+    "Remove new block trials"
+    ag_df = ag_df[ag_df['choices'] != -1]
+    
+    "Total error rates"
+    errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
+    
+    ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
+    
+    "Error Rates STT"
+    errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
+    
+    ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
+    
+    "Error Rates DTT"
+    errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
+
 #%%
 '''
 Prepare Inference
@@ -57,7 +85,7 @@ post_sample_df['model'] = [model]*len(post_sample_df)
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-params_sim_df = pd.DataFrame(columns = agent.par_dict.keys())
+params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
 for col in params_sim_df.columns:
     params_sim_df[col] = ['unknown']
 pickle.dump( (post_sample_df, exp_behav_df, infer.loss, params_sim_df), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
@@ -71,10 +99,12 @@ Analysis
 # import sys
 # sys.modules[__name__].__dict__.clear() # Clear variables
 # del model
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import utils
+import analysis as anal
 import torch
 import tkinter as tk
 from tkinter import filedialog
@@ -102,12 +132,39 @@ num_params = len(params_df.columns)
 
 #%%
 '''
+Compute Errorrates
+'''
+num_agents = len(expdata_df['ag_idx'].unique())
+errorrates = torch.zeros((3, num_agents)) # STT, DTT, Total
+
+for ag_idx in np.sort(expdata_df['ag_idx'].unique()):
+    ag_df = expdata_df[expdata_df['ag_idx'] == ag_idx]
+
+    "Remove new block trials"
+    ag_df = ag_df[ag_df['choices'] != -1]
+    
+    "Total error rates"
+    errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
+    
+    ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
+    
+    "Error Rates STT"
+    errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
+    
+    ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
+    
+    "Error Rates DTT"
+    errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
+
+
+#%%
+'''
 Plot ELBO
 '''
 import matplotlib.pyplot as plt
 import seaborn as sns
 fig, ax = plt.subplots()
-plt.plot(loss)
+plt.plot(loss[-2000:])
 plt.title("ELBO")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -140,98 +197,7 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-num_params = len(post_sample_df.columns[0:-3])
-
-fig, ax = plt.subplots(1, num_params, figsize=(15,5), sharey=0)
-
-if model == 'B':
-    ylims = [[0, 0.03], # lr
-             [0.5, 7.5], # theta_Q
-             [0., 8.], # theta_rep
-             [0, 0.03], # lr
-             [0.5, 7.5], # theta_Q
-             [0., 8]] # theta_rep
-    
-elif model == 'Conflict'or model =='conflictmodel':
-    ylims = [[0, 0.03], # lr
-             [0.5, 7.5], # theta_Q
-             [0.5, 5], # theta_rep
-             [-0.4, 0.5], # conflict param
-             [0, 0.03], # lr
-             [0.5, 7.5], # theta_Q
-             [0.5, 5], # theta_rep
-             [-0.5, 0.5]] # conflict param
-    
-
-for par in range(num_params):
-    
-    if 1:    
-        "With colorbar"
-        "ax[0]"
-        dataseries = (inf_mean_df.melt()[inf_mean_df.melt()['variable'] == params_df.columns[par]])
-        dataseries['value'] = pd.to_numeric(dataseries['value'], errors='coerce')
-        
-        sns.violinplot(ax = ax[par], 
-                       x = 'variable',
-                       y = 'value',
-                       data = dataseries,
-                       color=".8")
-        
-        sns.stripplot(x = 'variable',
-                      y = 'value',
-                      data = dataseries,
-                      edgecolor = 'gray',
-                      linewidth = 1,
-                      jitter=True,
-                      ax=ax[par])
-                      # palette="coolwarm")
-        
-        ax[par].legend([],[], frameon=False)
-        
-        "Position"
-        chartBox = ax[par].get_position()
-        ax[par].set_position([chartBox.x0+par/64,
-                          chartBox.y0,
-                          chartBox.width,
-                          chartBox.height])
-        
-        ax[par].set_ylim(ylims[par])
-    
-        "Colorbar"
-        # variance = df[params_df.columns[par]].std()**2
-        
-        # normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, 
-        #                                  vmin=min(variance), 
-        #                                  vmax=max(variance))
-        
-        # colormap = cm.coolwarm
-        # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-        # scalarmappaple.set_array(variance)
-        # plt.colorbar(scalarmappaple, ax = ax[par])
-        
-    else:
-        "Without colorbar"
-        "ax[0]"
-        g1 = sns.violinplot(ax=ax[par], 
-                            x="parameter", 
-                            y="inferred", 
-                            data=inf_mean_df[inf_mean_df["parameter"]==inf_mean_df["parameter"].unique()[par]], 
-                            color=".8")
-        
-        g2 = sns.stripplot(x="parameter",
-                      y="inferred",
-                      edgecolor = 'gray',
-                      linewidth = 1,
-                      data = inf_mean_df[inf_mean_df["parameter"]==inf_mean_df["parameter"].unique()[par]],
-                      jitter = True,
-                      ax = ax[par])
-            
-        if par > 0:
-            g1.set(ylabel=None)
-            g2.set(ylabel=None)
-        ax[par].legend([],[], frameon=False)
-
-plt.show()
+anal.violin(inf_mean_df)
 
 #%%
 '''
@@ -261,19 +227,73 @@ scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
 Correlations between subjects
 '''
 import analysis as anal
-anal.param_corr(inf_mean_df.iloc)
+anal.param_corr(inf_mean_df)
 
 
 #%%
 '''
 Correlations within subjects
 '''
-corr_dict = anal.within_subject_corr(post_sample_df.iloc)
+corr_dict = anal.within_subject_corr(post_sample_df)
 
 for key in corr_dict.keys():
     sns.kdeplot(corr_dict[key])
     plt.title(key)
     plt.show()
+
+
+#%%
+'''
+How close are subjects in correlation space?
+'''
+import ipdb
+import scipy.cluster.hierarchy as spc
+distance = np.zeros((num_agents, num_agents))
+
+for ag_idx1 in range(num_agents):
+    for ag_idx2 in range(num_agents):
+        v1 = np.zeros(len(corr_dict))
+        v2 = np.zeros(len(corr_dict))
+        
+        for key_idx in range(len(corr_dict.keys())):
+            key = list(corr_dict.keys())[key_idx]
+            v1[key_idx] = corr_dict[key][ag_idx1]
+            v2[key_idx] = corr_dict[key][ag_idx2]
+
+        distance[ag_idx1, ag_idx2] = np.sqrt(np.sum((v1 - v2)**2))
+
+def upper_tri_indexing(A):
+    m = A.shape[0]
+    r,c = np.triu_indices(m,1)
+    return A[r,c]
+
+distance_vec = upper_tri_indexing(distance)
+linkage = spc.linkage(distance_vec, method='single')
+idx = spc.fcluster(linkage, 0.5 * distance_vec.max(), 'distance')
+dn = spc.dendrogram(linkage)
+plt.show()
+
+"----- With spc"
+pdist = spc.distance.pdist(pd.DataFrame(corr_dict))
+"Linkage matrix"
+linkage = spc.linkage(pdist, method='single')
+idx = spc.fcluster(linkage, 0.5 * pdist.max(), 'distance')
+dn = spc.dendrogram(linkage)
+plt.show()
+"---"
+
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# cax = ax.matshow(distance)
+# fig.colorbar(cax)
+
+# corr_prep_df = post_sample_df.drop(['group', 'model'], axis = 1)
+
+# "From Internet"
+
+# corrdf = pd.DataFrame(corr_dict)
+# corr = corrdf.corr().values
+# pdist = spc.distance.pdist(corr)
 
 #%%
 '''
@@ -299,5 +319,3 @@ utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
 Posterior Predictives
 '''
 complete_df = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
-
-#%%

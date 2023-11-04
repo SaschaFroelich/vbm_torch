@@ -39,7 +39,7 @@ import numpy as np
 
 #%%
 
-model = 'Random'
+model = 'Bhand'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 52
@@ -74,7 +74,6 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 
 utils.plot_grouplevel(group_behav_df)
 
-
 #%%
 '''
 Inference
@@ -98,6 +97,9 @@ post_sample_df['model'] = [model]*len(post_sample_df)
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 pickle.dump((post_sample_df, group_behav_df, infer.loss, params_sim_df), open(f"parameter_recovery/param_recov_model_{model}_{timestamp}.p", "wb" ) )
+
+#%%
+log_like = infer.compute_ll()
 
 #%%
 '''
@@ -138,7 +140,7 @@ inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model','ag_idx','group'], as
 # inf_mean_df['paramtype'] = ['inf']*len(params_df)
 model = inf_mean_df['model'][0]
 num_agents = len(inf_mean_df['ag_idx'].unique())
-    
+
 # post_sample_df, params_sim_df, group_behav_df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
 #%%
 '''

@@ -603,7 +603,7 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01 # shape (1, num_agents)
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
             
@@ -680,7 +680,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['seq_param_day2'] = params_uniform[7:8, :]*6
             
         else:
-            pass
+            raise Exception("Not yet implemented")
             # print("Setting initial parameters as provided.")
             # param_dict['lr_day1'] = params['lr_day1'][None,...]
             # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
@@ -712,7 +712,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['p_rand_day2'] = params_uniform[5:6, :]
             
         else:
-            pass
+            raise Exception("Not yet implemented")
             # print("Setting initial parameters as provided.")
             # param_dict['lr_day1'] = params['lr_day1'][None,...]
             # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
@@ -726,6 +726,83 @@ def init_agent(model, group, num_agents=1, params = None):
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
+        
+    elif model == 'BQ':
+        num_params = models.Vbm_B_Q.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            locs = torch.tensor(np.random.uniform(-8,4, (1, num_agents, num_params)))
+            param_dict = models.Vbm_B_Q.locs_to_pars('None', locs)
+            
+        else:
+            raise Exception("Not yet implemented")
+            # print("Setting initial parameters as provided.")
+            # param_dict['lr_day1'] = params['lr_day1'][None,...]
+            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            
+            # param_dict['lr_day2'] = params['lr_day2'][None,...]
+            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            
+        newagent = models.Vbm_B_Q(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+        
+    elif model == 'Bk':
+        num_params = models.Vbm_B_k.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            param_dict = models.Vbm_B_k.locs_to_pars('None', locs)
+            
+        else:
+            raise Exception("Not yet implemented")
+            # print("Setting initial parameters as provided.")
+            # param_dict['lr_day1'] = params['lr_day1'][None,...]
+            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            
+            # param_dict['lr_day2'] = params['lr_day2'][None,...]
+            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            
+        newagent = models.Vbm_B_k(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model=='Bhand':
+        num_params = models.Handedness.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            param_dict = models.Handedness.locs_to_pars('None', locs)
+            
+        else:
+            raise Exception("Not yet implemented")
+            # print("Setting initial parameters as provided.")
+            # param_dict['lr_day1'] = params['lr_day1'][None,...]
+            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            
+            # param_dict['lr_day2'] = params['lr_day2'][None,...]
+            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            
+        newagent = models.Handedness(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
         
     else:
         raise Exception("No model specified")
@@ -923,6 +1000,8 @@ def plot_grouplevel(groupdata_df_1,
 
     '''
     
+    plt.style.use("ggplot")
+    
     "----- Model 1"
     model_1 = groupdata_df_1['model'].unique()[0]
     
@@ -966,7 +1045,7 @@ def plot_grouplevel(groupdata_df_1,
         
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     if plot_single:
-        for ag_idx in groupdata_df_1['ag_idx'].unique():
+        for ag_idx in np.sort(groupdata_df_1['ag_idx'].unique()):
             agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == ag_idx]
             agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             
@@ -986,7 +1065,10 @@ def plot_grouplevel(groupdata_df_1,
                             # kind='line', 
                             data = agent_df_1,
                             ax = ax1)
+                ax1.set_xticks(np.arange(15), minor = True)
+                ax1.grid(which='minor', alpha=0.5)
                 ax1.set_title(f'DF 1 (model {model_1}), agent {ag_idx}')
+                ax1.get_legend().remove()
                 
                 sns.lineplot(x='block_num', 
                             y= 'choices_GD', 
@@ -994,17 +1076,22 @@ def plot_grouplevel(groupdata_df_1,
                             # kind='line', 
                             data = agent_df_2,
                             ax = ax2)
+                ax2.set_xticks(np.arange(15), minor = True)
+                ax2.grid(which='minor', alpha=0.5)
                 ax2.set_title(f'DF 2 (model {model_2}), agent {ag_idx}')
+                ax2.get_legend().remove()
                 plt.show()        
             
             else:
+                fig, ax = plt.subplots()
                 sns.lineplot(x='block_num',
                             y= 'choices_GD',
                             hue='jokertypes',
-                            # kind='line',
+                            ax = ax,
                             data = agent_df_1,
                             palette = custom_palette)
                 plt.title(f'Agent {ag_idx}, model {model_1}')
+                ax.get_legend().remove()
                 plt.show()
     
     
@@ -1022,14 +1109,20 @@ def plot_grouplevel(groupdata_df_1,
                     hue = 'jokertypes', 
                     data = grouped_df_1,
                     ax = ax1)
+        ax1.set_xticks(np.arange(15), minor = True)
+        ax1.grid(which='minor', alpha=0.5)
         ax1.set_title(f'Dataset 1 (model {model_1})')
+        ax1.get_legend().remove()
         
         sns.lineplot(x = 'block_num', 
                     y = 'choices_GD', 
                     hue ='jokertypes', 
                     data = grouped_df_2,
                     ax = ax2)
+        ax2.set_xticks(np.arange(15), minor = True)
+        ax2.grid(which='minor', alpha=0.5)
         ax2.set_title(f'Dataset 2 (model {model_2})')
+        ax2.get_legend().remove()
         plt.show()      
 
     else:
@@ -1127,6 +1220,8 @@ def posterior_predictives(post_sample,
                             palette = custom_palette,
                             ax = ax2)
                 ax2.set_title(f'Post Pred (model {model})')
+                ax1.get_legend().remove()
+                ax2.get_legend().remove()
                 plt.show()        
             
             else:
@@ -1139,6 +1234,7 @@ def posterior_predictives(post_sample,
                             palette = custom_palette,
                             ax = ax)
                 plt.title(f'Post Pred (agent {ag_idx}, model {model})')
+                ax.get_legend().remove()
                 plt.show()
         
         complete_df = pd.concat((complete_df, grouped_df))
@@ -1157,7 +1253,7 @@ def posterior_predictives(post_sample,
                                              blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                              else row['blockidx'], axis=1)
         model_exp = exp_data['model'].unique()[0]
-        exp_data.drop(['group', 'blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1, inplace = True)
+        exp_data = exp_data.drop(['group', 'blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1)
         exp_data['jokertypes'] = exp_data['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
         exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes'], as_index = False).mean())
         # exp_data_grouped_all = pd.DataFrame(exp_data_grouped.groupby(['block_num','jokertypes'], as_index = False).mean())

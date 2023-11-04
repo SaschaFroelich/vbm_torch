@@ -94,7 +94,6 @@ class Env():
         self.data['rewprobs'] = torch.tensor(rewprobs)[torch.tensor(sequence)-1,:]
         
         num_blocks = self.agent.num_blocks
-        # assert(num_blocks == 14)
         
         seq_idxs = [1, 3, 5, 6, 8, 10, 12] # seq idxs for blockorder == 1
         rand_idxs = [0, 2, 4, 7, 9, 11, 13] # random idxs for blockorder == 1

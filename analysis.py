@@ -60,145 +60,105 @@ def violin(df, with_colbar = 1, sharey = False):
 
     '''
     
-    df.drop(['model', 'ag_idx', 'group', 'choices', 'model'], axis = 1, inplace = True)
+    model = df['model'].unique()[0]
+    df = df.drop(['model', 'ag_idx', 'group'], axis = 1)
     
-    plt.style.use("seaborn-v0_8-dark")
+    num_params = len(df.columns)
     
-    npar = len(df["parameter"].unique())
+    fig, ax = plt.subplots(1, num_params, figsize=(15,5), sharey=0)
     
-    fig, ax = plt.subplots(1, npar, figsize=(15,5), sharey=sharey)
+    if model == 'B':
+        ylims = [[0, 0.03], # lr
+                 [0.5, 7.5], # theta_Q
+                 [0., 8.], # theta_rep
+                 [0, 0.03], # lr
+                 [0.5, 7.5], # theta_Q
+                 [0., 8]] # theta_rep
+        
+    elif model == 'Conflict'or model =='conflictmodel':
+        ylims = [[0, 0.03], # lr
+                 [0.5, 7.5], # theta_Q
+                 [0.5, 5], # theta_rep
+                 [-0.4, 0.5], # conflict param
+                 [0, 0.03], # lr
+                 [0.5, 7.5], # theta_Q
+                 [0.5, 5], # theta_rep
+                 [-0.5, 0.5]] # conflict param
+        
     
-    for par in range(npar):
-    
-        if with_colbar:    
-    
+    for par in range(num_params):
+        
+        if 1:    
+            "With colorbar"
             "ax[0]"
-            sns.violinplot(ax=ax[par], 
-                           x="parameter", 
-                           y="inferred", 
-                           data=df[df["parameter"]==df["parameter"].unique()[par]], 
+            dataseries = (df.melt()[df.melt()['variable'] == df.columns[par]])
+            dataseries['value'] = pd.to_numeric(dataseries['value'], errors='coerce')
+            
+            sns.violinplot(ax = ax[par], 
+                           x = 'variable',
+                           y = 'value',
+                           data = dataseries,
                            color=".8")
             
-            sns.stripplot(x="parameter",
-                          y="inferred",
-                          hue="variance",
+            sns.stripplot(x = 'variable',
+                          y = 'value',
+                          data = dataseries,
                           edgecolor = 'gray',
                           linewidth = 1,
-                          data=df[df["parameter"]==df["parameter"].unique()[par]],
                           jitter=True,
-                          ax=ax[par],
-                          palette="coolwarm")
+                          ax=ax[par])
+                          # palette="coolwarm")
             
             ax[par].legend([],[], frameon=False)
             
             "Position"
             chartBox = ax[par].get_position()
-            ax[par].set_position([chartBox.x0+par/4,
+            ax[par].set_position([chartBox.x0+par/64,
                               chartBox.y0,
                               chartBox.width,
                               chartBox.height])
+            
+            ax[par].set_ylim(ylims[par])
         
             "Colorbar"
-            variance = df[df["parameter"]==df["parameter"].unique()[par]]["variance"]
+            # variance = df[params_df.columns[par]].std()**2
             
-            normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2,
-                                             vmin=min(variance),
-                                              vmax=max(variance))
-            colormap = cm.coolwarm
-            scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-            scalarmappaple.set_array(variance)
-            plt.colorbar(scalarmappaple, ax = ax[par])
+            # normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, 
+            #                                  vmin=min(variance), 
+            #                                  vmax=max(variance))
+            
+            # colormap = cm.coolwarm
+            # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
+            # scalarmappaple.set_array(variance)
+            # plt.colorbar(scalarmappaple, ax = ax[par])
             
         else:
+            "Without colorbar"
             "ax[0]"
-            g1 = sns.violinplot(ax=ax[par],
-                                x="parameter",
-                                y="inferred",
-                                data=df[df["parameter"]==df["parameter"].unique()[par]],
+            g1 = sns.violinplot(ax=ax[par], 
+                                x="parameter", 
+                                y="inferred", 
+                                data=df[df["parameter"]==df["parameter"].unique()[par]], 
                                 color=".8")
             
             g2 = sns.stripplot(x="parameter",
                           y="inferred",
                           edgecolor = 'gray',
                           linewidth = 1,
-                          data=df[df["parameter"]==df["parameter"].unique()[par]],
-                          jitter=True,
-                          ax=ax[par])
+                          data = df[df["parameter"]==df["parameter"].unique()[par]],
+                          jitter = True,
+                          ax = ax[par])
                 
             if par > 0:
                 g1.set(ylabel=None)
                 g2.set(ylabel=None)
             ax[par].legend([],[], frameon=False)
-        
-    plt.savefig('/home/sascha/Desktop/presentations/AST/June_21_23/modelB.svg')
     
-    # "ax[1]"
-    # sns.violinplot(ax=ax[1], x="parameter", y="inferred", data=df[df["parameter"]=="omega"], color=".8")
-    # sns.stripplot(x="parameter", \
-    #               y="inferred", \
-    #               hue="variance", \
-    #               edgecolor = 'gray', \
-    #               linewidth=1, \
-    #               data=df[df["parameter"]=="omega"], \
-    #               jitter=True,\
-    #               ax=ax[1], \
-    #               palette="coolwarm")
-        
-    # ax[1].legend([],[], frameon=False)
-    
-    # "Colorbar"
-    # # normalize = mcolors.TwoSlopeNorm(vcenter=(min(omega_variance)+max(omega_variance))/2, vmin=min(omega_variance), \
-    # #                                  vmax=max(omega_variance))
-    # # colormap = cm.coolwarm
-    # # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-    # # scalarmappaple.set_array(omega_variance)
-    # # plt.colorbar(scalarmappaple, ax =ax[1], anchor=(-20.,0.5))
-    
-    # chartBox = ax[1].get_position()
-    # ax[1].set_position([chartBox.x0-0.15, 
-    #                   chartBox.y0,
-    #                   chartBox.width,
-    #                   chartBox.height])
-    
-    # ax[1].set_ylabel("")
-    
-    # "ax[2]"
-    
-    # sns.violinplot(ax=ax[2], x="parameter", y="inferred", data=df[df["parameter"]=="decision temperature"], color=".8")
-    # sns.stripplot(x="parameter", \
-    #               y="inferred", \
-    #               hue="variance", \
-    #               edgecolor = 'gray', \
-    #               linewidth = 1, \
-    #               data=df[df["parameter"]=="decision temperature"], \
-    #               jitter=True, \
-    #               ax=ax[2], \
-    #               palette="coolwarm")
-    
-    # ax[2].legend([],[], frameon=False)
-    
-    # "Colorbar"
-    # # normalize = mcolors.TwoSlopeNorm(vcenter=(min(dectemp_variance)+max(dectemp_variance))/2, vmin=min(dectemp_variance), \
-    # #                                  vmax=max(dectemp_variance))
-    # # colormap = cm.coolwarm
-    # # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-    # # scalarmappaple.set_array(dectemp_variance)
-    # # plt.colorbar(scalarmappaple, ax =ax[2], anchor=(-15.,0.5))
-    
-    # chartBox = ax[2].get_position()
-    # ax[2].set_position([chartBox.x0-0.12, 
-    #                   chartBox.y0,
-    #                   chartBox.width,
-    #                   chartBox.height])
-    
-    # ax[2].set_ylabel("")
-    
-    # plt.savefig('/home/sascha/Desktop/presentations/AST/Meeting_June_2nd/participant_inference.png')
     plt.show()
     
 def param_corr(df):    
     
-    df.drop(['ag_idx', 'model', 'group'], axis = 1, inplace = True)
+    df = df.drop(['ag_idx', 'model', 'group'], axis = 1)
     
     # for col in range(len(df.columns)):
     #     df.rename(columns={df.columns[col] : df.columns[col][4:]}, inplace = True)
@@ -248,7 +208,7 @@ def within_subject_corr(df):
 
     '''
     
-    df.drop(['model', 'group'], axis = 1, inplace = True)
+    df = df.drop(['model', 'group'], axis = 1)
     
     corr_dict = {}
     for col1 in range(len(df.columns[0:-1])):
@@ -256,7 +216,7 @@ def within_subject_corr(df):
             corr_dict[df.columns[col1]+'_vs_'+df.columns[col2]] = []
     # dfgh
     
-    for ag_idx in df['ag_idx'].unique():  
+    for ag_idx in np.sort(df['ag_idx'].unique()):
         df_ag = df[df['ag_idx'] == ag_idx]
         for col1 in range(len(df_ag.columns[0:-1])):
             for col2 in range(col1+1, len(df_ag.columns[0:-1])):

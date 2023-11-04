@@ -77,11 +77,11 @@ class GeneralGroupInference(object):
             base_dist = dist.Normal(0., 1.).expand_by([self.num_parameters]).to_event(1)
             transform = dist.transforms.AffineTransform(mu, sig)
             locs = pyro.sample('locs', dist.TransformedDistribution(base_dist, [transform]))
-    
             "locs is either of shape [num_agents, num_parameters] or of shape [num_particles, num_agents, num_parameters]"
             if locs.ndim == 2:
                 locs = locs[None, :]
                 
+            # print(locs)
             self.agent.reset(locs)
             
             num_particles = locs.shape[0]
@@ -152,29 +152,76 @@ class GeneralGroupInference(object):
 
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
-    def sample_posterior(self, n_samples = 1_000):
+    def sample_posterior(self, n_samples = 1_000, locs = False):
         # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
         param_names = self.agent.param_names
-        sample_dict = {param: [] for param in param_names}
-        sample_dict["ag_idx"] = []
+        if locs:
+            sample_dict = {'tau': [], 'mu': [], 'locs': torch.zeros((self.num_agents, self.agent.num_params, n_samples))}
+            
+            for i in range(n_samples):
+                sample = self.guide()
+                for key in sample.keys():
+                    sample.setdefault(key, torch.ones(1))
+                sample_dict['locs'][:,:,i] = sample['locs']
+                
+            return sample_dict['locs']
+            
+        else:
+            sample_dict = {param: [] for param in param_names}
+            sample_dict["ag_idx"] = []
 
-        for i in range(n_samples):
-            sample = self.guide()
-            for key in sample.keys():
-                sample.setdefault(key, torch.ones(1))
-
-            par_sample = self.agent.locs_to_pars(sample["locs"])
-
-            for param in param_names:
-                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
-
-            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
-
-        sample_df = pd.DataFrame(sample_dict)
-
-        return sample_df
+            for i in range(n_samples):
+                sample = self.guide()
+                for key in sample.keys():
+                    sample.setdefault(key, torch.ones(1))
     
+                par_sample = self.agent.locs_to_pars(sample["locs"])
+
+                for param in param_names:
+                    sample_dict[param].extend(list(par_sample[param].detach().numpy()))
+    
+                sample_dict["ag_idx"].extend(list(range(self.num_agents)))
+        
+            sample_df = pd.DataFrame(sample_dict)
+            return sample_df
+    
+    def compute_ll(self, df = None):
+        '''
+        Computeslog-likelihood of model
+        Parameters
+        ----------
+        df : DataFrame
+            Contains the parameters with which to compute the ll
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        if df is not None:
+            locs = self.agent.pars_to_locs(df).mean(axis=-1)
+            
+        else:
+            locs = self.sample_posterior(locs = True)
+            
+        conditioned_model = pyro.condition(self.model, data = {'locs' : locs})
+        
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
+        log_likelihood = trace.log_prob_sum()
+
+        return log_likelihood
+    
+    def compute_IC(self):
+        print("BIC only approx. right.")
+        '''
+        BIC = k*ln(n) - 2*ll --> the lower, the better
+        '''
+        BIC = torch.tensor(self.agent.num_parameters)*torch.log(torch.tensor(self.agent.num_agents *14*72)) -\
+            2*self.compute_ll()
+
+        return BIC
 
 "Inference"
 class SingleInference(object):
