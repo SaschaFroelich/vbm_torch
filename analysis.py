@@ -155,7 +155,7 @@ def violin(df, with_colbar = 1, sharey = False):
             ax[par].legend([],[], frameon=False)
     
     plt.show()
-    
+
 def param_corr(df):    
     
     df = df.drop(['ag_idx', 'model', 'group'], axis = 1)
@@ -521,6 +521,7 @@ def cluster_analysis(corr_dict, title= ''):
     idx = spc.fcluster(linkage, 0.5 * distance_vec.max(), 'distance')
     dn = spc.dendrogram(linkage)
     plt.title(f"Clusters ({title})")
+    plt.gca().set_xlabel('ag_idx (leavnodes)')
     plt.show()
     
     "----- Plot ordered matrix"
@@ -531,8 +532,9 @@ def cluster_analysis(corr_dict, title= ''):
     cax = ax.matshow(distance[leavnodes,:][:, leavnodes])
     fig.colorbar(cax)
     plt.title(f"Similarity matrix ({title})")
+    plt.gca().set_ylabel('leavnode idx')
     plt.show()
-    
+    # dfgh
     # "----- With spc"
     # pdist = spc.distance.pdist(pd.DataFrame(corr_dict))
     # "Linkage matrix"
@@ -543,3 +545,60 @@ def cluster_analysis(corr_dict, title= ''):
     # "---"
     
     return leavnodes
+
+def compare_lists(leavnode1, leavnode2):
+    leavnode1 = list(leavnode1)
+    leavnode2 = list(leavnode2)
+    
+    l1 = 0 # num of elements only in leavnode1
+    l2 = 0 # num of elements only in leavnode1
+    union = 0
+    
+    while len(leavnode1):
+        element = leavnode1.pop()
+        
+        if element in leavnode2:
+            union += 1
+            
+        else:
+            l1 += 1
+            
+    l2 = len(leavnode2) - union
+    
+    print(f"Number of elements only in list 1: {l1}.\n"+\
+          f"Number of elements only in list 2: {l2}.\n"+\
+          f"Number of elements in union: {union}.")
+        
+        
+def kmeans(corr_dict, inf_mean_df, n_clusters):
+    
+    from sklearn.cluster import KMeans
+    n_clusters = n_clusters
+    kmean = KMeans(n_clusters=n_clusters, n_init = 10, init ='random')
+    kmeans = kmean.fit(pd.DataFrame(corr_dict).to_numpy())
+    
+    for clus1 in range(n_clusters):
+        for clus2 in range(clus1+1, n_clusters):
+            cluster_distance = np.sqrt(((kmeans.cluster_centers_[clus1,:]-kmeans.cluster_centers_[clus2,:])**2).sum())
+            print(f"Cluster distance (cluster {clus1} and {clus2}) is %.4f"%cluster_distance)
+    
+    
+    cluster_groups = [[None]]*n_clusters
+    
+    for clus in range(n_clusters):
+        cluster_groups[clus] = list(inf_mean_df['ag_idx'][np.where(kmeans.labels_ == clus)[0]])
+        cluster_groups[clus].sort()
+    
+    for clus_idx in range(len(cluster_groups)):
+        groups_in_cluster = inf_mean_df['group'][cluster_groups[clus_idx]]
+        num_groups_in_cluster = len(groups_in_cluster.unique())
+        print("\n\nThere are %d groups in cluster no %d."%(num_groups_in_cluster, clus_idx))
+        group_distr = [None]*num_groups_in_cluster
+        
+        for i in range(num_groups_in_cluster):
+            group_distr[i] = (groups_in_cluster == groups_in_cluster.unique()[i]).sum()
+            
+        print("Experimental groups in cluster %d are distributed as follows:"%clus_idx)
+        print(group_distr)
+        
+    return kmeans.labels_, cluster_groups

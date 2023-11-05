@@ -131,6 +131,7 @@ def get_groupdata(data_dir):
             RT : nested list, 'shape' [num_trials, num_agents]
             group : list, len [num_trials, num_agents]. 0-indexed
             ag_idx
+            ID
             
     groupdata_df : DataFrame
 
@@ -138,6 +139,7 @@ def get_groupdata(data_dir):
     
     groupdata = []
     group = []
+    exclude_pb = [14, 20, 24, 28, 38, 43, 45, 57, 58]
     
     pb = -1
     for grp in range(4):
@@ -145,12 +147,13 @@ def get_groupdata(data_dir):
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
-            group.append(grp)
             data, _ = get_participant_data(file1, 
                                             grp, 
                                             data_dir)
             
-            groupdata.append(data)
+            if pb not in exclude_pb:
+                groupdata.append(data)
+                group.append(grp)
 
     newgroupdata = comp_groupdata(groupdata)
     num_trials = len(newgroupdata['trialsequence'])
@@ -732,9 +735,21 @@ def init_agent(model, group, num_agents=1, params = None):
         param_dict = {}
         
         if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-8,4, (1, num_agents, num_params)))
+            # param_dict = models.Vbm_B_Q.locs_to_pars('None', locs)
+            
             print("Setting random parameters.")
-            locs = torch.tensor(np.random.uniform(-8,4, (1, num_agents, num_params)))
-            param_dict = models.Vbm_B_Q.locs_to_pars('None', locs)
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            param_dict['Qparam'] = params_uniform[6:7, :]*10
             
         else:
             raise Exception("Not yet implemented")
@@ -758,9 +773,21 @@ def init_agent(model, group, num_agents=1, params = None):
         param_dict = {}
         
         if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.Vbm_B_k.locs_to_pars('None', locs)
+            
             print("Setting random parameters.")
-            locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-            param_dict = models.Vbm_B_k.locs_to_pars('None', locs)
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            param_dict['kparam'] = params_uniform[6:7, :]*1000
             
         else:
             raise Exception("Not yet implemented")
@@ -783,9 +810,21 @@ def init_agent(model, group, num_agents=1, params = None):
         param_dict = {}
         
         if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.Handedness.locs_to_pars('None', locs)
+            
             print("Setting random parameters.")
-            locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-            param_dict = models.Handedness.locs_to_pars('None', locs)
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            param_dict['hand_param'] = (params_uniform[6:7, :]-0.5)*80
             
         else:
             raise Exception("Not yet implemented")
@@ -797,7 +836,7 @@ def init_agent(model, group, num_agents=1, params = None):
             # param_dict['lr_day2'] = params['lr_day2'][None,...]
             # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
             # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            
+
         newagent = models.Handedness(param_dict,
                               
                               k=torch.tensor([k]),
@@ -902,15 +941,6 @@ def simulate_data(model,
     assert len(sequence) == num_agents
     assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
     assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
-
-    if model == 'original':
-        num_params = models.Vbm.num_params #number of latent model parameters
-        
-    elif model == 'B':
-        num_params = models.Vbm_B.num_params #number of latent model parameters
-        
-    elif model == 'Conflict':
-        num_params = models.Conflict.num_params #number of latent model parameters
     
     if params is not None:
         if isinstance(params, pd.DataFrame):
@@ -920,7 +950,6 @@ def simulate_data(model,
     
     "----- Initialize agent"
     if params == None:
-        # params_sim = torch.zeros((num_params, num_agents))
         newagent = init_agent(model, 
                               group, 
                               num_agents = num_agents)
@@ -976,7 +1005,8 @@ def simulate_data(model,
 def plot_grouplevel(groupdata_df_1,
                     groupdata_df_2 = None,
                     plot_single = False,
-                    plot_pairs = None):
+                    plot_pairs = None, 
+                    day = None):
     '''
     Parameters
     ----------
@@ -1003,6 +1033,12 @@ def plot_grouplevel(groupdata_df_1,
     
     plt.style.use("ggplot")
     
+    if day == 1:
+        groupdata_df_1 = groupdata_df_1[groupdata_df_1['blockidx'] <= 5]
+
+    elif day == 2:
+        groupdata_df_1 = groupdata_df_1[groupdata_df_1['blockidx'] > 5]
+    
     "----- Model 1"
     model_1 = groupdata_df_1['model'].unique()[0]
     
@@ -1024,6 +1060,12 @@ def plot_grouplevel(groupdata_df_1,
     groupdata_df_1 = groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
     
     if groupdata_df_2 is not None:
+        if day == 1:
+            groupdata_df_2 = groupdata_df_2[groupdata_df_2['blockidx'] <= 5]
+    
+        elif day == 2:
+            groupdata_df_2 = groupdata_df_2[groupdata_df_2['blockidx'] > 5]
+        
         "----- Model 2"
         model_2 = groupdata_df_2['model'].unique()[0]
         

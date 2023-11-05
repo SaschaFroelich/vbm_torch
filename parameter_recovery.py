@@ -72,8 +72,7 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
                                                                       num_agents,
                                                                       group = group)
 
-utils.plot_grouplevel(group_behav_df)
-
+# utils.plot_grouplevel(group_behav_df)
 #%%
 '''
 Inference
@@ -113,9 +112,12 @@ Analysis
 import utils
 import pandas as pd
 import seaborn as sns
+import analysis as anal
+import numpy as np
 import matplotlib.pylab as plt
 import pickle
 import tkinter as tk
+
 from tkinter import filedialog
 
 def open_files():
@@ -132,7 +134,7 @@ button.pack()
 root.mainloop()
 
 res = pickle.load(open( filenames[0], "rb" ))
-post_sample_df, exp_data_df, loss, params_df = res
+post_sample_df, expdata_df, loss, params_df = res
 
 # params_df['paramtype'] = ['sim']*len(params_df)
 
@@ -169,7 +171,7 @@ for param in params_df.columns[0:-3]:
 '''
 Posterior Predictives
 '''
-_ = utils.posterior_predictives(post_sample_df, exp_data = exp_data_df)
+_ = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
 
 #%%
 '''
@@ -180,11 +182,108 @@ groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(
                                                                         group = list(inf_mean_df['group']),
                                                                         params = inf_mean_df)
 
-utils.plot_grouplevel(exp_data_df, group_behav_df, plot_single = True)
+utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
 
 #%%
 '''
-Test Correlation between Parameters within and across participants
+Correlations between subjects
+'''
+anal.param_corr(inf_mean_df)
+
+#%%
+'''
+Correlations within subjects
+'''
+corr_dict = anal.within_subject_corr(post_sample_df)
+
+for key in corr_dict.keys():
+    sns.kdeplot(corr_dict[key])
+    plt.title(key)
+    plt.show()
+
+
+#%%
+# '''
+# Compare within-subject correlations with between-subject correlations
+# '''
+# corr_bewteen_df = inf_mean_df.drop(['ag_idx', 'model', 'group'], axis = 1)
+
+# for col1 in range(len(corr_bewteen_df.columns)):
+#     for col2 in range(col1, len(corr_bewteen_df.columns)):
+#         col1_name = corr_bewteen_df.columns[col1]
+#         col2_name = corr_bewteen_df.columns[col2]
+#         r_between = corr_bewteen_df.iloc[:, col1].corr(corr_bewteen_df.iloc[:, col2])
+        
+#%%
+'''
+How close are subjects in correlation space?
 '''
 
-"----- Within"
+leavnodes = anal.cluster_analysis(corr_dict, title = 'all correlations sim')
+#%%
+'''
+Plot one cluster against the other
+'''
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:13])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:3])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
+
+#%%
+'''
+Perform correlation analysis only within day 1
+'''
+post_sample_df_day1 = post_sample_df.drop(['lr_day1', 'theta_Q_day1', 'theta_rep_day1'], axis = 1)
+corr_dict_day1 = anal.within_subject_corr(post_sample_df_day1)
+
+leavnodes_day1 = anal.cluster_analysis(corr_dict_day1, title='day 1')
+
+inf_mean_df[inf_mean_df['ag_idx'].isin(leavnodes[0:16])]['group']
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:7])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[6:16])])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:16])],
+                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[16:])])
+
+#%%
+'''
+Perform correlation analysis only within day 2
+'''
+post_sample_df_day2 = post_sample_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
+corr_dict_day2 = anal.within_subject_corr(post_sample_df_day2)
+
+leavnodes_day2 = anal.cluster_analysis(corr_dict_day2, title = 'day 2')
+
+#%%
+'''
+Perform correlation analysis only between days
+'''
+
+corr_dict_day_between = corr_dict.copy()
+del corr_dict_day_between['lr_day1_vs_theta_Q_day1']
+del corr_dict_day_between['lr_day2_vs_theta_Q_day2']
+
+del corr_dict_day_between['lr_day1_vs_theta_rep_day1']
+del corr_dict_day_between['lr_day2_vs_theta_rep_day2']
+
+del corr_dict_day_between['theta_Q_day1_vs_theta_rep_day1']
+del corr_dict_day_between['theta_Q_day2_vs_theta_rep_day2']
+
+leavnodes_betweendays = anal.cluster_analysis(corr_dict_day2, title = 'between days')
+
+#%%
+'''
+K-means clustering
+'''
+labels, cluster_groups = anal.kmeans(corr_dict_day1, inf_mean_df, n_clusters = 2)
+
+# anal.compare_leavnodes(grp1_agidx, leavnodes_day1[0:16])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups[0])],
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups[1])], 
+                      day=1)
