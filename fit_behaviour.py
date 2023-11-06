@@ -24,7 +24,7 @@ B
 Conflict
 '''
 
-model = 'BQ'
+model = 'Bhand'
 #%%
 exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 utils.plot_grouplevel(expdata_df)
@@ -111,6 +111,39 @@ model = post_sample_df['model'][0]
 num_agents = len(post_sample_df['ag_idx'].unique())
 num_params = len(params_df.columns)
 
+'''
+Plot ELBO
+'''
+import matplotlib.pyplot as plt
+import seaborn as sns
+fig, ax = plt.subplots()
+plt.plot(loss)
+plt.title(f"ELBO for model {model}")
+ax.set_xlabel("Number of iterations")
+ax.set_ylabel("ELBO")
+plt.show()
+
+num_plot_cols = 3
+num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
+                (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
+
+fig = plt.figure()
+gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.5, wspace = 0.3)
+ax = gs.subplots()
+# params_df.columns
+for param_idx in range(num_params):
+    plot_col_idx = param_idx % num_plot_cols
+    plot_row_idx = (param_idx // num_plot_cols)
+    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
+    # ca.plot([0,0], ca.get_ylim())
+    ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
+    if plot_col_idx > 0:
+        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+        
+    if plot_row_idx > 0:
+        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        
+plt.show()
 #%%
 '''
 Compute Errorrates
@@ -159,38 +192,6 @@ for ag_idx in np.sort(expdata_df['ag_idx'].unique()):
     ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
     "Error Rates DTT"
     errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
-
-
-#%%
-'''
-Plot ELBO
-'''
-import matplotlib.pyplot as plt
-import seaborn as sns
-fig, ax = plt.subplots()
-plt.plot(loss[-2000:])
-plt.title("ELBO")
-ax.set_xlabel("Number of iterations")
-ax.set_ylabel("ELBO")
-plt.show()
-
-#%%
-'''
-Plot ELBO and Parameter Estimates
-'''
-
-fig, ax = plt.subplots()
-plt.plot(loss)
-plt.title("ELBO")
-ax.set_xlabel("Number of iterations")
-ax.set_ylabel("ELBO")
-plt.show()
-
-for param in params_df.columns:
-    fig, ax = plt.subplots()
-    sns.kdeplot(post_sample_df[param])
-    # plt.plot(df[param+'_true'], df[param+'_true'])
-    plt.show()
 
 #%%
 '''
@@ -255,16 +256,20 @@ for key in corr_dict.keys():
 Correlation analysis both days
 '''
 leavnodes = anal.cluster_analysis(corr_dict, title = 'all correlations exp')
-labels, cluster_groups = anal.kmeans(corr_dict, inf_mean_df, n_clusters = 2)
+kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_dict, 
+                                         inf_mean_df, 
+                                         n_clusters = 2,
+                                         num_reps = 1)
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:13])],
-                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[0])],
+#                       expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[1])])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])],
-                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[13:21])],
+#                       expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:3])],
-                      expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:3])],
+#                       expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
+
 
 #%%
 '''
@@ -277,23 +282,25 @@ leavnodes_day1 = anal.cluster_analysis(corr_dict_day1, title='day 1 exp')
 
 # inf_mean_df[inf_mean_df['ag_idx'].isin(leavnodes[0:16])]['group']
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[0:7])],
-                      expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[6:16])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[0:7])],
+#                       expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[6:16])])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[0:16])],
-                      expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[16:])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[0:16])],
+#                       expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[16:])])
 
 
 '''
 K-means clustering for Day 1
 '''
-labels, cluster_groups_day1 = anal.kmeans(corr_dict_day1, inf_mean_df, n_clusters = 2)
+labels, cluster_groups_day1, _ = anal.kmeans(corr_dict_day1, 
+                                          inf_mean_df, 
+                                          n_clusters = 2,
+                                          num_reps = 1)
 
 # anal.compare_leavnodes(grp1_agidx, leavnodes_day1[0:16])
 
 utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[0])],
-                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1])], 
-                      day=1)
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1])], )
 
 #%%
 '''
@@ -321,18 +328,20 @@ leavnodes_day2 = anal.cluster_analysis(corr_dict_day2, title = 'day 2')
 '''
 K-means clustering for Day 2
 '''
-labels, cluster_groups = anal.kmeans(corr_dict_day2, inf_mean_df, n_clusters = 2)
+labels, cluster_groups_day2 = anal.kmeans(corr_dict_day2, 
+                                     inf_mean_df, 
+                                     n_clusters = 2,
+                                     num_reps = 100)
 
 # anal.compare_leavnodes(grp0_agidx, leavnodes_day1[0:16])
 
 # utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(grp0_agidx)],
 #                       expdata_df[expdata_df['ag_idx'].isin(grp1_agidx)])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups[0])],
-                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups[1])],
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day2[0])],
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day2[1])],
                       day = 2)
 
-#%%
 '''
 kmeans with errors Day 2
 '''
@@ -351,7 +360,7 @@ labels, cluster_groups = anal.kmeans(corr_dict_day2_errors, inf_mean_df, n_clust
 '''
 Perform correlation analysis only between days
 '''
-
+corr_dict = anal.within_subject_corr(post_sample_df)
 corr_dict_day_between = corr_dict.copy()
 del corr_dict_day_between['lr_day1_vs_theta_Q_day1']
 del corr_dict_day_between['lr_day2_vs_theta_Q_day2']
@@ -364,24 +373,27 @@ del corr_dict_day_between['theta_Q_day2_vs_theta_rep_day2']
 
 leavnodes_betweendays = anal.cluster_analysis(corr_dict_day_between, title = 'between days')
 
-labels, cluster_groups_between = anal.kmeans(corr_dict_day_between, inf_mean_df, n_clusters = 2)
+labels, cluster_groups_between, _ = anal.kmeans(corr_dict_day_between, 
+                                             inf_mean_df, 
+                                             n_clusters = 2,
+                                             num_reps = 1)
 
 # anal.compare_leavnodes(grp0_agidx, leavnodes_day1[0:16])
 
 # utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(grp0_agidx)],
 #                       expdata_df[expdata_df['ag_idx'].isin(grp1_agidx)])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[0])],
-                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[1])])
+# utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[0])],
+#                       expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[1])])
 
-anal.compare_leavnodes(cluster_groups_day1[1], cluster_groups_between[1])
+# anal.compare_lists(cluster_groups_between[1], cluster_groups_between[1])
 
 #%%
 
 utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[0])],
                       expdata_df[expdata_df['ag_idx'].isin(cluster_groups_between[1])])
 
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1])], day = 1)
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1])], day = 2)
 
 
 #%%

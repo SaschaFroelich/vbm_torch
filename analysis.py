@@ -70,10 +70,10 @@ def violin(df, with_colbar = 1, sharey = False):
     if model == 'B':
         ylims = [[0, 0.03], # lr
                  [0.5, 7.5], # theta_Q
-                 [0., 8.], # theta_rep
+                 [0., 2.], # theta_rep
                  [0, 0.03], # lr
                  [0.5, 7.5], # theta_Q
-                 [0., 8]] # theta_rep
+                 [0., 2]] # theta_rep
         
     elif model == 'Conflict'or model =='conflictmodel':
         ylims = [[0, 0.03], # lr
@@ -570,35 +570,105 @@ def compare_lists(leavnode1, leavnode2):
           f"Number of elements in union: {union}.")
         
         
-def kmeans(corr_dict, inf_mean_df, n_clusters):
+def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
+    '''
+    
+
+    Parameters
+    ----------
+    corr_dict : TYPE
+        DESCRIPTION.
+        
+    inf_mean_df : TYPE
+        DESCRIPTION.
+        
+    n_clusters : TYPE
+        DESCRIPTION.
+        
+    num_reps : TYPE, optional
+        DESCRIPTION. The default is 1.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+        
+    cluster_groups : nested list
+        Contains the ag_idx for the different clusters.
+
+    '''
+    
+    num_agents = len(inf_mean_df['ag_idx'].unique())
     
     from sklearn.cluster import KMeans
     n_clusters = n_clusters
     kmean = KMeans(n_clusters=n_clusters, n_init = 10, init ='random')
-    kmeans = kmean.fit(pd.DataFrame(corr_dict).to_numpy())
     
-    for clus1 in range(n_clusters):
-        for clus2 in range(clus1+1, n_clusters):
-            cluster_distance = np.sqrt(((kmeans.cluster_centers_[clus1,:]-kmeans.cluster_centers_[clus2,:])**2).sum())
-            print(f"Cluster distance (cluster {clus1} and {clus2}) is %.4f"%cluster_distance)
+    all_cluster_groups = []
+    all_labels = []
+    mini_clusters = np.zeros((num_agents, num_agents))
+    c_distances = []
     
-    
-    cluster_groups = [[None]]*n_clusters
-    
-    for clus in range(n_clusters):
-        cluster_groups[clus] = list(inf_mean_df['ag_idx'][np.where(kmeans.labels_ == clus)[0]])
-        cluster_groups[clus].sort()
-    
-    for clus_idx in range(len(cluster_groups)):
-        groups_in_cluster = inf_mean_df['group'][cluster_groups[clus_idx]]
-        num_groups_in_cluster = len(groups_in_cluster.unique())
-        print("\n\nThere are %d groups in cluster no %d."%(num_groups_in_cluster, clus_idx))
-        group_distr = [None]*num_groups_in_cluster
+    for rep in range(num_reps):
+        kmeans = kmean.fit(pd.DataFrame(corr_dict).to_numpy())
         
-        for i in range(num_groups_in_cluster):
-            group_distr[i] = (groups_in_cluster == groups_in_cluster.unique()[i]).sum()
+        for clus1 in range(n_clusters):
+            for clus2 in range(clus1+1, n_clusters):
+                cluster_distance = np.sqrt(((kmeans.cluster_centers_[clus1,:]-kmeans.cluster_centers_[clus2,:])**2).sum())
+                c_distances.append(cluster_distance)
+                print(f"Cluster distance (cluster {clus1} and {clus2}) is %.4f"%cluster_distance)
+        
+        
+        cluster_groups = [[None]]*n_clusters
+        
+        for clus in range(n_clusters):
+            cluster_groups[clus] = list(inf_mean_df['ag_idx'][np.where(kmeans.labels_ == clus)[0]])
+            cluster_groups[clus].sort()
+        
+        for clus_idx in range(len(cluster_groups)):
+            groups_in_cluster = inf_mean_df['group'][cluster_groups[clus_idx]]
+            num_groups_in_cluster = len(groups_in_cluster.unique())
+            print("\n\nThere are %d groups in cluster no %d."%(num_groups_in_cluster, clus_idx))
+            group_distr = [None]*num_groups_in_cluster
             
-        print("Experimental groups in cluster %d are distributed as follows:"%clus_idx)
-        print(group_distr)
+            for i in range(num_groups_in_cluster):
+                group_distr[i] = (groups_in_cluster == groups_in_cluster.unique()[i]).sum()
+                
+            print("Experimental groups in cluster %d are distributed as follows:"%clus_idx)
+            print(group_distr)
         
-    return kmeans.labels_, cluster_groups
+        for row_idx in range(num_agents):
+            for col_idx in range(num_agents):
+                for cgroup in cluster_groups:
+                    if row_idx in cgroup and col_idx in cgroup:
+                        mini_clusters[row_idx, col_idx] += 1
+        
+        
+        all_cluster_groups.append(cluster_groups)
+        all_labels.append(kmeans.labels_)
+        
+    mini_clusters /= num_reps
+
+    if num_reps > 1 and plot:    
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(mini_clusters)
+        fig.colorbar(cax)
+        plt.title(f"Mini Clusters for {n_clusters} clusters")
+        plt.gca().set_ylabel('ag_idx')
+        plt.grid(False)
+        plt.show()
+        
+        # leavnodes = cluster_analysis(mini_clusters, title = 'mini clusters')
+        # print("leavnodes mini clusters:")
+        # print(leavnodes)
+        
+    # '''
+    # Which cluster is the 'most stable' mini cluster?
+    # '''
+    # for i in range(num_reps):
+    #     compare_lists(leavnode1, leavnode2)
+        
+    # dfgh
+        
+    return kmeans, cluster_groups, c_distances

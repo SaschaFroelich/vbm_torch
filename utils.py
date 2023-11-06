@@ -742,14 +742,14 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
-            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.2
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*8
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
             
-            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
-            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.1
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*8
             param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-            param_dict['Qparam'] = params_uniform[6:7, :]*10
+            param_dict['Qparam'] = params_uniform[6:7, :]*500
             
         else:
             raise Exception("Not yet implemented")
@@ -781,11 +781,11 @@ def init_agent(model, group, num_agents=1, params = None):
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
             param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
-            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*8
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
             
             param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
-            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*8
             param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
             param_dict['kparam'] = params_uniform[6:7, :]*1000
             

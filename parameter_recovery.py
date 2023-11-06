@@ -39,7 +39,7 @@ import numpy as np
 
 #%%
 
-model = 'Bhand'
+model = 'BQ'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 52
@@ -142,8 +142,42 @@ inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model','ag_idx','group'], as
 # inf_mean_df['paramtype'] = ['inf']*len(params_df)
 model = inf_mean_df['model'][0]
 num_agents = len(inf_mean_df['ag_idx'].unique())
-
+num_params = len(params_df.columns) - 3
 # post_sample_df, params_sim_df, group_behav_df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
+
+'''
+Plot ELBO
+'''
+import matplotlib.pyplot as plt
+import seaborn as sns
+fig, ax = plt.subplots()
+plt.plot(loss[:250])
+plt.title(f"ELBO for model {model}")
+ax.set_xlabel("Number of iterations")
+ax.set_ylabel("ELBO")
+plt.show()
+
+num_plot_cols = 3
+num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
+                (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
+
+fig = plt.figure()
+gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.5, wspace = 0.3)
+ax = gs.subplots()
+# params_df.columns
+for param_idx in range(num_params):
+    plot_col_idx = param_idx % num_plot_cols
+    plot_row_idx = (param_idx // num_plot_cols)
+    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
+    # ca.plot([0,0], ca.get_ylim())
+    ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
+    if plot_col_idx > 0:
+        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+        
+    if plot_row_idx > 0:
+        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        
+plt.show()
 #%%
 '''
 Plot ELBO and Parameter Estimates
@@ -151,7 +185,7 @@ Plot ELBO and Parameter Estimates
 
 fig, ax = plt.subplots()
 plt.plot(loss)
-plt.title("ELBO")
+plt.title(f"ELBO for model {model}")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
 plt.show()
@@ -164,7 +198,7 @@ for param in params_df.columns[0:-3]:
     plt.plot(params_df[param], params_df[param])
     ax.set_xlabel('true value')
     ax.set_ylabel('inferred value')
-    plt.title(param)
+    plt.title(param + f' for model {model}')
     plt.show()
 
 #%%
@@ -200,7 +234,68 @@ for key in corr_dict.keys():
     sns.kdeplot(corr_dict[key])
     plt.title(key)
     plt.show()
+    
+#%%
+'''
+Correlation analysis both days
+'''
+import random
+num_sims = 1000
 
+dd = []
+
+for sim in range(num_sims):
+    print("Simulation num %d"%sim)
+    num_agents = 36
+    agidxs_temp = random.sample(range(52), 36)
+    # agidxs_temp.sort()
+    # print(agidxs_temp)
+    
+    post_sample_df_temp = post_sample_df[post_sample_df['ag_idx'].isin(agidxs_temp)]
+    corr_dict_temp = anal.within_subject_corr(post_sample_df_temp)
+    inf_mean_df_temp = inf_mean_df[inf_mean_df['ag_idx'].isin(agidxs_temp)]
+    inf_mean_df_temp.loc[:, 'ag_idx'] = range(36)
+    inf_mean_df_temp = inf_mean_df_temp.reset_index(drop=True)
+    
+    leavnodes = anal.cluster_analysis(corr_dict_temp, title = 'all correlations exp')
+    kmeans, cluster_groups, c_distances = anal.kmeans(corr_dict_temp, 
+                                             inf_mean_df_temp, 
+                                             n_clusters = 2,
+                                             num_reps = 1,
+                                             plotfig = False)
+    dd.extend(c_distances)
+
+#%%
+'''
+Correlation analysis day 1
+'''
+import random
+num_sims = 1000
+
+dd = []
+
+for sim in range(num_sims):
+    print("Simulation num %d"%sim)
+    num_agents = 36
+    agidxs_temp = random.sample(range(52), 36)
+    # agidxs_temp.sort()
+    # print(agidxs_temp)
+    post_sample_df_temp = post_sample_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
+    post_sample_df_temp = post_sample_df_temp[post_sample_df_temp['ag_idx'].isin(agidxs_temp)]
+    corr_dict_temp = anal.within_subject_corr(post_sample_df_temp)
+    
+    inf_mean_df_temp = inf_mean_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
+    inf_mean_df_temp = inf_mean_df_temp[inf_mean_df_temp['ag_idx'].isin(agidxs_temp)]
+    inf_mean_df_temp.loc[:, 'ag_idx'] = range(36)
+    inf_mean_df_temp = inf_mean_df_temp.reset_index(drop=True)
+    
+    leavnodes = anal.cluster_analysis(corr_dict_temp, title = 'all correlations day 1')
+    kmeans, cluster_groups, c_distances = anal.kmeans(corr_dict_temp, 
+                                             inf_mean_df_temp, 
+                                             n_clusters = 2,
+                                             num_reps = 1,
+                                             plotfig = False)
+    dd.extend(c_distances)
 
 #%%
 # '''
@@ -274,7 +369,42 @@ del corr_dict_day_between['lr_day2_vs_theta_rep_day2']
 del corr_dict_day_between['theta_Q_day1_vs_theta_rep_day1']
 del corr_dict_day_between['theta_Q_day2_vs_theta_rep_day2']
 
-leavnodes_betweendays = anal.cluster_analysis(corr_dict_day2, title = 'between days')
+leavnodes_betweendays = anal.cluster_analysis(corr_dict_day_between, title = 'between days')
+
+import random
+num_sims = 1000
+
+dd = []
+
+for sim in range(num_sims):
+    print("Simulation num %d"%sim)
+    num_agents = 36
+    agidxs_temp = random.sample(range(52), 36)
+    # agidxs_temp.sort()
+    # print(agidxs_temp)
+    post_sample_df_temp = post_sample_df[post_sample_df['ag_idx'].isin(agidxs_temp)]
+    corr_dict_temp = anal.within_subject_corr(post_sample_df_temp)
+    
+    del corr_dict_temp['lr_day1_vs_theta_Q_day1']
+    del corr_dict_temp['lr_day2_vs_theta_Q_day2']
+    
+    del corr_dict_temp['lr_day1_vs_theta_rep_day1']
+    del corr_dict_temp['lr_day2_vs_theta_rep_day2']
+    
+    del corr_dict_temp['theta_Q_day1_vs_theta_rep_day1']
+    del corr_dict_temp['theta_Q_day2_vs_theta_rep_day2']
+    
+    inf_mean_df_temp = inf_mean_df[inf_mean_df['ag_idx'].isin(agidxs_temp)]
+    inf_mean_df_temp.loc[:, 'ag_idx'] = range(36)
+    inf_mean_df_temp = inf_mean_df_temp.reset_index(drop=True)
+    
+    leavnodes = anal.cluster_analysis(corr_dict_temp, title = 'all correlations day 1')
+    kmeans, cluster_groups, c_distances = anal.kmeans(corr_dict_temp, 
+                                             inf_mean_df_temp, 
+                                             n_clusters = 2,
+                                             num_reps = 1,
+                                             plotfig = False)
+    dd.extend(c_distances)
 
 #%%
 '''
