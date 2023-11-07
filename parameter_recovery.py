@@ -42,7 +42,7 @@ import numpy as np
 model = 'BQ'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 52
+num_agents = 56
 
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
@@ -151,7 +151,7 @@ Plot ELBO
 import matplotlib.pyplot as plt
 import seaborn as sns
 fig, ax = plt.subplots()
-plt.plot(loss[:250])
+plt.plot(loss)
 plt.title(f"ELBO for model {model}")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -161,6 +161,7 @@ num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
                 (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
 
+    
 fig = plt.figure()
 gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.5, wspace = 0.3)
 ax = gs.subplots()
@@ -176,7 +177,32 @@ for param_idx in range(num_params):
         
     if plot_row_idx > 0:
         ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+plt.show()
+
+'''
+Plot Inf vs True
+'''
+fig = plt.figure(figsize=(16,12), dpi=100)
+gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.1)
+ax = gs.subplots()
+# params_df.columns
+for param_idx in range(num_params):
+    param = params_df.columns[param_idx]
+    plot_col_idx = param_idx % num_plot_cols
+    plot_row_idx = (param_idx // num_plot_cols)
+    ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
+    ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+    # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+    # ca.plot([0,0], ca.get_ylim())
+    ax[plot_row_idx, plot_col_idx].set_xlabel(param)
+    ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
+    if plot_col_idx > 0:
+        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
         
+    if plot_row_idx > 0:
+        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        
+# fig.suptitle(f"Model {model}", fontsize = 32)
 plt.show()
 #%%
 '''
@@ -200,6 +226,7 @@ for param in params_df.columns[0:-3]:
     ax.set_ylabel('inferred value')
     plt.title(param + f' for model {model}')
     plt.show()
+
 
 #%%
 '''

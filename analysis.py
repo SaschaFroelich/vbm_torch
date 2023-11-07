@@ -40,7 +40,7 @@ def remap(blockno):
     
     return blockno_new
 
-def violin(df, with_colbar = 1, sharey = False):
+def violin(df, with_colbar = 1, sharey = False, ylims = None):
     '''
 
     Parameters
@@ -75,7 +75,7 @@ def violin(df, with_colbar = 1, sharey = False):
                  [0.5, 7.5], # theta_Q
                  [0., 2]] # theta_rep
         
-    elif model == 'Conflict'or model =='conflictmodel':
+    elif model == 'Conflict':
         ylims = [[0, 0.03], # lr
                  [0.5, 7.5], # theta_Q
                  [0.5, 5], # theta_rep
@@ -84,7 +84,9 @@ def violin(df, with_colbar = 1, sharey = False):
                  [0.5, 7.5], # theta_Q
                  [0.5, 5], # theta_rep
                  [-0.5, 0.5]] # conflict param
-        
+    
+    else:
+        del ylims
     
     for par in range(num_params):
         
@@ -672,3 +674,52 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
     # dfgh
         
     return kmeans, cluster_groups, c_distances
+
+def compute_errors(df):
+    num_agents = len(df['ag_idx'].unique())
+    errorrates = np.zeros((3, num_agents)) # STT, DTT, Total
+    errorrates_day1 = np.zeros((3, num_agents)) # STT, DTT, Total
+    errorrates_day2 = np.zeros((3, num_agents)) # STT, DTT, Total
+    
+    for ag_idx in np.sort(df['ag_idx'].unique()):
+        "----- Both days"
+        ag_df = df[df['ag_idx'] == ag_idx]
+        "Remove new block trials"
+        ag_df = ag_df[ag_df['choices'] != -1]
+        "Total error rates"
+        errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
+        ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
+        "Error Rates STT"
+        errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
+        ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
+        "Error Rates DTT"
+        errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
+        
+        "----- Day 1"
+        ag_df_day1 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] <= 5)]
+        "Remove new block trials"
+        ag_df_day1 = ag_df_day1[ag_df_day1['choices'] != -1]
+        "Total error rates"
+        errorrates_day1[-1, ag_idx] = (ag_df_day1['choices'] == -2).sum() / len(ag_df_day1)
+        ag_df_day1_stt = ag_df_day1[ag_df_day1['trialsequence'] < 10]
+        "Error Rates STT"
+        errorrates_day1[0, ag_idx] = (ag_df_day1_stt['choices'] == -2).sum() / len(ag_df_day1_stt)
+        ag_df_day1_dtt = ag_df_day1[ag_df_day1['trialsequence'] > 10]
+        "Error Rates DTT"
+        errorrates_day1[1, ag_idx] = (ag_df_day1_dtt['choices'] == -2).sum() / len(ag_df_day1_dtt)
+    
+        "----- Day 2"
+        ag_df_day2 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] > 5)]
+        "Remove new block trials"
+        ag_df_day2 = ag_df_day2[ag_df_day2['choices'] != -1]
+        "Total error rates"
+        errorrates_day2[-1, ag_idx] = (ag_df_day2['choices'] == -2).sum() / len(ag_df_day2)
+        ag_df_day2_stt = ag_df_day2[ag_df_day2['trialsequence'] < 10]
+        "Error Rates STT"
+        errorrates_day2[0, ag_idx] = (ag_df_day2_stt['choices'] == -2).sum() / len(ag_df_day2_stt)
+        ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
+        "Error Rates DTT"
+        errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
+
+
+    return errorrates, errorrates_day1, errorrates_day2

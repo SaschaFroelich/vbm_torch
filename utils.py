@@ -139,7 +139,43 @@ def get_groupdata(data_dir):
     
     groupdata = []
     group = []
-    exclude_pb = [14, 20, 24, 28, 38, 43, 45, 57, 58]
+    'Exclude because of errors'
+    # exclude_pb = [# Grp 0
+    #                 # Grp1
+    #                 14, 20, 24, 28,
+    #                 # Grp2
+    #                 38, 43, 45, 
+    #                 # Grp3
+    #                 57, 58]
+    
+    exclude_pb = [# Grp 0
+                  
+                  # Grp 1
+                  28,
+                  # Grp 2
+                  ]
+    
+    'Exclude because of execution time'
+    exclude_ID = [# Grp 0
+                  '604fa685e33606f9a0ee8189',
+                  # Grp 1
+                '56d8df02d13f6b000e542eef', '63ef938aea545fb9bd19a591',
+                '601f08cba1191642cadf59c1', '5f48f497fae2763d537d2e6b',
+                '6151f20d06757e43aa1f54f9',
+                # Grp 2
+                '5a54d42476d1c60001aacd6c', '62cbed33d29c28e6be511bde',
+                '59e7232f24d7bf00012f112e',
+                # '63e5eb956eab1f2740ac6289', 
+                # Grp 3
+                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492',
+                '5ea00d4b1286ee0008405450']
+    
+    exclude_random = []
+    exclude_random.append(np.random.choice(range(14)))
+    exclude_random.extend(list(np.random.choice(range(32, 49), size = 2, replace = False)))
+    exclude_random.append(np.random.choice(range(49, 65)))
+    
+    print(exclude_random)
     
     pb = -1
     for grp in range(4):
@@ -147,11 +183,11 @@ def get_groupdata(data_dir):
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
-            data, _ = get_participant_data(file1, 
+            data, ID = get_participant_data(file1, 
                                             grp, 
                                             data_dir)
             
-            if pb not in exclude_pb:
+            if ID not in exclude_ID and pb not in exclude_pb and pb not in exclude_random:
                 groupdata.append(data)
                 group.append(grp)
 
@@ -204,8 +240,8 @@ def get_participant_data(file_day1, group, data_dir):
     
     ID = file_day1.split("/")[-1][4:28] # Prolific ID
 
-    print(data_dir)
-    print(glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID)))
+    # print(data_dir)
+    # print(glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID)))
     
     file_day2 = glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID))[0]
 

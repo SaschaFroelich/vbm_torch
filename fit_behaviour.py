@@ -24,11 +24,23 @@ B
 Conflict
 '''
 
-model = 'Bhand'
+model = 'B'
 #%%
 exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+
+errorrates, errorrates_day1, errorrates_day2 = anal.compute_errors(expdata_df)
+print("-------------------------------------------------------\n\n")
+print("Maximum errorrate for STT: %.2f, DTT: %.2f, total: %.2f"%(errorrates[0,:].max(),errorrates[1,:].max(),errorrates[2,:].max()))
+
 utils.plot_grouplevel(expdata_df)
 num_agents = len(expdata_df['ag_idx'].unique())
+dfnew=pd.DataFrame(expdata_df.groupby(['ag_idx', 'group', 'model'], as_index = False).mean())
+group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
+print(group_distro)
+assert np.abs(np.diff(group_distro)).sum() == 0
+# print(len(dfnew[dfnew['group']==1]))
+# print(len(dfnew[dfnew['group']==2]))
+# print(len(dfnew[dfnew['group']==3]))
 #%%
 # '''
 # Exclude participants with high error rates (only to balance groups)
@@ -114,11 +126,9 @@ num_params = len(params_df.columns)
 '''
 Plot ELBO
 '''
-import matplotlib.pyplot as plt
-import seaborn as sns
 fig, ax = plt.subplots()
 plt.plot(loss)
-plt.title(f"ELBO for model {model}")
+plt.title(f"ELBO for model {model} ({num_agents} agents)")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
 plt.show()
@@ -127,8 +137,8 @@ num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
                 (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
 
-fig = plt.figure()
-gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.5, wspace = 0.3)
+fig = plt.figure(figsize=(16,12), dpi=100)
+gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.2)
 ax = gs.subplots()
 # params_df.columns
 for param_idx in range(num_params):
@@ -142,56 +152,12 @@ for param_idx in range(num_params):
         
     if plot_row_idx > 0:
         ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
-        
+
 plt.show()
 #%%
 '''
 Compute Errorrates
 '''
-num_agents = len(expdata_df['ag_idx'].unique())
-errorrates = torch.zeros((3, num_agents)) # STT, DTT, Total
-errorrates_day1 = torch.zeros((3, num_agents)) # STT, DTT, Total
-errorrates_day2 = torch.zeros((3, num_agents)) # STT, DTT, Total
-
-for ag_idx in np.sort(expdata_df['ag_idx'].unique()):
-    "----- Both days"
-    ag_df = expdata_df[expdata_df['ag_idx'] == ag_idx]
-    "Remove new block trials"
-    ag_df = ag_df[ag_df['choices'] != -1]
-    "Total error rates"
-    errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
-    ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
-    "Error Rates STT"
-    errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
-    ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
-    "Error Rates DTT"
-    errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
-    
-    "----- Day 1"
-    ag_df_day1 = expdata_df[(expdata_df['ag_idx'] == ag_idx) & (expdata_df['blockidx'] <= 5)]
-    "Remove new block trials"
-    ag_df_day1 = ag_df_day1[ag_df_day1['choices'] != -1]
-    "Total error rates"
-    errorrates_day1[-1, ag_idx] = (ag_df_day1['choices'] == -2).sum() / len(ag_df_day1)
-    ag_df_day1_stt = ag_df_day1[ag_df_day1['trialsequence'] < 10]
-    "Error Rates STT"
-    errorrates_day1[0, ag_idx] = (ag_df_day1_stt['choices'] == -2).sum() / len(ag_df_day1_stt)
-    ag_df_day1_dtt = ag_df_day1[ag_df_day1['trialsequence'] > 10]
-    "Error Rates DTT"
-    errorrates_day1[1, ag_idx] = (ag_df_day1_dtt['choices'] == -2).sum() / len(ag_df_day1_dtt)
-
-    "----- Day 2"
-    ag_df_day2 = expdata_df[(expdata_df['ag_idx'] == ag_idx) & (expdata_df['blockidx'] > 5)]
-    "Remove new block trials"
-    ag_df_day2 = ag_df_day2[ag_df_day2['choices'] != -1]
-    "Total error rates"
-    errorrates_day2[-1, ag_idx] = (ag_df_day2['choices'] == -2).sum() / len(ag_df_day2)
-    ag_df_day2_stt = ag_df_day2[ag_df_day2['trialsequence'] < 10]
-    "Error Rates STT"
-    errorrates_day2[0, ag_idx] = (ag_df_day2_stt['choices'] == -2).sum() / len(ag_df_day2_stt)
-    ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
-    "Error Rates DTT"
-    errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
 
 #%%
 '''
