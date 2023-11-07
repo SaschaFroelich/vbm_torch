@@ -126,9 +126,10 @@ class GeneralGroupInference(object):
         return {'tau': tau, 'mu': mu, 'locs': locs}
 
     def infer_posterior(self,
-                        iter_steps=1_000,
-                        num_particles=10,
-                        optim_kwargs={'lr': .01}): # Adam learning rate
+                        iter_steps = 1_000,
+                        num_particles = 10,
+                        optim_kwargs = {'lr': .01},
+                        automatic_stop = True): # Adam learning rate
         """Perform SVI over free model parameters."""
 
         pyro.clear_param_store()
@@ -139,16 +140,38 @@ class GeneralGroupInference(object):
                   loss=pyro.infer.Trace_ELBO(num_particles=num_particles,
                                   # set below to true once code is vectorized
                                   vectorize_particles=True))
-
         loss = []
         pbar = tqdm(range(iter_steps), position=0)
-        print("Starting inference steps")
-        for step in pbar:#range(iter_steps):
-            "Runs through the model twice the first time"
-            loss.append(torch.tensor(svi.step()).to(device))
-            pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
-            if torch.isnan(loss[-1]):
-                break
+        print("Starting inference.")
+        if automatic_stop:
+            keep_inferring = 1
+            step = 0
+            while keep_inferring:
+                step += 1
+                "Runs through the model twice the first time"
+                loss.append(torch.tensor(svi.step()).to(device))
+                pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
+                if torch.isnan(loss[-1]):
+                    break
+                
+                if len(loss) > 1_000 and loss%250 == 0:
+                    print("Inference step number %d."%len(loss))
+                    if torch.abs(torch.tensor(loss[-1_000:-750]).mean() - \
+                                 torch.tensor(loss[-250:]).mean()) < torch.tensor(loss[-250:]).std() / 2:
+                        
+                        keep_inferring = 0
+                        
+                    if step > iter_steps:
+                        keep_inferring = 0
+
+        else:
+            "Stop after iter_steps steps."
+            for step in pbar:#range(iter_steps):
+                "Runs through the model twice the first time"
+                loss.append(torch.tensor(svi.step()).to(device))
+                pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
+                if torch.isnan(loss[-1]):
+                    break
 
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
