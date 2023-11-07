@@ -163,17 +163,17 @@ def get_groupdata(data_dir):
                 '601f08cba1191642cadf59c1', '5f48f497fae2763d537d2e6b',
                 '6151f20d06757e43aa1f54f9',
                 # Grp 2
-                '5a54d42476d1c60001aacd6c', '62cbed33d29c28e6be511bde',
-                '59e7232f24d7bf00012f112e',
+                '5a54d42476d1c60001aacd6c', '62cbed33d29c28e6be511bde', # pb 44, 33
+                '59e7232f24d7bf00012f112e', # pb 43
                 # '63e5eb956eab1f2740ac6289', 
                 # Grp 3
-                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492',
-                '5ea00d4b1286ee0008405450']
+                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492', # pb 50, 63
+                '5ea00d4b1286ee0008405450'] #pb 58
     
     exclude_random = []
     exclude_random.append(np.random.choice(range(14)))
-    exclude_random.extend(list(np.random.choice(range(32, 49), size = 2, replace = False)))
-    exclude_random.append(np.random.choice(range(49, 65)))
+    exclude_random.extend(list(np.random.choice([32,34,35,36,37,38,39,40,41,42,45,46,47,48], size = 2, replace = False)))
+    exclude_random.append(np.random.choice([49, 51, 52, 53, 54, 55, 56, 57, 59,60,61,62,64]))
     
     print(exclude_random)
     
