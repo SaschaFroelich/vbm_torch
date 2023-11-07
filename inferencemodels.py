@@ -141,31 +141,31 @@ class GeneralGroupInference(object):
                                   # set below to true once code is vectorized
                                   vectorize_particles=True))
         loss = []
-        pbar = tqdm(range(iter_steps), position=0)
         print("Starting inference.")
         if automatic_stop:
+            print("Automatic Halting enabled.")
             keep_inferring = 1
             step = 0
             while keep_inferring:
                 step += 1
                 "Runs through the model twice the first time"
                 loss.append(torch.tensor(svi.step()).to(device))
-                pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
+                # pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
                 if torch.isnan(loss[-1]):
                     break
                 
-                if len(loss) > 1_000 and loss%250 == 0:
-                    print("Inference step number %d."%len(loss))
+                if step > 1_000 and step%250 == 0:
+                    print("\nInference step number %d.\n"%step)
                     if torch.abs(torch.tensor(loss[-1_000:-750]).mean() - \
                                  torch.tensor(loss[-250:]).mean()) < torch.tensor(loss[-250:]).std() / 2:
-                        
                         keep_inferring = 0
                         
-                    if step > iter_steps:
+                    if step >= iter_steps:
                         keep_inferring = 0
 
         else:
             "Stop after iter_steps steps."
+            pbar = tqdm(range(iter_steps), position=0)
             for step in pbar:#range(iter_steps):
                 "Runs through the model twice the first time"
                 loss.append(torch.tensor(svi.step()).to(device))
