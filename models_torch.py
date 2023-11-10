@@ -144,9 +144,9 @@ class Vbm():
         as indicated by 'choices', where the values of Qin are retained. Q positions for agents with an error choice
         are replaced by 0."""
         
-        # # assert torch.is_tensor(choices), "choices must be a tensor."
-        # # assert choices.shape == (self.num_agents,), "choices must have shape (num_agents)."
-        # # assert Qin.ndim == 3
+        assert torch.is_tensor(choices), "choices must be a tensor."
+        assert choices.shape == (self.num_agents,), "choices must have shape (num_agents)."
+        assert Qin.ndim == 3
         
         Qin = Qin.type(torch.double)
         
@@ -278,12 +278,6 @@ class Vbm():
             
             "Combine choices"
             choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
-            
-            # print('day = %d'%day)
-            # print('self.Q[-1] = ...')
-            # print(self.Q[-1])
-            # print('self.V[-1] = ...')
-            # print(self.V[-1])
             
             # assert choice_python.ndim == 1
             return choice_python.clone().detach()
@@ -551,9 +545,6 @@ class Vbm_twodays(Vbm):
             
             "----- Compute new V-values for next trial -----"
             self.V.append(self.compute_V(omega))
-            self.V.append([((1-omega)[..., None]*self.rep[-1] + omega[..., None]*self.Q[-1])])
-            # dfgh
-
             if len(self.Q) > 10:
                 "Free up some memory space"
                 self.V[0:-2] = []
@@ -600,6 +591,60 @@ class Vbm_twodays(Vbm):
         
         return probs
 
+    def choose_action(self, trial, day, **kwargs):
+        '''
+        Only execute for num_particles == 1.
+        
+        Parameters
+        ----------
+        trial : tensor with shape (num_agents) 
+            Contains stimulus trial. 1-indexed.
+
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+
+        Returns
+        -------
+        tensor with shape (num_agents)
+            Chosen action of agent. 0-indexed.
+            -2 = error
+        '''
+        
+        # assert trial.ndim == 1 and trial.shape[0] == self.num_agents
+        # assert isinstance(day, int)
+        
+        "New Code"
+        "STT"
+        choice_python_stt = torch.where(trial < 10, trial-1, trial)
+        cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_stt) 
+        choice_python_stt = cond_stt * self.BAD_CHOICE + ~cond_stt * choice_python_stt
+        
+        "DTT"
+        if torch.any(trial>10):
+            option1, option2 = self.find_resp_options(trial)
+            "[0, :] to choose 0th particle"
+            choice_sample = torch.distributions.categorical.Categorical(probs=
+                                                                        self.compute_probs(trial, 
+                                                                                           day = day)).sample()[0, :]
+
+            choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
+            
+            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
+            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + ~cond_dtt * choice_python_dtt
+            
+            "Combine choices"
+            choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
+            
+            # assert choice_python.ndim == 1
+            return choice_python.clone().detach()
+        
+        else:
+            # assert choice_python_stt.ndim == 1
+            return choice_python_stt.clone().detach()
+
     def reset(self, locs):   
         self.param_dict = self.locs_to_pars(locs)
         
@@ -616,7 +661,6 @@ class Vbm_twodays(Vbm):
         
         "Compute V"
         self.V.append(self.compute_V(self.param_dict['omega_day1']))
-        
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-2 in seq_counter for errors"
         "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
@@ -935,7 +979,10 @@ class Conflict(Vbm_B):
         if torch.any(trial>10):
             option1, option2 = self.find_resp_options(trial)
             "[0, :] to choose 0th particle"
-            choice_sample = torch.distributions.categorical.Categorical(probs=self.compute_probs(trial, day = day, blocktype = blocktype)).sample()[0, :]
+            choice_sample = torch.distributions.categorical.Categorical(probs=
+                                                                        self.compute_probs(trial, 
+                                                                                           day = day, 
+                                                                                           blocktype = blocktype)).sample()[0, :]
 
             choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
             
@@ -944,12 +991,6 @@ class Conflict(Vbm_B):
             
             "Combine choices"
             choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
-            
-            # print('day = %d'%day)
-            # print('self.Q[-1] = ...')
-            # print(self.Q[-1])
-            # print('self.V[-1] = ...')
-            # print(self.V[-1])
             
             # assert choice_python.ndim == 1
             return choice_python.clone().detach()
@@ -1919,9 +1960,15 @@ class Handedness(Vbm_B):
         _, mask = self.Qoutcomp(self.V[-1], option2)
         Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
         
+        if day == 1:
+            hand_param = self.param_dict['hand_param_day1']
+            
+        elif day == 2:
+            hand_param = self.param_dict['hand_param_day2']
+        
         assert torch.all(option1 <= option2)
         sides_bool = (option1 < 2).type(torch.int) * (option2 >= 2).type(torch.int)
-        probs = self.softmax(torch.stack((Vopt1, Vopt2 + self.param_dict['hand_param']*sides_bool), 2))
+        probs = self.softmax(torch.stack((Vopt1, Vopt2 + hand_param*sides_bool), 2))
 
         return probs
     
