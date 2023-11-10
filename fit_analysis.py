@@ -22,30 +22,19 @@ import pandas as pd
 import utils
 import analysis_tools as anal
 import torch
-import tkinter as tk
-from tkinter import filedialog
-import pickle
 
-def open_files():
-    global filenames
-    filenames = filedialog.askopenfilenames()
-    print(f'File paths: {filenames}')
-    root.destroy()
-    
-root = tk.Tk()
-button = tk.Button(root, text="Open Files", command=open_files)
-print(button)
-button.pack()
-root.mainloop()
+post_sample_df, expdata_df, loss, params_df, num_params = utils.get_data_from_file()
 
-# post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
-res = pickle.load(open( filenames[0], "rb" ))
-post_sample_df, expdata_df, loss, params_df = res
+# print("=======================================================")
+# post_sample_df = post_sample_df[post_sample_df['ag_idx'] < 48]
+# expdata_df = expdata_df[expdata_df['ag_idx'] < 48]
+# params_df = params_df[params_df['ag_idx'] < 48]
+
 inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 'ag_idx', 'group'], as_index = False).mean())
 model = post_sample_df['model'][0]
 num_agents = len(post_sample_df['ag_idx'].unique())
-num_params = len(params_df.columns)
 
+print(f"Model fit of model {model} for {num_agents} agents after %d inference steps."%len(loss))
 '''
 Plot ELBO
 '''
@@ -77,12 +66,7 @@ for param_idx in range(num_params):
         ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
 
 plt.show()
-#%%
-'''
-Compute Errorrates
-'''
 
-#%%
 '''
 Violin Plot
 '''
@@ -95,26 +79,60 @@ anal.violin(inf_mean_df)
 
 #%%
 '''
-Model B specific analysis_tools
-Ratios between parameters.
+Compute Errorrates
 '''
 
-Q_R_ratio_day1 = []
-Q_R_ratio_day2 = []
-for ag_idx in range(num_agents):
-    Q_R_ratio_day1.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day1'] / \
-        post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day1']).mean())
+
+
+#%%
+'''
+Differences day 1 & day 2
+'''
+
+inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
+inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
+post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
+post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
+
+
+anal.daydiff(inf_mean_df, sign_level = 0.01)
+anal.violin(inf_mean_df)
+
+anal.daydiff(post_sample_df, sign_level = 0.01)
+
+anal.daydiff(post_sample_df[post_sample_df['group']==0], sign_level = 0.01)
+anal.daydiff(post_sample_df[post_sample_df['group']==1], sign_level = 0.01)
+anal.daydiff(post_sample_df[post_sample_df['group']==2], sign_level = 0.01)
+anal.daydiff(post_sample_df[post_sample_df['group']==3], sign_level = 0.01)
+
+anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==1)], sign_level = 0.01)
+anal.daydiff(post_sample_df[(post_sample_df['group']==2) | (post_sample_df['group']==3)], sign_level = 0.01)
+
+anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==2)], sign_level = 0.01)
+anal.daydiff(post_sample_df[(post_sample_df['group']==1) | (post_sample_df['group']==3)], sign_level = 0.01)
+
+# #%%
+# '''
+# Model B specific analysis_tools
+# Ratios between parameters.
+# '''
+
+# Q_R_ratio_day1 = []
+# Q_R_ratio_day2 = []
+# for ag_idx in range(num_agents):
+#     Q_R_ratio_day1.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day1'] / \
+#         post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day1']).mean())
         
-    Q_R_ratio_day2.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day2'] / \
-        post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day2']).mean())
+#     Q_R_ratio_day2.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day2'] / \
+#         post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day2']).mean())
         
-diff = torch.tensor(Q_R_ratio_day1) - torch.tensor(Q_R_ratio_day2)
-sns.kdeplot(diff)
-plt.title('Ratio Differences Day 1 - Day 2')
-import scipy
-import numpy as np
-scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
-# post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
+# diff = torch.tensor(Q_R_ratio_day1) - torch.tensor(Q_R_ratio_day2)
+# sns.kdeplot(diff)
+# plt.title('Ratio Differences Day 1 - Day 2')
+# import scipy
+# import numpy as np
+# scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
+# # post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
 
 #%%
 '''
@@ -129,26 +147,28 @@ Correlations within subjects
 '''
 corr_dict = anal.within_subject_corr(post_sample_df)
 
-corr_dict_errors = corr_dict.copy()
-corr_dict_errors['errors_stt'] = errorrates[0, :]
-corr_dict_errors['errors_dtt'] = errorrates[1, :]
+# corr_dict_errors = corr_dict.copy()
+# corr_dict_errors['errors_stt'] = errorrates[0, :]
+# corr_dict_errors['errors_dtt'] = errorrates[1, :]
 
 #%%
+'''
+Kdeplots of within-subject  correlations
+'''
 for key in corr_dict.keys():
     sns.kdeplot(corr_dict[key])
     plt.title(key)
     plt.show()
 
-
 #%%
 '''
 Correlation analysis_tools both days
 '''
-leavnodes = anal.cluster_analysis_tools(corr_dict, title = 'all correlations exp')
+leavnodes = anal.cluster_analysis(corr_dict, title = 'all correlations exp')
 kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_dict, 
                                          inf_mean_df, 
                                          n_clusters = 2,
-                                         num_reps = 1)
+                                         num_reps = 100)
 
 # utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[0])],
 #                       expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[1])])
@@ -159,15 +179,15 @@ kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_dict,
 # utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes[0:3])],
 #                       expdata_df[expdata_df['ag_idx'].isin(leavnodes[21:])])
 
-
 #%%
 '''
-Correlation analysis_tools day 1
+Correlation analysis day 1
 '''
-post_sample_df_day1 = post_sample_df.drop(['lr_day1', 'theta_Q_day1', 'theta_rep_day1'], axis = 1)
+droplist_for_day1 = [param for param in post_sample_df.columns if 'day2'  in param]
+post_sample_df_day1 = post_sample_df.drop(droplist_for_day1, axis = 1)
 corr_dict_day1 = anal.within_subject_corr(post_sample_df_day1)
 
-leavnodes_day1 = anal.cluster_analysis_tools(corr_dict_day1, title='day 1 exp')
+leavnodes_day1 = anal.cluster_analysis(corr_dict_day1, title='day 1 exp')
 
 # inf_mean_df[inf_mean_df['ag_idx'].isin(leavnodes[0:16])]['group']
 
@@ -177,14 +197,13 @@ leavnodes_day1 = anal.cluster_analysis_tools(corr_dict_day1, title='day 1 exp')
 # utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[0:16])],
 #                       expdata_df[expdata_df['ag_idx'].isin(leavnodes_day1[16:])])
 
-
 '''
 K-means clustering for Day 1
 '''
 labels, cluster_groups_day1, _ = anal.kmeans(corr_dict_day1, 
                                           inf_mean_df, 
                                           n_clusters = 2,
-                                          num_reps = 1)
+                                          num_reps = 100)
 
 # anal.compare_leavnodes(grp1_agidx, leavnodes_day1[0:16])
 
@@ -206,18 +225,15 @@ labels, cluster_groups_day1_errors = anal.kmeans(corr_dict_day1_errors, inf_mean
 anal.compare_lists(cluster_groups_day1_errors[0], cluster_groups_day1[0])
 #%%
 '''
-Perform correlation analysis_tools only within day 2
+Correlation analysis day 2
 '''
-post_sample_df_day2 = post_sample_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
+droplist_for_day2 = [param for param in post_sample_df.columns if 'day1'  in param]
+post_sample_df_day2 = post_sample_df.drop(droplist_for_day2, axis = 1)
 corr_dict_day2 = anal.within_subject_corr(post_sample_df_day2)
 
-leavnodes_day2 = anal.cluster_analysis_tools(corr_dict_day2, title = 'day 2')
+leavnodes_day2 = anal.cluster_analysis(corr_dict_day2, title = 'day 2')
 
-#%%
-'''
-K-means clustering for Day 2
-'''
-labels, cluster_groups_day2 = anal.kmeans(corr_dict_day2, 
+labels, cluster_groups_day2, c_distances = anal.kmeans(corr_dict_day2, 
                                      inf_mean_df, 
                                      n_clusters = 2,
                                      num_reps = 100)
@@ -251,21 +267,24 @@ Perform correlation analysis_tools only between days
 '''
 corr_dict = anal.within_subject_corr(post_sample_df)
 corr_dict_day_between = corr_dict.copy()
-del corr_dict_day_between['lr_day1_vs_theta_Q_day1']
-del corr_dict_day_between['lr_day2_vs_theta_Q_day2']
 
-del corr_dict_day_between['lr_day1_vs_theta_rep_day1']
-del corr_dict_day_between['lr_day2_vs_theta_rep_day2']
+dropkeys = []
+for key in corr_dict_day_between.keys():
+    if 'day1' in key and 'day2' not in key:
+        dropkeys.append(key)
+        
+    elif 'day2' in key and 'day1' not in key:
+        dropkeys.append(key)
 
-del corr_dict_day_between['theta_Q_day1_vs_theta_rep_day1']
-del corr_dict_day_between['theta_Q_day2_vs_theta_rep_day2']
+for key in dropkeys:
+    del corr_dict_day_between[key]
 
-leavnodes_betweendays = anal.cluster_analysis_tools(corr_dict_day_between, title = 'between days')
+leavnodes_betweendays = anal.cluster_analysis(corr_dict_day_between, title = 'between days')
 
 labels, cluster_groups_between, _ = anal.kmeans(corr_dict_day_between, 
                                              inf_mean_df, 
                                              n_clusters = 2,
-                                             num_reps = 1)
+                                             num_reps = 100)
 
 # anal.compare_leavnodes(grp0_agidx, leavnodes_day1[0:16])
 
@@ -309,3 +328,24 @@ utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
 Posterior Predictives
 '''
 complete_df = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
+
+#%%
+'''
+ELBO Barplots
+'''
+
+# Assuming values is your list of values
+values = [46900, 46550, 46230, 46870, 47880, 46830]
+
+# Create a list of colors
+colors = ['b', 'g', 'r', 'c', 'm']
+
+# Create an array for the x values
+models = ['Base', 'Hand', 'Seq Boost', 'Incongr.', 'Q_init', 'Habitual Tend']
+
+# Create the bar plot
+plt.bar(models, values, color=colors)
+plt.ylim([46000, 48000])
+# Show the plot
+plt.title('ELBOs (48 agents)')
+plt.show()

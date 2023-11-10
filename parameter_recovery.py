@@ -39,7 +39,7 @@ import numpy as np
 
 #%%
 
-model = 'BQ'
+model = 'B'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 56

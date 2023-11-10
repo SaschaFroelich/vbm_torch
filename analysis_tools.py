@@ -40,7 +40,10 @@ def remap(blockno):
     
     return blockno_new
 
-def violin(df, with_colbar = 1, sharey = False, ylims = None):
+def violin(df, 
+           with_colbar = 1, 
+           sharey = False, 
+           ylims = None):
     '''
 
     Parameters
@@ -68,23 +71,42 @@ def violin(df, with_colbar = 1, sharey = False, ylims = None):
     fig, ax = plt.subplots(1, num_params, figsize=(15,5), sharey=0)
     
     if model == 'B':
-        ylims = [[0, 0.03], # lr
-                 [0.5, 7.5], # theta_Q
-                 [0., 2.], # theta_rep
-                 [0, 0.03], # lr
-                 [0.5, 7.5], # theta_Q
-                 [0., 2]] # theta_rep
+        ylims = [[0, 0.04], # lr
+                  [0.5, 7.5], # theta_Q
+                  [0., 2.], # theta_rep
+                  [0, 0.04], # lr
+                  [0.5, 7.5], # theta_Q
+                  [0., 2]] # theta_rep
         
     elif model == 'Conflict':
-        ylims = [[0, 0.03], # lr
-                 [0.5, 7.5], # theta_Q
-                 [0.5, 5], # theta_rep
-                 [-0.4, 0.5], # conflict param
-                 [0, 0.03], # lr
-                 [0.5, 7.5], # theta_Q
-                 [0.5, 5], # theta_rep
-                 [-0.5, 0.5]] # conflict param
-    
+        ylims = [[0, 0.04], # lr
+                  [0, 8], # theta_Q
+                  [0.5, 5], # theta_rep
+                  [-0.4, 0.5], # conflict param
+                  [0, 0.04], # lr
+                  [0, 8], # theta_Q
+                  [0.5, 5], # theta_rep
+                  [-0.5, 0.5]] # conflict param
+        
+    elif model == 'Seqparam':
+        ylims = [[0, 0.04], # lr
+                  [0., 8], # theta_Q
+                  [0., 2], # theta_rep
+                  [0.05, 0.1], # seqparam
+                  [0, 0.04], # lr
+                  [0., 8], # theta_Q
+                  [0., 2], # theta_rep
+                  [0.05, 0.1]] # seqparam
+        
+    elif model == 'Bhand':
+        ylims = [[0, 0.04], # lr
+                  [0., 8], # theta_Q
+                  [0., 2], # theta_rep
+                  [0, 0.04], # lr
+                  [0., 8], # theta_Q
+                  [0., 2], # theta_rep
+                  [-2.5, 2.5]] # hand_param
+        
     else:
         del ylims
     
@@ -120,7 +142,8 @@ def violin(df, with_colbar = 1, sharey = False, ylims = None):
                               chartBox.width,
                               chartBox.height])
             
-            ax[par].set_ylim(ylims[par])
+            if ylims is not None:
+                ax[par].set_ylim(ylims[par])
         
             "Colorbar"
             # variance = df[params_df.columns[par]].std()**2
@@ -154,6 +177,7 @@ def violin(df, with_colbar = 1, sharey = False, ylims = None):
             if par > 0:
                 g1.set(ylabel=None)
                 g2.set(ylabel=None)
+                
             ax[par].legend([],[], frameon=False)
     
     plt.show()
@@ -210,20 +234,29 @@ def within_subject_corr(df):
 
     '''
     
-    df = df.drop(['model', 'group'], axis = 1)
-    
+    if 'ID' in df.columns:
+        df_temp = df.drop(['model', 'group', 'ag_idx', 'ID'], axis = 1)
+        df = df.drop(['model', 'group', 'ID'], axis = 1)
+        num_params = len(df_temp.columns)
+        param_names = df_temp.columns
+        
+    else:
+        df_temp = df.drop(['model', 'group', 'ag_idx'], axis = 1)
+        df = df.drop(['model', 'group'], axis = 1)
+        num_params = len(df_temp.columns)
+        param_names = df_temp.columns
+        
     corr_dict = {}
-    for col1 in range(len(df.columns[0:-1])):
-        for col2 in range(col1+1, len(df.columns[0:-1])):
-            corr_dict[df.columns[col1]+'_vs_'+df.columns[col2]] = []
-    # dfgh
+    for param1_idx in range(num_params):
+        for param2_idx in range(param1_idx+1, num_params):
+            corr_dict[param_names[param1_idx]+'_vs_' + param_names[param2_idx]] = []
     
     for ag_idx in np.sort(df['ag_idx'].unique()):
         df_ag = df[df['ag_idx'] == ag_idx]
-        for col1 in range(len(df_ag.columns[0:-1])):
-            for col2 in range(col1+1, len(df_ag.columns[0:-1])):
-                # dfgh
-                corr_dict[df_ag.columns[col1]+'_vs_'+df_ag.columns[col2]].append(df_ag.iloc[:, col1].corr(df_ag.iloc[:, col2]))
+        for param1_idx in range(num_params):
+            for param2_idx in range(param1_idx+1, num_params):
+                corr_dict[param_names[param1_idx] + '_vs_' + param_names[param2_idx]].append(\
+                           df_ag.loc[:, param_names[param1_idx]].corr(df_ag.loc[:, param_names[param2_idx]]))
 
     return corr_dict
 
@@ -597,7 +630,9 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
         
     cluster_groups : nested list
         Contains the ag_idx for the different clusters.
-
+        
+    c_distances : array
+        Distances between clusters.
     '''
     
     num_agents = len(inf_mean_df['ag_idx'].unique())
@@ -651,7 +686,7 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
         
     mini_clusters /= num_reps
 
-    if num_reps > 1 and plot:    
+    if num_reps > 1 and plotfig:    
         fig = plt.figure()
         ax = fig.add_subplot(111)
         cax = ax.matshow(mini_clusters)
@@ -676,50 +711,214 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
     return kmeans, cluster_groups, c_distances
 
 def compute_errors(df):
-    num_agents = len(df['ag_idx'].unique())
-    errorrates = np.zeros((3, num_agents)) # STT, DTT, Total
-    errorrates_day1 = np.zeros((3, num_agents)) # STT, DTT, Total
-    errorrates_day2 = np.zeros((3, num_agents)) # STT, DTT, Total
     
-    for ag_idx in np.sort(df['ag_idx'].unique()):
-        "----- Both days"
-        ag_df = df[df['ag_idx'] == ag_idx]
-        "Remove new block trials"
-        ag_df = ag_df[ag_df['choices'] != -1]
-        "Total error rates"
-        errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
-        ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
-        "Error Rates STT"
-        errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
-        ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
-        "Error Rates DTT"
-        errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
+    df = df[df['choices'] != -1]
+    # df_dtt = df[df['trialsequence'] > 10]
+    # df_stt = df[df['trialsequence'] < 10]
+    
+    error_rates = pd.DataFrame()
+    
+    # pd.DataFrame(df_dtt.groupby(['ID', 'model', 'ag_idx', 'group'], as_index=False))
+    
+    group = []
+    ag_idx = []
+    IDs = []
+    ER_dtt = []
+    ER_stt = []
+    ER_total = []
+    for ID in df['ID'].unique():
+        ER_dtt.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df['ID'] == ID)]))
+
+        ER_stt.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df['ID'] == ID)]))
         
-        "----- Day 1"
-        ag_df_day1 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] <= 5)]
-        "Remove new block trials"
-        ag_df_day1 = ag_df_day1[ag_df_day1['choices'] != -1]
-        "Total error rates"
-        errorrates_day1[-1, ag_idx] = (ag_df_day1['choices'] == -2).sum() / len(ag_df_day1)
-        ag_df_day1_stt = ag_df_day1[ag_df_day1['trialsequence'] < 10]
-        "Error Rates STT"
-        errorrates_day1[0, ag_idx] = (ag_df_day1_stt['choices'] == -2).sum() / len(ag_df_day1_stt)
-        ag_df_day1_dtt = ag_df_day1[ag_df_day1['trialsequence'] > 10]
-        "Error Rates DTT"
-        errorrates_day1[1, ag_idx] = (ag_df_day1_dtt['choices'] == -2).sum() / len(ag_df_day1_dtt)
+        ER_total.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df['ID'] == ID)]))
+        
+        IDs.append(ID)
+        group.append(df[df['ID'] == ID]['group'].unique()[0])
+        ag_idx.append(df[df['ID'] == ID]['ag_idx'].unique()[0])
     
-        "----- Day 2"
-        ag_df_day2 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] > 5)]
-        "Remove new block trials"
-        ag_df_day2 = ag_df_day2[ag_df_day2['choices'] != -1]
-        "Total error rates"
-        errorrates_day2[-1, ag_idx] = (ag_df_day2['choices'] == -2).sum() / len(ag_df_day2)
-        ag_df_day2_stt = ag_df_day2[ag_df_day2['trialsequence'] < 10]
-        "Error Rates STT"
-        errorrates_day2[0, ag_idx] = (ag_df_day2_stt['choices'] == -2).sum() / len(ag_df_day2_stt)
-        ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
-        "Error Rates DTT"
-        errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
+    er_df = pd.DataFrame({'ag_idx': ag_idx,
+                          'group': group,
+                          'ID': IDs,
+                          'ER_dtt': ER_dtt,
+                          'ER_stt': ER_stt,
+                          'ER_total': ER_total})
+    
+    return er_df
+    
+    # df_dtt = pd.DataFrame(df_dtt.drop(['model', 'group'], axis = 1).groupby(['ag_idx', 'ID', 'choices'], as_index = False).mean())
+    # df_dtt[]
+    
+    # # new_df = 
+    
+    # num_agents = len(df['ag_idx'].unique())
+    # errorrates = np.zeros((3, num_agents)) # STT, DTT, Total
+    # errorrates_day1 = np.zeros((3, num_agents)) # STT, DTT, Total
+    # errorrates_day2 = np.zeros((3, num_agents)) # STT, DTT, Total
+    # dfgh
+    # for ag_idx in np.sort(df['ag_idx'].unique()):
+    #     "----- Both days"
+    #     ag_df = df[df['ag_idx'] == ag_idx]
+    #     "Remove new block trials"
+    #     ag_df = ag_df[ag_df['choices'] != -1]
+    #     "Total error rates"
+    #     errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
+    #     ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
+    #     "Error Rates STT"
+    #     errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
+    #     ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
+    #     "Error Rates DTT"
+    #     errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
+        
+    #     "----- Day 1"
+    #     ag_df_day1 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] <= 5)]
+    #     "Remove new block trials"
+    #     ag_df_day1 = ag_df_day1[ag_df_day1['choices'] != -1]
+    #     "Total error rates"
+    #     errorrates_day1[-1, ag_idx] = (ag_df_day1['choices'] == -2).sum() / len(ag_df_day1)
+    #     ag_df_day1_stt = ag_df_day1[ag_df_day1['trialsequence'] < 10]
+    #     "Error Rates STT"
+    #     errorrates_day1[0, ag_idx] = (ag_df_day1_stt['choices'] == -2).sum() / len(ag_df_day1_stt)
+    #     ag_df_day1_dtt = ag_df_day1[ag_df_day1['trialsequence'] > 10]
+    #     "Error Rates DTT"
+    #     errorrates_day1[1, ag_idx] = (ag_df_day1_dtt['choices'] == -2).sum() / len(ag_df_day1_dtt)
+    
+    #     "----- Day 2"
+    #     ag_df_day2 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] > 5)]
+    #     "Remove new block trials"
+    #     ag_df_day2 = ag_df_day2[ag_df_day2['choices'] != -1]
+    #     "Total error rates"
+    #     errorrates_day2[-1, ag_idx] = (ag_df_day2['choices'] == -2).sum() / len(ag_df_day2)
+    #     ag_df_day2_stt = ag_df_day2[ag_df_day2['trialsequence'] < 10]
+    #     "Error Rates STT"
+    #     errorrates_day2[0, ag_idx] = (ag_df_day2_stt['choices'] == -2).sum() / len(ag_df_day2_stt)
+    #     ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
+    #     "Error Rates DTT"
+    #     errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
 
+    # return errorrates, errorrates_day1, errorrates_day2
+    
+def daydiff(df, sign_level = 0.05):
+    '''
+    
 
-    return errorrates, errorrates_day1, errorrates_day2
+    Parameters
+    ----------
+    df : DataFrame
+        If contains one value per participant -> plot difference.
+        If contains several samples per parameter per participant -> Check if variables
+        are statistically different from day 1 to day 2 within participant, and THEN
+        plot difference for those where the difference was statistically significant
+        according to a tow-sample t-test.
+
+    Returns
+    -------
+    None.
+
+    '''
+    from scipy import stats
+    
+    df_temp = df.drop(['ag_idx', 'model', 'group'], axis = 1)
+    parameter_names = df_temp.columns
+    from_posterior = 0
+    
+    if len(df[df['ag_idx']==df['ag_idx'].unique()[0]][parameter_names[0]]) > 1:
+        'df contains posterior dostros for each agents.'
+        from_posterior = 1
+        
+        diff_dict = {}
+        for param in parameter_names:
+            # ipdb.set_trace()
+            if 'day1' in param:
+                diff_dict[param] = []
+                diff_dict[param[0:-4]+'day2'] = []
+                diff_dict['ag_idx'] = []
+                for ag_idx in df['ag_idx'].unique():
+                    df_ag = df[df['ag_idx'] == ag_idx]
+                    t_statistic, p_value = stats.ttest_ind(df_ag[param], df_ag[param[0:-4] + 'day2'])
+                    
+                    if p_value < sign_level:
+                        diff_dict['ag_idx'].append(ag_idx)
+                        diff_dict[param].append(df_ag[param].mean())
+                        diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
+                        
+                    else:
+                        print("Excluding agent %d for parameter %s (p-value %.4f)"%(ag_idx, param[0:-5], p_value))
+        
+    num_pars = 0
+    for par in parameter_names:
+        if 'day1' in par:
+            num_pars += 1
+    
+    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
+    
+    num_plot_cols = 3
+    num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
+                    (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
+    gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
+    param_idx = 0
+    for par in parameter_names:
+        if 'day1' in par:
+            if from_posterior:
+                del df
+                df = pd.DataFrame({par : diff_dict[par], 
+                                   par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
+                                   'ag_idx' : range(len(diff_dict[par]))})
+                
+            param_idx += 1
+            plot_col_idx = param_idx % num_plot_cols
+            plot_row_idx = (param_idx // num_plot_cols)
+            
+            df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
+            t_statistic, p_value = scipy.stats.ttest_rel(df[par], df[par[0:-4]+'day2'])
+            if t_statistic > 0:
+                print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+                
+            else:
+                print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+            
+            for name, group in df_plot.groupby('ag_idx'):
+                x = np.arange(len(group))
+                y = group['value']
+                slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
+                color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
+                
+                if num_plot_rows > 1:
+                    group.plot('variable', 
+                               'value', 
+                               kind = 'line', 
+                               ax = ax[plot_row_idx, plot_col_idx], 
+                               color = color, 
+                               legend = False)
+                    
+                    df_plot.plot('variable', 
+                                 'value', 
+                                 kind='scatter', 
+                                 ax=ax[plot_row_idx, plot_col_idx], 
+                                 color='black', 
+                                 legend=False)
+                    
+                else:
+                    group.plot('variable', 
+                               'value', 
+                               kind = 'line', 
+                               ax = ax[plot_col_idx], 
+                               color = color, 
+                               legend = False)
+                    
+                    df_plot.plot('variable', 
+                                 'value', 
+                                 kind='scatter', 
+                                 ax = ax[plot_col_idx], 
+                                 color='black', 
+                                 legend=False)
+                    
+            # for line in plt.gca().get_lines():
+            #     line.set_linewidth(0.3)
+            
+            # plt.gca().legend([],[], frameon=False)  # Hide the legend
+            
+    plt.show()

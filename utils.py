@@ -140,7 +140,7 @@ def get_groupdata(data_dir):
     groupdata = []
     group = []
     'Exclude because of errors'
-    # exclude_pb = [# Grp 0
+    # exclude_errors = [# Grp 0
     #                 # Grp1
     #                 14, 20, 24, 28,
     #                 # Grp2
@@ -148,22 +148,22 @@ def get_groupdata(data_dir):
     #                 # Grp3
     #                 57, 58]
     
-    exclude_pb = [# Grp 0
+    exclude_errors = [# Grp 0
                   
                   # Grp 1
-                  28,
+                  '5e07c976f6191f137214e91f',
                   # Grp 2
                   ]
     
     'Exclude because of execution time'
-    exclude_ID = [# Grp 0
-                  '604fa685e33606f9a0ee8189',
+    exclude_time = [# Grp 0
+                  '604fa685e33606f9a0ee8189', # pb 5
                   # Grp 1
-                '56d8df02d13f6b000e542eef', '63ef938aea545fb9bd19a591',
-                '601f08cba1191642cadf59c1', '5f48f497fae2763d537d2e6b',
-                '6151f20d06757e43aa1f54f9',
+                '63ef938aea545fb9bd19a591', '56d8df02d13f6b000e542eef',  # pb 14, 15
+                '601f08cba1191642cadf59c1', '6151f20d06757e43aa1f54f9', '5f48f497fae2763d537d2e6b', # pb 23, 25, 26
+                
                 # Grp 2
-                '5a54d42476d1c60001aacd6c', '62cbed33d29c28e6be511bde', # pb 44, 33
+                '62cbed33d29c28e6be511bde', '5a54d42476d1c60001aacd6c', # pb 33, 44
                 '59e7232f24d7bf00012f112e', # pb 43
                 # '63e5eb956eab1f2740ac6289', 
                 # Grp 3
@@ -172,10 +172,119 @@ def get_groupdata(data_dir):
     
     exclude_random = []
     exclude_random.append(np.random.choice(range(14)))
-    exclude_random.extend(list(np.random.choice([32,34,35,36,37,38,39,40,41,42,45,46,47,48], size = 2, replace = False)))
+    exclude_random.extend(list(np.random.choice([32, 34, 35, 36, 37, 38, 39, 40, 41, 42, 45, 46, 47, 48], size = 2, replace = False)))
     exclude_random.append(np.random.choice([49, 51, 52, 53, 54, 55, 56, 57, 59,60,61,62,64]))
     
+    exclude_random.sort()
     print(exclude_random)
+    
+    IDs_included = []
+    
+    hand = []
+    'left/right/both: 0/1/2'
+    handedness = {
+                '5483702ffdf99b24c654b810'	: 1,
+                '5d55b7ef6a0f930017202336'	: 1,
+                '629f6b8c65fcae219e245284'	: 1,
+                '5b5e0e86902ad10001cfcc59'	: 1,
+                '5efb31fa8cd32f04bf048643'	: 1,
+                '5cbe04b4f429ff00159de30e'	: 1,
+                '5982eef79dfc3e00011d81e0'	: 1,
+                '57dd186e6598aa0001992616'	: 1,
+                '5d8a29c082fec30001d9c24a'	: 1,
+                '56d8df02d13f6b000e542eef'	: 1,
+                '62db2644ab0a3a353c0dcb54'	: 1,
+                '63ef938aea545fb9bd19a591'	: 0,
+                '5a54d42476d1c60001aacd6c'	: 1,
+                '5b2a72f7c293b90001732b89'	: 1,
+                '59dd90f6e75b450001a68dac'	: 1,
+                '63d79fcd741f9cfb2f87152f'	: 1,
+                '63174af7d57182f9bf90c094'	: 1,
+                '5d5a75c570a7c1000152623e'	: 1,
+                '5e850b0e390e520ec806b084'	: 1,
+                '55ca5305fdf99b498b73f29c'	: 1,
+                '5edeea354d54cb1a825aa8f9'	: 1,
+                '60e2577f8c52db9d1fb5ffac'	: 1,
+                '57c4761195a3ea00016e5992'	: 0,
+                '63e61d24e1c77b4b584e879f'	: 1,
+                '5fdcd228539a382bc5e9fae5'	: 1,
+                '640103805957bbf6a1326ed0'	: 1,
+                '5fdcd228539a382bc5e9fae5'	: 1,
+                '5fdcd228539a382bc5e9fae5'	: 1,
+                '5fd652b056a8bc53dbd1f680'	: 0,
+                '5fd652b056a8bc53dbd1f680'	: 0,
+                '5fbacf8a8f01f4b486dea42a'	: 1,
+                '5fb46dd5d9ece50422838e7a'	: 1,
+                '5ee38ef98c0c440172e022ac'	: 1,
+                '5e66c77e8ebdaf4466e26326'	: 0,
+                '5c4594514fe4f800016ea070'	: 1,
+                '5c8ba607c5366c0001d022cb'	: 1,
+                '63af557b3d4f219c3226b7d6'	: 1,
+                '617406fbfced12169896d158'	: 1,
+                '63f77b9ca8439f6e1620c1cd'	: 0,
+                '63f77b9ca8439f6e1620c1cd'	: 0,
+                '5e5fe64a8278d103d35cac54'	: 1,
+                '601f08cba1191642cadf59c1'	: 1,
+                '5d0245966e208b0017301561'	: 1,
+                '62e02b26e879244a99e852fa'	: 1,
+                '5d7ebf9e93902b0001965912'	: 1,
+                '5d49d17b3dad1f0001e2aba1'	: 1,
+                '5efcb50255a06b097b8d5d29'	: 1,
+                '56f699e876348f000c883bba'	: 1,
+                '604fa685e33606f9a0ee8189'	: 1,
+                '63e5eb956eab1f2740ac6289'	: 1,
+                '5f6bfe84b3d4ba1796defbfb'	: 1,
+                '6044ca22bc6235555362d5bb'	: 1,
+                '63eaa48e178ff1aadbf62963'	: 1,
+                '5eecd506d78b3b0a7182ccb9'	: 1,
+                '5eac671f0658ac0ea6c730d2'	: 2,
+                '5db4ef4a2986a3000be1f886'	: 1,
+                '5b266738007d870001c7c360'	: 1,
+                '5eb6d09db2c9c85dd30dc94e'	: 1,
+                '5b2bcfb51835660001cc6751'	: 1,
+                '5f356cbffb4cea5170d04fd9'	: 1,
+                '5c321ebf6558270001bd79aa'	: 1,
+                '5dc5da21d999de45a504651b'	: 1,
+                '58aca85e0da7f10001de92d4'	: 1,
+                '646dc9848e53ff1705d8c9c5'	: 1,
+                '5f16fde210d37701904c9dc2'	: 1,
+                '60a3f8075b013de7b5518e96'	: 1,
+                '5a9ed5046475f90001a0189e'	: 1,
+                '596f961cfe061d00011e3e03'	: 1,
+                '57d5ab3a722df500017f3622'	: 1,
+                '5f48f497fae2763d537d2e6b'	: 1,
+                '5c4b987538878c0001c7883b'	: 1,
+                '5908458b1138880001bc77e7'	: 1,
+                '5eebe3d7b1914c17e6208284'	: 1,
+                '62b05fdedd70cd33ea6afbd2'	: 2,
+                '62c8391cd913ab9b5317d5f9'	: 1,
+                '6329b1add3dcd53cb9c9cab8'	: 1,
+                '5eaadc0a7adeb404eea9c3c0'	: 1,
+                '62b44f66a16d45783569fad6'	: 1,
+                '5db32244dbe39d000be72fb0'	: 1,
+                '6286672d0165aad8f1386c27'	: 1,
+                '5e9ffa9ee172201b04f1a4c6'	: 1,
+                '631e235a33040da66ddf51a1'	: 1,
+                '5d8cef3c28e183001a335ab0'	: 1,
+                '5f0f7fe1d7ad1c000b42d091'	: 1,
+                '595e7974af78da0001a21c3a'	: 1,
+                '5c9f26cbe57be600147042e5'	: 1,
+                '6116b022b7ef87ef5828748b'	: 0,
+                '5e07c976f6191f137214e91f'	: 1,
+                '60f816ff1fa74fcfab532378'	: 1,
+                '5daf58c627595a00117d30b7'	: 1,
+                '5d5bdf323feb0c00195dcf2e'	: 1,
+                '6151f20d06757e43aa1f54f9'	: 1,
+                '5e8f94bcdc69fd294b61ebcc'	: 1,
+                '5d7fa4fd6eff6f001a16b4aa'	: 1,
+                '630389e7772b100ba592cdee'	: 1,
+                '5eec9ee7d900510326d78fc8'	: 1,
+                '62cbed33d29c28e6be511bde'	: 1,
+                '615739949cf5767509a7e29a'	: 1,
+                '6329c510ea44255e948f8492'	: 1,
+                '5ea00d4b1286ee0008405450'	: 1,
+                '59e7232f24d7bf00012f112e'	: 1,
+        }
     
     pb = -1
     for grp in range(4):
@@ -187,17 +296,29 @@ def get_groupdata(data_dir):
                                             grp, 
                                             data_dir)
             
-            if ID not in exclude_ID and pb not in exclude_pb and pb not in exclude_random:
+            if ID not in handedness.keys():
+                raise Exception('Handedness missing for ID %s'%ID)
+            
+            if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
                 groupdata.append(data)
                 group.append(grp)
+                IDs_included.append(ID)
+                hand.append(handedness[ID])
 
     newgroupdata = comp_groupdata(groupdata)
     num_trials = len(newgroupdata['trialsequence'])
     num_agents = len(newgroupdata['trialsequence'][0])
     newgroupdata['group'] = [group]*num_trials
+    newgroupdata['handedness'] = [hand]*num_trials
+    newgroupdata['ID'] = [IDs_included]*num_trials
     newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
     newgroupdata['model'] = [['Experiment']*num_agents]*num_trials
     groupdata_df = pd.DataFrame(newgroupdata).explode(list(newgroupdata.keys()))
+    
+    dfnew = pd.DataFrame(groupdata_df.groupby(['ag_idx', 'group', 'model', 'ID'], as_index = False).mean())
+    group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
+    print(group_distro)
+    assert np.abs(np.diff(group_distro)).sum() == 0
     
     return newgroupdata, groupdata_df
 
@@ -634,6 +755,40 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
+    elif model == 'Vbm_twodays':
+        num_params = models.Vbm_twodays.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['omega_day1'] = params_uniform[0:1, :]
+            param_dict['dectemp_day1'] = (params_uniform[1:2, :]+1)*3
+            param_dict['lr_day1'] = params_uniform[2:3, :]*0.01
+            
+            param_dict['omega_day2'] = params_uniform[3:4, :]
+            param_dict['dectemp_day2'] = (params_uniform[4:5, :]+1)*3
+            param_dict['lr_day2'] = params_uniform[5:6, :]*0.01
+            
+            
+        else:
+            assert isinstance(params, dict)
+            print("Setting initial parameters as provided.\n")
+            param_dict['omega_day1'] = params['omega_day1'][None,...]
+            param_dict['dectemp_day1'] = params['dectemp_day1'][None,...]
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            
+            param_dict['omega_day2'] = params['omega_day2'][None,...]
+            param_dict['dectemp_day2'] = params['dectemp_day2'][None,...]
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+        
+        newagent = models.Vbm_twodays(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init = Q_init[None, ...])
+        
+        
     elif model == 'B':
         num_params = models.Vbm_B.num_params #number of latent model parameters
         param_dict = {}
@@ -719,15 +874,16 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['seq_param_day2'] = params_uniform[7:8, :]*6
             
         else:
-            raise Exception("Not yet implemented")
-            # print("Setting initial parameters as provided.")
-            # param_dict['lr_day1'] = params['lr_day1'][None,...]
-            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
             
-            # param_dict['lr_day2'] = params['lr_day2'][None,...]
-            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
             
         newagent = models.Seqparam(param_dict,
                               
@@ -752,14 +908,7 @@ def init_agent(model, group, num_agents=1, params = None):
             
         else:
             raise Exception("Not yet implemented")
-            # print("Setting initial parameters as provided.")
-            # param_dict['lr_day1'] = params['lr_day1'][None,...]
-            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-            
-            # param_dict['lr_day2'] = params['lr_day2'][None,...]
-            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+
             
         newagent = models.Random(param_dict,
                               
@@ -863,21 +1012,21 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['hand_param'] = (params_uniform[6:7, :]-0.5)*80
             
         else:
-            raise Exception("Not yet implemented")
-            # print("Setting initial parameters as provided.")
-            # param_dict['lr_day1'] = params['lr_day1'][None,...]
-            # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-            # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
             
-            # param_dict['lr_day2'] = params['lr_day2'][None,...]
-            # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-            # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            
+            param_dict['hand_param'] = params['hand_param'][None,...]
 
         newagent = models.Handedness(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
-        
         
     else:
         raise Exception("No model specified")
@@ -1038,15 +1187,15 @@ def simulate_data(model,
     print("Simulation took %.4f seconds."%(time.time()-start))
     return data, group_behav_df, params_sim, params_sim_df
 
-def plot_grouplevel(groupdata_df_1,
-                    groupdata_df_2 = None,
+def plot_grouplevel(df1,
+                    df2 = None,
                     plot_single = False,
                     plot_pairs = None, 
                     day = None):
     '''
     Parameters
     ----------
-    groupdata_df_1 : DataFrame
+    df1 : DataFrame
         Contains each trial for all agents.
         columns
             choices
@@ -1067,6 +1216,18 @@ def plot_grouplevel(groupdata_df_1,
 
     '''
     
+    if 'ID' in df1.columns:
+        groupdata_df_1 = df1.drop(['ID'], axis = 1)
+        
+    else:
+        groupdata_df_1 = df1
+        
+    if df2 is not None and 'ID' in df2:
+        groupdata_df_2 = df2.drop(['ID'], axis = 1)
+        
+    elif df2 is not None and 'ID' not in df2:
+        groupdata_df_2 = df2
+        
     plt.style.use("ggplot")
     
     if day == 1:
@@ -1095,7 +1256,7 @@ def plot_grouplevel(groupdata_df_1,
         
     groupdata_df_1 = groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
     
-    if groupdata_df_2 is not None:
+    if df2 is not None:
         if day == 1:
             groupdata_df_2 = groupdata_df_2[groupdata_df_2['blockidx'] <= 5]
     
@@ -1157,7 +1318,7 @@ def plot_grouplevel(groupdata_df_1,
         for pair in range(num_pairs):
             agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 0]]
             
-            if groupdata_df_2 is not None:
+            if df2 is not None:
                 agent_df_2 = groupdata_df_2[groupdata_df_2['ag_idx'] == plot_pairs[pair, 1]]
             
             else:
@@ -1173,12 +1334,12 @@ def plot_grouplevel(groupdata_df_1,
     grouped_df_1 = pd.DataFrame(groupdata_df_1.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
     grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
-    if groupdata_df_2 is not None:
+    if df2 is not None:
         groupdata_df_2 = groupdata_df_2.drop(['model'], axis = 1)
         grouped_df_2 = pd.DataFrame(groupdata_df_2.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
         grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
-    if groupdata_df_2 is not None:
+    if df2 is not None:
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
         sns.lineplot(x = 'block_num', 
                     y = 'choices_GD', 
@@ -1187,7 +1348,7 @@ def plot_grouplevel(groupdata_df_1,
                     ax = ax1)
         ax1.set_xticks(np.arange(15), minor = True)
         ax1.grid(which='minor', alpha=0.5)
-        ax1.set_title(f'Dataset 1 (model {model_1})')
+        ax1.set_title(f'Model {model_1}')
         ax1.get_legend().remove()
         
         sns.lineplot(x = 'block_num', 
@@ -1197,7 +1358,7 @@ def plot_grouplevel(groupdata_df_1,
                     ax = ax2)
         ax2.set_xticks(np.arange(15), minor = True)
         ax2.grid(which='minor', alpha=0.5)
-        ax2.set_title(f'Dataset 2 (model {model_2})')
+        ax2.set_title(f'Model {model_2}')
         ax2.get_legend().remove()
         plt.show()      
 
@@ -1381,7 +1542,11 @@ def posterior_predictives(post_sample,
         model_exp = exp_data['model'].unique()[0]
         exp_data = exp_data.drop(['group', 'blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1)
         exp_data['jokertypes'] = exp_data['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
-        exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes'], as_index = False).mean())
+        
+        if 'ID' in exp_data.columns:
+            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes', 'ID'], as_index = False).mean())
+        else:
+            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes'], as_index = False).mean())
         # exp_data_grouped_all = pd.DataFrame(exp_data_grouped.groupby(['block_num','jokertypes'], as_index = False).mean())
         
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
@@ -1418,14 +1583,14 @@ def posterior_predictives(post_sample,
     print("Finished posterior predictives.")
     return complete_df
 
-def create_grouped(agent_df, ag_idx):
+def create_grouped(df, ag_idx):
     '''
     Creates grouped DataFrame for a single agent.
     Groups by block_num and jokertypes across whole dataframe.
     
     Parameters
     ----------
-    agent_df : DataFrame
+    df : DataFrame
         DataFrame with data of a single agent.
         Must contain columns:
             choices
@@ -1444,7 +1609,12 @@ def create_grouped(agent_df, ag_idx):
         DESCRIPTION.
     '''
     
-    groupdata_df = agent_df
+    if 'ID' in df.columns:
+        groupdata_df = df.drop(['ID'], axis = 1)
+    
+    else:
+        groupdata_df = df
+        
     "Remove new block trials"
     groupdata_df = groupdata_df[groupdata_df['choices'] != -1]
     "Remove error trials"
@@ -1464,3 +1634,43 @@ def create_grouped(agent_df, ag_idx):
     grouped_df['ag_idx'] = ag_idx
     
     return grouped_df
+
+def get_data_from_file():
+    import pickle
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    def open_files():
+        global filenames
+        filenames = filedialog.askopenfilenames()
+        print(f'File paths: {filenames}')
+        root.destroy()
+        
+    root = tk.Tk()
+    button = tk.Button(root, text="Open Files", command=open_files)
+    print(button)
+    button.pack()
+    root.mainloop()
+    
+    # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
+    post_sample_df, expdata_df, loss, params_df = pickle.load(open( filenames[0], "rb" ))
+    
+    if 'ag_idx' not in params_df.columns:
+        params_df['ag_idx'] = None
+        
+    if 'group' not in params_df.columns:
+        params_df['group'] = None
+
+    if 'model' not in params_df.columns:
+        params_df['model'] = post_sample_df['model'][0]
+    
+    if 'ID' in params_df.columns:
+        params_df_temp = params_df.drop(['model', 'ag_idx', 'ID', 'group'], axis = 1)
+        
+    else:
+        params_df_temp = params_df.drop(['model', 'ag_idx', 'group'], axis = 1)
+        
+    num_params = len(params_df_temp.columns)
+    del params_df_temp
+    
+    return post_sample_df, expdata_df, loss, params_df, num_params

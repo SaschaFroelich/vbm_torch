@@ -20,24 +20,34 @@ import utils
 '''
 Modelle:
 Vbm
+Vbm_twodays
+random
 B
 Conflict
+Seqparam
+Bhand
+BQ
+BK
 '''
 
-model = 'B'
+model = 'vbm_twodays'
 #%%
-exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 
-errorrates, errorrates_day1, errorrates_day2 = anal.compute_errors(expdata_df)
-print("-------------------------------------------------------\n\n")
-print("Maximum errorrate for STT: %.2f, DTT: %.2f, total: %.2f"%(errorrates[0,:].max(),errorrates[1,:].max(),errorrates[2,:].max()))
-
-utils.plot_grouplevel(expdata_df)
-num_agents = len(expdata_df['ag_idx'].unique())
-dfnew=pd.DataFrame(expdata_df.groupby(['ag_idx', 'group', 'model'], as_index = False).mean())
+exp_behav_dict, expdata_df = pickle.load(open("behav_fit/preproc_data.p", "rb" ))
+dfnew = pd.DataFrame(expdata_df.groupby(['ag_idx', 'group', 'model', 'ID'], as_index = False).mean())
 group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
 print(group_distro)
 assert np.abs(np.diff(group_distro)).sum() == 0
+del dfnew
+
+# er_df = anal.compute_errors(expdata_df)
+print("-------------------------------------------------------\n\n")
+# print("Maximum errorrate for STT: %.2f, DTT: %.2f, total: %.2f"%(errorrates[0,:].max(),errorrates[1,:].max(),errorrates[2,:].max()))
+
+utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
+num_agents = len(expdata_df['ag_idx'].unique())
+
+print(f"Starting inference of model {model} for {num_agents} agents.")
 # print(len(dfnew[dfnew['group']==1]))
 # print(len(dfnew[dfnew['group']==2]))
 # print(len(dfnew[dfnew['group']==3]))
@@ -60,7 +70,6 @@ group = exp_behav_dict['group'][0]
 '''
 Inference
 '''
-
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          group, 
@@ -69,7 +78,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 1, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -81,4 +90,9 @@ timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
 for col in params_sim_df.columns:
     params_sim_df[col] = ['unknown']
-pickle.dump( (post_sample_df, expdata_df, infer.loss, params_sim_df), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
+    
+params_sim_df['ag_idx']  = None
+params_sim_df['group']  = None
+params_sim_df['model']  = model
+BIC = infer.compute_IC()
+# pickle.dump( (post_sample_df, expdata_df, infer.loss, params_sim_df, BIC), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )

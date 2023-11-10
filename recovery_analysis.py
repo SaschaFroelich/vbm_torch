@@ -21,26 +21,8 @@ import seaborn as sns
 import analysis_tools as anal
 import numpy as np
 import matplotlib.pylab as plt
-import pickle
-import tkinter as tk
 
-from tkinter import filedialog
-
-def open_files():
-    global filenames
-    filenames = filedialog.askopenfilenames()
-    print(f'File paths: {filenames}')
-    # return filenames
-    root.destroy()
-
-root = tk.Tk()
-button = tk.Button(root, text="Open Files", command=open_files)
-print(button)
-button.pack()
-root.mainloop()
-
-res = pickle.load(open( filenames[0], "rb" ))
-post_sample_df, expdata_df, loss, params_df = res
+post_sample_df, expdata_df, loss, params_df, num_params = utils.get_data_from_file()
 
 # params_df['paramtype'] = ['sim']*len(params_df)
 
@@ -51,6 +33,8 @@ num_agents = len(inf_mean_df['ag_idx'].unique())
 num_params = len(params_df.columns) - 3
 # post_sample_df, params_sim_df, group_behav_df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
 
+
+print(f"Recovery of model {model} for {num_agents} agents after %d inference steps."%len(loss))
 '''
 Plot ELBO
 '''
