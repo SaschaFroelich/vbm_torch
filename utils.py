@@ -1005,23 +1005,24 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            param_dict['hand_param_day1'] = (params_uniform[3:4, :]-0.5)*5
             
-            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
-            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
-            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-            param_dict['hand_param'] = (params_uniform[6:7, :]-0.5)*80
+            param_dict['lr_day2'] = params_uniform[4:5, :]*0.01
+            param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
+            param_dict['hand_param_day2'] = (params_uniform[7:8, :]-0.5)*5
             
         else:
             print("Setting initial parameters as provided.")
             param_dict['lr_day1'] = params['lr_day1'][None,...]
             param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
             param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
             
             param_dict['lr_day2'] = params['lr_day2'][None,...]
             param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            
-            param_dict['hand_param'] = params['hand_param'][None,...]
+            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
 
         newagent = models.Handedness(param_dict,
                               

@@ -648,20 +648,20 @@ class Vbm_B(Vbm):
         
         return param_dict
     
-    def pars_to_locs(self, df):
-        df.drop(['model', 'ag_idx', 'group'], axis = 1, inplace = True)
-        param_dict = df.to_dict(orient='list')
+    # def pars_to_locs(self, df):
+    #     df.drop(['model', 'ag_idx', 'group'], axis = 1, inplace = True)
+    #     param_dict = df.to_dict(orient='list')
         
-        locs = torch.ones((self.num_agents, self.num_params))
-        locs[:, 0] = torch.logit(torch.tensor(param_dict['lr_day1']))
-        locs[:, 1] = torch.log(torch.tensor(param_dict['theta_Q_day1']))
-        locs[:, 2] = torch.log(torch.tensor(param_dict['theta_rep_day1']))
+    #     locs = torch.ones((self.num_agents, self.num_params))
+    #     locs[:, 0] = torch.logit(torch.tensor(param_dict['lr_day1']))
+    #     locs[:, 1] = torch.log(torch.tensor(param_dict['theta_Q_day1']))
+    #     locs[:, 2] = torch.log(torch.tensor(param_dict['theta_rep_day1']))
         
-        locs[:, 3] = torch.logit(torch.tensor(param_dict['lr_day2']))
-        locs[:, 4] = torch.log(torch.tensor(param_dict['theta_Q_day2']))
-        locs[:, 5] = torch.log(torch.tensor(param_dict['theta_rep_day2']))
+    #     locs[:, 3] = torch.logit(torch.tensor(param_dict['lr_day2']))
+    #     locs[:, 4] = torch.log(torch.tensor(param_dict['theta_Q_day2']))
+    #     locs[:, 5] = torch.log(torch.tensor(param_dict['theta_rep_day2']))
 
-        return locs
+    #     return locs
     
     def compute_probs(self, trial, **kwargs):
         '''
@@ -981,12 +981,12 @@ class Seqparam(Vbm_B):
         param_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
                     "theta_Q_day1": torch.exp(locs[..., 1]),
                     "theta_rep_day1": torch.exp(locs[..., 2]),
-                    "seq_param_day1": torch.exp(locs[..., 3]),
+                    "seq_param_day1": locs[..., 3],
                     
                     "lr_day2": torch.sigmoid(locs[..., 4]),
                     "theta_Q_day2": torch.exp(locs[..., 5]),
                     "theta_rep_day2": torch.exp(locs[..., 6]),
-                    "seq_param_day2": torch.exp(locs[..., 7])}
+                    "seq_param_day2": locs[..., 7]}
     
         return param_dict
     
@@ -1868,10 +1868,12 @@ class Handedness(Vbm_B):
     param_names = ['lr_day1', 
                     'theta_Q_day1',
                     'theta_rep_day1',
+                    'hand_param_day1',
+                    
                     'lr_day2',
                     'theta_Q_day2',
                     'theta_rep_day2',
-                    'hand_param']
+                    'hand_param_day2']
     
     num_params = len(param_names)
     
@@ -1879,11 +1881,12 @@ class Handedness(Vbm_B):
         param_dict = {'lr_day1': torch.sigmoid(locs[..., 0]),
                     'theta_Q_day1': torch.exp(locs[..., 1]),
                     'theta_rep_day1': torch.exp(locs[..., 2]),
+                    'hand_param_day1':  locs[..., 3],
                     
-                    'lr_day2': torch.sigmoid(locs[..., 3]),
-                    'theta_Q_day2': torch.exp(locs[..., 4]),
-                    'theta_rep_day2': torch.exp(locs[..., 5]),
-                    'hand_param': locs[..., 6]*10}
+                    'lr_day2': torch.sigmoid(locs[..., 4]),
+                    'theta_Q_day2': torch.exp(locs[..., 5]),
+                    'theta_rep_day2': torch.exp(locs[..., 6]),
+                    'hand_param_day2': locs[..., 7]}
         
         return param_dict
     
