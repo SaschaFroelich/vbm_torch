@@ -8,7 +8,7 @@ Created on Tue Nov  7 17:31:18 2023
 
 #%%
 '''
-analysis_tools
+Analysis_tools
 '''
 #%%
 "----- Open Files"
@@ -24,6 +24,11 @@ import analysis_tools as anal
 import torch
 
 post_sample_df, expdata_df, loss, params_df, num_params = utils.get_data_from_file()
+# if isinstance(measures, list):
+#     loss = measures
+    
+# elif isinstance(measures, tuple):
+#     loss, BIC = measures
 
 # print("=======================================================")
 # post_sample_df = post_sample_df[post_sample_df['ag_idx'] < 48]
@@ -79,11 +84,20 @@ anal.violin(inf_mean_df)
 
 #%%
 '''
-Compute Errorrates
+Check for how many participants Seqboost is larger than 0:
 '''
+sign_level = 0.001
 
-
-
+from scipy.stats import ttest_1samp
+for param in post_sample_df.columns:
+    if param != 'group' and param != 'model' and param != 'ag_idx':
+        print("----- Testing parameter %s"%param)
+        for ag_idx in post_sample_df['ag_idx'].unique():
+            t_statistic, p_value = ttest_1samp(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param], 0)
+            
+            if p_value > sign_level:
+                print(f"{param} for agent {ag_idx} is zero.")
+    
 #%%
 '''
 Differences day 1 & day 2

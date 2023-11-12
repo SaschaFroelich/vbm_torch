@@ -92,11 +92,11 @@ def violin(df,
         ylims = [[0, 0.04], # lr
                   [0., 8], # theta_Q
                   [0., 2], # theta_rep
-                  [0.05, 0.1], # seqparam
+                  [-2, 2], # seqparam
                   [0, 0.04], # lr
                   [0., 8], # theta_Q
                   [0., 2], # theta_rep
-                  [0.05, 0.1]] # seqparam
+                  [-2, 2]] # seqparam
         
     elif model == 'Bhand':
         ylims = [[0, 0.04], # lr

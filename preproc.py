@@ -12,4 +12,4 @@ import utils
 
 exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
 
-pickle.dump((exp_behav_dict, expdata_df), open("behav_fit/preproc_data.p", "wb" ) )
+pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data.p", "wb" ) )

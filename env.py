@@ -218,6 +218,7 @@ class Env():
             
             if all(trial == -1):
                 "Beginning of new block"
+                # print("NEW TRIAL!")
                 agent.update(torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 

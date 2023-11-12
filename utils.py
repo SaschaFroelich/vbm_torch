@@ -855,8 +855,8 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Seqparam':
-        num_params = models.Seqparam.num_params #number of latent model parameters
+    elif model == 'Seqboost':
+        num_params = models.Seqboost.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -885,7 +885,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
             
-        newagent = models.Seqparam(param_dict,
+        newagent = models.Seqboost(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1025,6 +1025,45 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
 
         newagent = models.Handedness(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'HandSeq':
+        num_params = models.HandSeq.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.HandSeq.locs_to_pars('None', locs)
+            
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['theta_Q_day1'] = params_uniform[0:1, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[1:2, :]*6
+            param_dict['hand_param_day1'] = (params_uniform[2:3, :]-0.5)*5
+            param_dict['seq_param_day1'] = params_uniform[3:4, :]*0.5
+            
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            param_dict['hand_param_day2'] = (params_uniform[6:7, :]-0.5)*5
+            param_dict['seq_param_day2'] = params_uniform[7:8, :]*0.5
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
+            param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
+            
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
+            param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
+
+        newagent = models.HandSeq(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1654,8 +1693,19 @@ def get_data_from_file():
     root.mainloop()
     
     # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
-    post_sample_df, expdata_df, loss, params_df = pickle.load(open( filenames[0], "rb" ))
-    
+    res = pickle.load(open( filenames[0], "rb" ))
+    if len(res) == 4:
+        post_sample_df, expdata_df, res_2, params_df = res
+        if isinstance(res_2, tuple):
+            loss = res_2[0]
+            BIC = res_2[1]
+            
+        else:
+            loss = res_2
+        
+    elif len(res) == 5:
+        post_sample_df, expdata_df, loss, params_df, BIC = res
+        
     if 'ag_idx' not in params_df.columns:
         params_df['ag_idx'] = None
         
