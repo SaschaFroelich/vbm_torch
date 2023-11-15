@@ -24,13 +24,16 @@ random
 B
 Conflict
 Seqboost
+Seqboost_nolr
 Bhand
 BQ
 BK
-Hand_Seq
+HandSeq
+HandSeq2
+Random
 '''
 
-model = 'HandSeq'
+model = 'Seqboost_nolr'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 48
@@ -67,7 +70,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 6_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -80,5 +83,5 @@ timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC), params_sim_df), open(f"parameter_recovery/param_recov_model_{model}_{timestamp}.p", "wb" ) )
 
 #%%
-log_like = infer.compute_ll()
+# log_like = infer.compute_ll()
 

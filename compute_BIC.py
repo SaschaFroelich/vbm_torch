@@ -11,8 +11,8 @@ import inferencemodels
 from datetime import datetime
 import pickle
 
-sim_with = 'Vbm'
-fit_with = 'B'
+sim_with = 'Bhand'
+fit_with = 'Vbm_twodays'
 num_agents = 48
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 #%%
@@ -35,7 +35,7 @@ agent = utils.init_agent(fit_with,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 6_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()

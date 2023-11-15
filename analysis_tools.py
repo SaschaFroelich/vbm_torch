@@ -64,6 +64,12 @@ def violin(df,
     '''
     
     model = df['model'].unique()[0]
+    if 'ID' in df.columns:
+        df = df.drop(['ID'], axis = 1)
+
+    if 'handedness' in df.columns:
+        df = df.drop(['handedness'], axis = 1)
+        
     df = df.drop(['model', 'ag_idx', 'group'], axis = 1)
     
     num_params = len(df.columns)
@@ -88,7 +94,7 @@ def violin(df,
                   [0.5, 5], # theta_rep
                   [-0.5, 0.5]] # conflict param
         
-    elif model == 'Seqparam':
+    elif model == 'Seqparam' or model == 'Seqboost':
         ylims = [[0, 0.04], # lr
                   [0., 8], # theta_Q
                   [0., 2], # theta_rep
@@ -99,16 +105,27 @@ def violin(df,
                   [-2, 2]] # seqparam
         
     elif model == 'Bhand':
-        ylims = [[0, 0.04], # lr
-                  [0., 8], # theta_Q
-                  [0., 2], # theta_rep
-                  [0, 0.04], # lr
-                  [0., 8], # theta_Q
-                  [0., 2], # theta_rep
-                  [-2.5, 2.5]] # hand_param
+        if num_params == 7:
+            ylims = [[0, 0.04], # lr
+                      [0., 8], # theta_Q
+                      [0., 2], # theta_rep
+                      [0, 0.04], # lr
+                      [0., 8], # theta_Q
+                      [0., 2], # theta_rep
+                      [-2.5, 2.5]] # hand_param
         
+        elif num_params == 8:
+            ylims = [[0, 0.04], # lr
+                      [0., 8], # theta_Q
+                      [0., 2], # theta_rep
+                      [-2.5, 2.5], # hand_param
+                      [0, 0.04], # lr
+                      [0., 8], # theta_Q
+                      [0., 2], # theta_rep
+                      [-2.5, 2.5]] # hand_param
+            
     else:
-        del ylims
+        ylims == None
     
     for par in range(num_params):
         

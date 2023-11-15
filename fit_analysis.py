@@ -36,6 +36,13 @@ post_sample_df, expdata_df, loss, params_df, num_params = utils.get_data_from_fi
 # params_df = params_df[params_df['ag_idx'] < 48]
 
 inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 'ag_idx', 'group'], as_index = False).mean())
+inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
+if 'ID' in expdata_df.columns:
+    inf_mean_df['ID'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['ID']
+    
+if 'handedness' in expdata_df.columns:
+    inf_mean_df['handedness'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['handedness']
+
 model = post_sample_df['model'][0]
 num_agents = len(post_sample_df['ag_idx'].unique())
 
@@ -44,7 +51,7 @@ print(f"Model fit of model {model} for {num_agents} agents after %d inference st
 Plot ELBO
 '''
 fig, ax = plt.subplots()
-plt.plot(loss)
+plt.plot(loss[-2000:])
 plt.title(f"ELBO for model {model} ({num_agents} agents)")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -61,14 +68,28 @@ ax = gs.subplots()
 for param_idx in range(num_params):
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
-    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
-    # ca.plot([0,0], ca.get_ylim())
-    ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
-    if plot_col_idx > 0:
-        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+    if num_params > 3:
+        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
+        ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])    
+
+        if plot_col_idx > 0:
+            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
         
-    if plot_row_idx > 0:
-        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+    else:
+        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_col_idx])
+        ax[plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])    
+        
+        if plot_col_idx > 0:
+            ax[plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_col_idx].get_position().y0 += 10
+        
+    # ca.plot([0,0], ca.get_ylim())
+
 
 plt.show()
 
@@ -84,7 +105,7 @@ anal.violin(inf_mean_df)
 
 #%%
 '''
-Check for how many participants Seqboost is larger than 0:
+Check for how many participants Seqboost is different from 0:
 '''
 sign_level = 0.001
 

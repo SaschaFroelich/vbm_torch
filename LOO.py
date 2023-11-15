@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Oct 25 11:05:13 2023
-
-Fit model to behaviour.
+Created on Sun Nov 12 15:48:11 2023
 
 @author: sascha
 """
+
 import numpy as np
 import torch
 import pandas as pd
@@ -30,7 +29,7 @@ BQ
 BK
 '''
 
-model = 'Vbm'
+model = 'B'
 #%%
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
@@ -47,9 +46,6 @@ print("-------------------------------------------------------\n\n")
 utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
 num_agents = len(expdata_df['ag_idx'].unique())
 
-print(f"Starting inference of model {model} for {num_agents} agents.")
-
-#%%
 '''
 Prepare Inference
 '''
@@ -65,11 +61,15 @@ agent = utils.init_agent(model,
 
 print("===== Starting inference =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-infer.infer_posterior(iter_steps = 6_000, num_particles = 10, block_max = 14)
+infer = inferencemodels.GeneralGroupInference(agent, 
+                                              exp_behav_dict)
+
+infer.infer_posterior(iter_steps = 2, num_particles = 10, block_max = 4)
+
+infer.loo_predict()
 
 "----- Sample parameter estimates from posterior"
-post_sample_df = infer.sample_posterior( )
+post_sample_df = infer.sample_posterior()
 post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: exp_behav_dict['group'][0][x])
 post_sample_df['model'] = [model]*len(post_sample_df)
 
@@ -83,5 +83,4 @@ params_sim_df['ag_idx']  = None
 params_sim_df['group']  = None
 params_sim_df['model']  = model
 BIC = infer.compute_IC()
-# infer.loo_predict()
 pickle.dump( (post_sample_df, expdata_df, (infer.loss, BIC), params_sim_df), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )

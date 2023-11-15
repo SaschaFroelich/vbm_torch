@@ -155,7 +155,7 @@ class Env():
                                            blocktype_counter[ag_idx, current_blocktype[ag_idx]].item(), 
                                            current_blocktype[ag_idx], 
                                            sequence = sequence[ag_idx])
-                        
+
                     blocktype_counter[ag_idx, current_blocktype[ag_idx]] += 1
                     # random_block += 1
                     
@@ -172,7 +172,7 @@ class Env():
         
         self.run_loop(self.agent, self.data, 1, infer = 0)
         
-    def run_loop(self, agent, data, num_particles, infer = 0):
+    def run_loop(self, agent, data, num_particles, infer = 0, block_max = 14):
         '''
 
         Parameters
@@ -189,6 +189,9 @@ class Env():
         infer : bool, optional
             0/1 simulate data/ infer model parameters
 
+        block_max : int
+            Up to which block (inclusive) to perform inference.
+
         Raises
         ------
         Exception
@@ -201,9 +204,12 @@ class Env():
         '''
         
         num_trials = len(data["trialsequence"])
+        num_trials_per_block = 481
         t = -1
-
-        for tau in pyro.markov(range(num_trials)):
+        # blocknum = 0
+        # print("NEW LOOP")
+        # for tau in pyro.markov(range(num_trials)):
+        for tau in pyro.markov(range(num_trials_per_block*block_max)):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             
@@ -218,7 +224,8 @@ class Env():
             
             if all(trial == -1):
                 "Beginning of new block"
-                # print("NEW TRIAL!")
+                # blocknum += 1
+                # print(f"NEW BLOCK NUMBER {blocknum}!")
                 agent.update(torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 

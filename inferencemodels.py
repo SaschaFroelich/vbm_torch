@@ -45,6 +45,10 @@ class GeneralGroupInference(object):
                 blockidx : nested list, 'shape' [num_trials, num_agents]
                 RT : nested list, 'shape' [num_trials, num_agents]
                 group : list, len [num_agents]
+                
+                
+        inf_block_max : int
+            Block idx up to which to perform inference.
         '''
         self.agent = agent
         self.trials = agent.trials # length of experiment
@@ -87,9 +91,14 @@ class GeneralGroupInference(object):
             num_particles = locs.shape[0]
             # print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
             
-            env.Env.run_loop(None, self.agent, self.data, num_particles, infer = 1)
+            env.Env.run_loop(None, 
+                             self.agent, 
+                             self.data, 
+                             num_particles, 
+                             infer = 1,
+                             block_max = 14)
 
-    def guide(self):
+    def guide(self, *args):
         trns = torch.distributions.biject_to(dist.constraints.positive)
     
         # define mean vector and covariance matrix of multivariate normal
@@ -128,8 +137,9 @@ class GeneralGroupInference(object):
     def infer_posterior(self,
                         iter_steps = 1_000,
                         num_particles = 10,
-                        optim_kwargs = {'lr': .01},
-                        automatic_stop = False): # Adam learning rate
+                        optim_kwargs = {'lr': .01},  # Adam learning rate
+                        automatic_stop = False,
+                        block_max = 14):
         """Perform SVI over free model parameters."""
 
         pyro.clear_param_store()
@@ -230,10 +240,11 @@ class GeneralGroupInference(object):
     
     def compute_ll(self, df = None):
         '''
-        Computeslog-likelihood of model
+        Computeslog-likelihood of model.
+        
         Parameters
         ----------
-        df : DataFrame
+        df : DataFrame 'inf_mean_df'
             Contains the parameters with which to compute the ll
 
         Returns
@@ -243,35 +254,76 @@ class GeneralGroupInference(object):
         '''
         
         if df is not None:
-            locs = self.agent.pars_to_locs(df).mean(axis=-1)
+            locs = self.agent.pars_to_locs(df)[None, ...]
+            
+            if len(df) > 200:
+                raise Exception('df should contain one row per agent.')
             
         else:
-            locs = self.sample_posterior(locs = True).mean(axis = -1)[None, ...]
+            locs = self.sample_posterior(locs = True).mean(axis = -1)[None, ...] # [num_particles, num_agents, num_parameters]
             
         conditioned_model = pyro.condition(self.model, data = {'locs' : locs})
-        
+        print("Starting trace, baby!")
         trace = pyro.poutine.trace(conditioned_model).get_trace()
+        
         log_likelihood = trace.log_prob_sum()
 
         return log_likelihood
     
-    def compute_IC(self):
+    def compute_IC(self, df=None):
         print("BIC only approx. right.")
         '''
             BIC = k*ln(n) - 2*ll --> the lower, the better
         '''
         
-        df = pd.DataFrame(self.data).explode(list(self.data.keys()))
-        df = df[df['trialsequence'] != -1]
-        df = df[df['trialsequence'] > 10]
-        df = df[df['choices'] != -2]
-        n = len(df)
+        data_df = pd.DataFrame(self.data).explode(list(self.data.keys()))
+        data_df = data_df[data_df['trialsequence'] != -1]
+        data_df = data_df[data_df['trialsequence'] > 10]
+        data_df = data_df[data_df['choices'] != -2]
+        n = len(data_df)
         
         BIC = torch.tensor(self.agent.num_params)*torch.log(torch.tensor(n)) -\
-            2*self.compute_ll()
-
+            2*self.compute_ll(df = df)
+            
         return BIC
+    
+    def loo_predict(self, df = None):
+        '''
+        Parameters
+        ----------
+        df : DataFrame 'inf_mean_df'
+            Contains the parameters with which to compute the ll
 
+        Returns
+        -------
+        probs_means : tensor
+            The average probability of the chosen action.
+
+        '''
+        if df is not None:
+            locs = self.agent.pars_to_locs(df)[None, ...]
+            
+        else:
+            locs = self.sample_posterior(locs = True).mean(axis = -1)[None, ...]
+        
+        
+        conditioned_model = pyro.condition(self.model, data = {'locs' : locs})
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
+        
+        chosen_prob_means = []
+        for key in trace.nodes.keys():
+            if 'observed' in key  and 'unobserved' not in key and trace.nodes[key]['is_observed']:
+                if int(key.split('_')[1]) >= 1598:
+                    probs = trace.nodes[key]['fn'].probs
+                    choices = trace.nodes[key]['value']
+                    observed = trace.nodes[key]['mask']
+                    probs_dtt = probs*observed.type(torch.int)[..., None]
+                    chosen_prob_means.append((probs_dtt[0, range(self.agent.num_agents), choices[0,:]]).tolist())
+
+        probs_means = torch.tensor(chosen_prob_means).sum(axis=0) / torch.ceil(torch.tensor(chosen_prob_means)).sum(axis = 0)
+        
+        return probs_means
+        
 "Inference"
 class SingleInference(object):
 
