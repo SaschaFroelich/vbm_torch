@@ -2449,4 +2449,3 @@ class Vbm_B_k(Vbm_B):
                     'kparam':torch.exp(locs[..., 6])}
         
         return param_dict
-

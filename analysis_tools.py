@@ -203,6 +203,12 @@ def param_corr(df):
     
     df = df.drop(['ag_idx', 'model', 'group'], axis = 1)
     
+    if 'ID' in df.columns:
+        df = df.drop(['ID'], axis = 1)    
+
+    if 'handedness' in df.columns:
+        df = df.drop(['handedness'], axis = 1)    
+    
     # for col in range(len(df.columns)):
     #     df.rename(columns={df.columns[col] : df.columns[col][4:]}, inplace = True)
     
@@ -622,22 +628,26 @@ def compare_lists(leavnode1, leavnode2):
           f"Number of elements in union: {union}.")
         
         
-def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
+def kmeans(corr_dict, 
+           inf_mean_df, 
+           n_clusters, 
+           num_reps = 1, 
+           plotfig = True,
+           title = None):
     '''
-    
 
     Parameters
     ----------
     corr_dict : TYPE
         DESCRIPTION.
         
-    inf_mean_df : TYPE
-        DESCRIPTION.
+    inf_mean_df : DataFrame
+        For ag_idx and groups
         
     n_clusters : TYPE
         DESCRIPTION.
         
-    num_reps : TYPE, optional
+    num_reps : int, optional
         DESCRIPTION. The default is 1.
 
     Returns
@@ -671,7 +681,6 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
                 cluster_distance = np.sqrt(((kmeans.cluster_centers_[clus1,:]-kmeans.cluster_centers_[clus2,:])**2).sum())
                 c_distances.append(cluster_distance)
                 print(f"Cluster distance (cluster {clus1} and {clus2}) is %.4f"%cluster_distance)
-        
         
         cluster_groups = [[None]]*n_clusters
         
@@ -708,7 +717,11 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
         ax = fig.add_subplot(111)
         cax = ax.matshow(mini_clusters)
         fig.colorbar(cax)
-        plt.title(f"Mini Clusters for {n_clusters} clusters")
+        if title is not None:
+            plt.title(f"For {n_clusters} clusters ({title})")
+            
+        else:
+            plt.title(f"For {n_clusters} clusters.")
         plt.gca().set_ylabel('ag_idx')
         plt.grid(False)
         plt.show()
@@ -716,7 +729,7 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
         # leavnodes = cluster_analysis(mini_clusters, title = 'mini clusters')
         # print("leavnodes mini clusters:")
         # print(leavnodes)
-        
+
     # '''
     # Which cluster is the 'most stable' mini cluster?
     # '''
@@ -728,6 +741,20 @@ def kmeans(corr_dict, inf_mean_df, n_clusters, num_reps = 1, plotfig = True):
     return kmeans, cluster_groups, c_distances
 
 def compute_errors(df):
+    '''
+    
+
+    Parameters
+    ----------
+    df : DataFrame
+        Contains trial-level agent behaviour.
+
+    Returns
+    -------
+    er_df : DataFrame
+        DESCRIPTION.
+
+    '''
     
     df = df[df['choices'] != -1]
     # df_dtt = df[df['trialsequence'] > 10]

@@ -180,115 +180,29 @@ def get_groupdata(data_dir):
     
     IDs_included = []
     
+    'right/left/ambidextrous: 0/1/2'
     hand = []
-    'left/right/both: 0/1/2'
-    handedness = {
-                '5483702ffdf99b24c654b810'	: 1,
-                '5d55b7ef6a0f930017202336'	: 1,
-                '629f6b8c65fcae219e245284'	: 1,
-                '5b5e0e86902ad10001cfcc59'	: 1,
-                '5efb31fa8cd32f04bf048643'	: 1,
-                '5cbe04b4f429ff00159de30e'	: 1,
-                '5982eef79dfc3e00011d81e0'	: 1,
-                '57dd186e6598aa0001992616'	: 1,
-                '5d8a29c082fec30001d9c24a'	: 1,
-                '56d8df02d13f6b000e542eef'	: 1,
-                '62db2644ab0a3a353c0dcb54'	: 1,
-                '63ef938aea545fb9bd19a591'	: 0,
-                '5a54d42476d1c60001aacd6c'	: 1,
-                '5b2a72f7c293b90001732b89'	: 1,
-                '59dd90f6e75b450001a68dac'	: 1,
-                '63d79fcd741f9cfb2f87152f'	: 1,
-                '63174af7d57182f9bf90c094'	: 1,
-                '5d5a75c570a7c1000152623e'	: 1,
-                '5e850b0e390e520ec806b084'	: 1,
-                '55ca5305fdf99b498b73f29c'	: 1,
-                '5edeea354d54cb1a825aa8f9'	: 1,
-                '60e2577f8c52db9d1fb5ffac'	: 1,
-                '57c4761195a3ea00016e5992'	: 0,
-                '63e61d24e1c77b4b584e879f'	: 1,
-                '5fdcd228539a382bc5e9fae5'	: 1,
-                '640103805957bbf6a1326ed0'	: 1,
-                '5fdcd228539a382bc5e9fae5'	: 1,
-                '5fdcd228539a382bc5e9fae5'	: 1,
-                '5fd652b056a8bc53dbd1f680'	: 0,
-                '5fd652b056a8bc53dbd1f680'	: 0,
-                '5fbacf8a8f01f4b486dea42a'	: 1,
-                '5fb46dd5d9ece50422838e7a'	: 1,
-                '5ee38ef98c0c440172e022ac'	: 1,
-                '5e66c77e8ebdaf4466e26326'	: 0,
-                '5c4594514fe4f800016ea070'	: 1,
-                '5c8ba607c5366c0001d022cb'	: 1,
-                '63af557b3d4f219c3226b7d6'	: 1,
-                '617406fbfced12169896d158'	: 1,
-                '63f77b9ca8439f6e1620c1cd'	: 0,
-                '63f77b9ca8439f6e1620c1cd'	: 0,
-                '5e5fe64a8278d103d35cac54'	: 1,
-                '601f08cba1191642cadf59c1'	: 1,
-                '5d0245966e208b0017301561'	: 1,
-                '62e02b26e879244a99e852fa'	: 1,
-                '5d7ebf9e93902b0001965912'	: 1,
-                '5d49d17b3dad1f0001e2aba1'	: 1,
-                '5efcb50255a06b097b8d5d29'	: 1,
-                '56f699e876348f000c883bba'	: 1,
-                '604fa685e33606f9a0ee8189'	: 1,
-                '63e5eb956eab1f2740ac6289'	: 1,
-                '5f6bfe84b3d4ba1796defbfb'	: 1,
-                '6044ca22bc6235555362d5bb'	: 1,
-                '63eaa48e178ff1aadbf62963'	: 1,
-                '5eecd506d78b3b0a7182ccb9'	: 1,
-                '5eac671f0658ac0ea6c730d2'	: 2,
-                '5db4ef4a2986a3000be1f886'	: 1,
-                '5b266738007d870001c7c360'	: 1,
-                '5eb6d09db2c9c85dd30dc94e'	: 1,
-                '5b2bcfb51835660001cc6751'	: 1,
-                '5f356cbffb4cea5170d04fd9'	: 1,
-                '5c321ebf6558270001bd79aa'	: 1,
-                '5dc5da21d999de45a504651b'	: 1,
-                '58aca85e0da7f10001de92d4'	: 1,
-                '646dc9848e53ff1705d8c9c5'	: 1,
-                '5f16fde210d37701904c9dc2'	: 1,
-                '60a3f8075b013de7b5518e96'	: 1,
-                '5a9ed5046475f90001a0189e'	: 1,
-                '596f961cfe061d00011e3e03'	: 1,
-                '57d5ab3a722df500017f3622'	: 1,
-                '5f48f497fae2763d537d2e6b'	: 1,
-                '5c4b987538878c0001c7883b'	: 1,
-                '5908458b1138880001bc77e7'	: 1,
-                '5eebe3d7b1914c17e6208284'	: 1,
-                '62b05fdedd70cd33ea6afbd2'	: 2,
-                '62c8391cd913ab9b5317d5f9'	: 1,
-                '6329b1add3dcd53cb9c9cab8'	: 1,
-                '5eaadc0a7adeb404eea9c3c0'	: 1,
-                '62b44f66a16d45783569fad6'	: 1,
-                '5db32244dbe39d000be72fb0'	: 1,
-                '6286672d0165aad8f1386c27'	: 1,
-                '5e9ffa9ee172201b04f1a4c6'	: 1,
-                '631e235a33040da66ddf51a1'	: 1,
-                '5d8cef3c28e183001a335ab0'	: 1,
-                '5f0f7fe1d7ad1c000b42d091'	: 1,
-                '595e7974af78da0001a21c3a'	: 1,
-                '5c9f26cbe57be600147042e5'	: 1,
-                '6116b022b7ef87ef5828748b'	: 0,
-                '5e07c976f6191f137214e91f'	: 1,
-                '60f816ff1fa74fcfab532378'	: 1,
-                '5daf58c627595a00117d30b7'	: 1,
-                '5d5bdf323feb0c00195dcf2e'	: 1,
-                '6151f20d06757e43aa1f54f9'	: 1,
-                '5e8f94bcdc69fd294b61ebcc'	: 1,
-                '5d7fa4fd6eff6f001a16b4aa'	: 1,
-                '630389e7772b100ba592cdee'	: 1,
-                '5eec9ee7d900510326d78fc8'	: 1,
-                '62cbed33d29c28e6be511bde'	: 1,
-                '615739949cf5767509a7e29a'	: 1,
-                '6329c510ea44255e948f8492'	: 1,
-                '5ea00d4b1286ee0008405450'	: 1,
-                '59e7232f24d7bf00012f112e'	: 1,
-        }
+    gender = []
+    age = []
+    
+    q_sometimes_easier = []
+    q_notice_a_sequence = []
+    q_sequence_repro = []
+    q_sequence_repro_with_help = []
+    
+    sociopsy_df = pd.read_csv(data_dir + 'sociopsy_data.csv')
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded\xa0(0)', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded\xa0(1)', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous\xa0(2)', 'Handedness'] = 2
+    
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female\xa0(0)', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
     
     pb = -1
     for grp in range(4):
         files_day1 = glob.glob(data_dir + "Grp%d/csv/*Tag1*.mat"%(grp+1))
+        
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
@@ -296,26 +210,48 @@ def get_groupdata(data_dir):
                                             grp, 
                                             data_dir)
             
-            if ID not in handedness.keys():
-                raise Exception('Handedness missing for ID %s'%ID)
+            file_day2 = glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(grp+1, ID))[0]
+            participant_day2 = scipy.io.loadmat(file_day2)
+            
+            # if ID not in handedness.keys():
+            #     raise Exception('Handedness missing for ID %s'%ID)
             
             if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
                 groupdata.append(data)
                 group.append(grp)
                 IDs_included.append(ID)
-                hand.append(handedness[ID])
-
+                hand.append(sociopsy_df[sociopsy_df['ID'] == ID]['Handedness'])
+                gender.append(sociopsy_df[sociopsy_df['ID'] == ID]['Gender'])
+                age.append(sociopsy_df[sociopsy_df['ID'] == ID]['Age'])
+                
+                q_sometimes_easier.append(participant_day2['q1'][0,1][0])
+                q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
+                # q_sequence_repro.append(participant_day2['q3'][0,1][0])
+                # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
+    
+    q_sometimes_easier = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
+    q_notice_a_sequence  = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_notice_a_sequence]
+    
     newgroupdata = comp_groupdata(groupdata)
     num_trials = len(newgroupdata['trialsequence'])
     num_agents = len(newgroupdata['trialsequence'][0])
     newgroupdata['group'] = [group]*num_trials
     newgroupdata['handedness'] = [hand]*num_trials
+    newgroupdata['age'] = [age]*num_trials
+    newgroupdata['gender'] = [gender]*num_trials
+    
+    newgroupdata['q_sometimes_easier'] = [q_sometimes_easier]*num_trials
+    newgroupdata['q_notice_a_sequence'] = [q_notice_a_sequence]*num_trials
+    # newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
+    # newgroupdata['q_sequence_repro_with_help'] = [q_sequence_repro_with_help]*num_trials
+    
     newgroupdata['ID'] = [IDs_included]*num_trials
     newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
     newgroupdata['model'] = [['Experiment']*num_agents]*num_trials
     groupdata_df = pd.DataFrame(newgroupdata).explode(list(newgroupdata.keys()))
     
-    dfnew = pd.DataFrame(groupdata_df.groupby(['ag_idx', 'group', 'model', 'ID'], as_index = False).mean())
+    dfnew = pd.DataFrame(groupdata_df.loc[:, ['ID', 'group']].groupby(['ID'], as_index = False).mean())
+    
     group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
     print(group_distro)
     assert np.abs(np.diff(group_distro)).sum() == 0
@@ -797,11 +733,11 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01 # shape (1, num_agents)
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.5 # shape (1, num_agents)
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
             
-            param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.5
             param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
             param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
             
@@ -866,12 +802,12 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-            param_dict['seq_param_day1'] = params_uniform[3:4, :]*6
+            param_dict['seq_param_day1'] = params_uniform[3:4, :]-0.5
             
             param_dict['lr_day2'] = params_uniform[4:5, :]*0.01
             param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
             param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-            param_dict['seq_param_day2'] = params_uniform[7:8, :]*6
+            param_dict['seq_param_day2'] = params_uniform[7:8, :]-0.5
             
         else:
             print("Setting initial parameters as provided.")
@@ -1443,12 +1379,18 @@ def plot_grouplevel(df1,
             
     "----- Plot grouplevel"
     groupdata_df_1 = groupdata_df_1.drop(['model'], axis = 1)
-    grouped_df_1 = pd.DataFrame(groupdata_df_1.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+    grouped_df_1 = pd.DataFrame(groupdata_df_1.loc[:, ['ag_idx',
+                                               'block_num',
+                                               'jokertypes',
+                                               'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
     grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
     if df2 is not None:
         groupdata_df_2 = groupdata_df_2.drop(['model'], axis = 1)
-        grouped_df_2 = pd.DataFrame(groupdata_df_2.groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+        grouped_df_2 = pd.DataFrame(groupdata_df_2.loc[:, ['ag_idx',
+                                                   'block_num',
+                                                   'jokertypes',
+                                                   'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
         grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
     
     if df2 is not None:
@@ -1802,4 +1744,13 @@ def get_data_from_file():
     num_params = len(params_df_temp.columns)
     del params_df_temp
     
-    return post_sample_df, expdata_df, loss, params_df, num_params
+    sociopsy_df = pd.read_csv('/home/sascha/Desktop/vbm_torch/behav_data/sociopsy_data.csv')
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded\xa0(0)', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded\xa0(1)', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous\xa0(2)', 'Handedness'] = 2
+    
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female\xa0(0)', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
+    
+    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df

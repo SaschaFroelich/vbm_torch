@@ -41,7 +41,7 @@ Plot ELBO
 import matplotlib.pyplot as plt
 import seaborn as sns
 fig, ax = plt.subplots()
-plt.plot(loss)
+plt.plot(loss[-2000:])
 plt.title(f"ELBO for model {model}")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -51,7 +51,9 @@ num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
                 (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
 
-    
+'''
+Plot parameter distributions
+'''
 fig = plt.figure()
 gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.5, wspace = 0.3)
 ax = gs.subplots()
@@ -70,7 +72,7 @@ for param_idx in range(num_params):
 plt.show()
 
 '''
-Plot Inf vs True
+Plot Inferred vs True
 '''
 fig = plt.figure(figsize=(16,12), dpi=100)
 gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.1)
@@ -93,6 +95,7 @@ for param_idx in range(num_params):
         ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
         
 # fig.suptitle(f"Model {model}", fontsize = 32)
+fig.suptitle('Dot = Mean of Posterior')
 plt.show()
 #%%
 '''

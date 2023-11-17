@@ -33,7 +33,7 @@ HandSeq2
 Random
 '''
 
-model = 'Seqboost_nolr'
+model = 'B'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 48
@@ -61,6 +61,8 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 '''
 Inference
 '''
+import time
+time.sleep(7200)
 
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 

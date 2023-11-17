@@ -132,7 +132,7 @@ class GeneralGroupInference(object):
         with pyro.plate('ag_idx', self.num_agents):
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
-        return {'tau': tau, 'mu': mu, 'locs': locs}
+        return {'tau': tau, 'mu': mu, 'locs': locs, 'm_locs': m_locs, 'st_locs': st_locs}
 
     def infer_posterior(self,
                         iter_steps = 1_000,
@@ -323,7 +323,8 @@ class GeneralGroupInference(object):
         probs_means = torch.tensor(chosen_prob_means).sum(axis=0) / torch.ceil(torch.tensor(chosen_prob_means)).sum(axis = 0)
         
         return probs_means
-        
+
+
 "Inference"
 class SingleInference(object):
 

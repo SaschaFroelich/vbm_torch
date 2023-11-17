@@ -23,7 +23,11 @@ import utils
 import analysis_tools as anal
 import torch
 
-post_sample_df, expdata_df, loss, params_df, num_params = utils.get_data_from_file()
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = utils.get_data_from_file()
+param_names = params_df.iloc[:, 0:-3].columns
+
+assert len(param_names) == num_params
+
 # if isinstance(measures, list):
 #     loss = measures
     
@@ -118,7 +122,7 @@ for param in post_sample_df.columns:
             
             if p_value > sign_level:
                 print(f"{param} for agent {ag_idx} is zero.")
-    
+
 #%%
 '''
 Differences day 1 & day 2
@@ -128,7 +132,6 @@ inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row[
 inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
-
 
 anal.daydiff(inf_mean_df, sign_level = 0.01)
 anal.violin(inf_mean_df)
@@ -384,3 +387,95 @@ plt.ylim([46000, 48000])
 # Show the plot
 plt.title('ELBOs (48 agents)')
 plt.show()
+
+#%%
+'''
+Clustering in Parameter Space Both days
+'''
+df = inf_mean_df.drop(['model', 'ag_idx', 'group', 'labels', 'lr_day1', 'lr_day2'], axis = 1)
+normalized_df = (df-df.mean())/df.std()
+
+kmeans, cluster_groups_between, _ = anal.kmeans(normalized_df.to_dict(orient='list'), 
+                                             inf_mean_df, 
+                                             n_clusters = 2,
+                                             num_reps = 1,
+                                             title = 'both days')
+newdf = inf_mean_df
+newdf['labels'] = kmeans.labels_
+
+newdf0 = newdf[newdf['labels'] == 0]
+newdf1 = newdf[newdf['labels'] == 1]
+
+_, group_behav_df0, _, _ = utils.simulate_data('B', 
+                                                len(newdf0),
+                                                group = list(newdf0['group']),
+                                                params = newdf1)
+
+_, group_behav_df1, _, _ = utils.simulate_data('B', 
+                                                len(newdf0),
+                                                group = list(newdf1['group']),
+                                                params = newdf1)
+
+utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
+
+'''
+From experimental data
+'''
+expdf = expdata_df.copy()
+expdf['labels'] = kmeans.labels_
+
+utils.plot_grouplevel(expdf[expdf['labels'] == 0], expdf[expdf['labels'] == 1], plot_single = False)
+
+#%%
+'''
+Clustering in Parameter Space Day 1
+'''
+df = inf_mean_df.drop(['model', 'ag_idx', 'group', 'lr_day2', 'theta_Q_day2', 'theta_rep_day2', 'labels'], axis = 1)
+normalized_df = (df-df.mean())/df.std()
+
+kmeans, cluster_groups_between, _ = anal.kmeans(normalized_df.to_dict(orient='list'), 
+                                             inf_mean_df, 
+                                             n_clusters = 2,
+                                             num_reps = 100,
+                                             title = 'both days')
+newdf = inf_mean_df
+newdf['labels'] = kmeans.labels_
+
+newdf0 = newdf[newdf['labels'] == 0]
+newdf1 = newdf[newdf['labels'] == 0]
+
+_, group_behav_df0, _, _ = utils.simulate_data('B', 
+                                                len(newdf0),
+                                                group = list(newdf0['group']),
+                                                params = newdf0)
+
+_, group_behav_df1, _, _ = utils.simulate_data('B', 
+                                                len(newdf0),
+                                                group = list(newdf0['group']),
+                                                params = newdf0)
+
+utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
+
+#%%
+'''
+Association with sociopsy data
+'''
+ID_agidx_dict = dict(zip(expdata_df['ID'], expdata_df['ag_idx']))
+ID_agidx_df = pd.DataFrame(list(ID_agidx_dict.items()), columns=['ID', 'ag_idx'])
+# df = pd.DataFrame(data = ID_agidx_dict, index = range(num_agents))
+
+filteered_sociopsy_df = sociopsy_df[sociopsy_df['ID'].isin(ID_agidx_df['ID'])]
+complete_df = pd.merge(inf_mean_df,filteered_sociopsy_df, on = 'ID')
+
+import scipy
+for param in param_names:
+    r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df[param])
+    print(param)
+    print(r)
+    print(p)
+# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day1'])
+# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day1'])
+
+# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['lr_day2'])
+# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day2'])
+# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day2'])
