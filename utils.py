@@ -140,40 +140,29 @@ def get_groupdata(data_dir):
     groupdata = []
     group = []
     'Exclude because of errors'
-    # exclude_errors = [# Grp 0
-    #                 # Grp1
-    #                 14, 20, 24, 28,
-    #                 # Grp2
-    #                 38, 43, 45, 
-    #                 # Grp3
-    #                 57, 58]
     
-    exclude_errors = [# Grp 0
-                  
-                  # Grp 1
-                  '5e07c976f6191f137214e91f',
-                  # Grp 2
+    exclude_errors = [
+                  '5e07c976f6191f137214e91f' # (Grp 1)
                   ]
     
     'Exclude because of execution time'
     exclude_time = [# Grp 0
-                  '604fa685e33606f9a0ee8189', # pb 5
+                  '604fa685e33606f9a0ee8189',
                   # Grp 1
-                '63ef938aea545fb9bd19a591', '56d8df02d13f6b000e542eef',  # pb 14, 15
-                '601f08cba1191642cadf59c1', '6151f20d06757e43aa1f54f9', '5f48f497fae2763d537d2e6b', # pb 23, 25, 26
-                
+                '63ef938aea545fb9bd19a591', '56d8df02d13f6b000e542eef',
+                '601f08cba1191642cadf59c1', '6151f20d06757e43aa1f54f9', '5f48f497fae2763d537d2e6b',
+                '63e5eb956eab1f2740ac6289',
                 # Grp 2
-                '62cbed33d29c28e6be511bde', '5a54d42476d1c60001aacd6c', # pb 33, 44
-                '59e7232f24d7bf00012f112e', # pb 43
-                # '63e5eb956eab1f2740ac6289', 
+                '62cbed33d29c28e6be511bde', '5a54d42476d1c60001aacd6c', 
+                '59e7232f24d7bf00012f112e',
                 # Grp 3
-                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492', # pb 50, 63
-                '5ea00d4b1286ee0008405450'] #pb 58
+                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492',
+                '5ea00d4b1286ee0008405450']
     
     exclude_random = []
-    exclude_random.append(np.random.choice(range(14)))
-    exclude_random.extend(list(np.random.choice([32, 34, 35, 36, 37, 38, 39, 40, 41, 42, 45, 46, 47, 48], size = 2, replace = False)))
-    exclude_random.append(np.random.choice([49, 51, 52, 53, 54, 55, 56, 57, 59,60,61,62,64]))
+    exclude_random.extend(list(np.random.choice(range(19), size = 2, replace = False))) # Grp 0
+    # exclude_random.extend(list(np.random.choice(range(19, 41), size = 1, replace = False))) # Grp 1
+    exclude_random.extend(list(np.random.choice(range(41, 61), size = 2, replace = False))) # Grp 2
     
     exclude_random.sort()
     print(exclude_random)
@@ -206,6 +195,7 @@ def get_groupdata(data_dir):
         for file1 in files_day1:
             "Loop over participants"
             pb += 1
+            print(f"Doing pb {pb}")
             data, ID = get_participant_data(file1, 
                                             grp, 
                                             data_dir)
