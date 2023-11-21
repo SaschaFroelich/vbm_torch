@@ -921,7 +921,7 @@ class Seqboost(Vbm_B):
     def specific_init(self):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
         self.V = [(self.param_dict['theta_rep_day1'][..., None]*self.rep[-1] + self.param_dict['theta_Q_day1'][..., None]*self.Q[-1])]
-        self.continuous_actions = torch.zeros(self.num_agents)
+        self.continuous_seq_actions = torch.zeros(self.num_particles, self.num_agents)
     
     def locs_to_pars(self, locs):
         param_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
@@ -936,7 +936,7 @@ class Seqboost(Vbm_B):
     
         return param_dict
     
-    def update(self, choices, outcomes, blocktype, day, **kwargs):
+    def update(self, choices, outcomes, blocktype, day, trialstimulus, **kwargs):
         '''
         Class Vbm_B(Vbm).
         
@@ -1000,13 +1000,31 @@ class Seqboost(Vbm_B):
             self.continuous_actions = torch.zeros(self.num_agents)
             
         else:
-            "----- Update GD-values -----"
-            # outcome is either -2 (error), 0, or 1
-            # assert torch.all(outcomes <= 1)
-            # # assert torch.all(outcomes > -1)
+            "----- Update continuous seq-action -----"
+
+            self.continuous_seq_actions += torch.logical_and(trialstimulus < 10, choices != -2) # STT
             
-            self.continuous_actions += choices != -2
-            self.continuous_actions = torch.where(choices == -2, torch.zeros(self.continuous_actions.shape), self.continuous_actions)
+            if torch.any(trialstimulus > 10):
+                "DTT"
+                option1 = self.find_resp_options(trialstimulus)[0]
+                option2 = self.find_resp_options(trialstimulus)[1]
+                
+                repvals_option1 = self.rep[-1][torch.arange(self.num_particles)[:, None], 
+                                               torch.arange(self.num_agents), 
+                                               option1]
+                
+                repvals_option2 = self.rep[-1][torch.arange(self.num_particles)[:, None], 
+                                               torch.arange(self.num_agents), 
+                                               option2]
+                
+                repselect_bool = torch.logical_or(torch.logical_and(repvals_option1 - repvals_option2 > 0,
+                                                   choices == option1),
+                                                  torch.logical_and(repvals_option1 - repvals_option2 < 0,
+                                                                                     choices == option2))
+                
+                self.continuous_seq_actions += torch.logical_and(trialstimulus > 10, repselect_bool) # DTT
+            
+            self.continuous_seq_actions = torch.where(choices == -2, torch.zeros(self.continuous_seq_actions.shape), self.continuous_seq_actions)
             
             "--- Group!!! ----"
             "mask contains 1s where Qoutcomp() contains non-zero entries"
@@ -1041,7 +1059,9 @@ class Seqboost(Vbm_B):
             
             "----- Compute new V-values for next trial -----"
             seq_cond = (self.continuous_actions > 8).type(torch.int)
-            self.V.append((theta_rep[..., None] + seq_cond[..., None]*seq_param[..., None])*\
+            seqblock_bool = blocktype == 0
+            
+            self.V.append((theta_rep[..., None] + seq_cond[..., None]*seq_param[..., None]*seqblock_bool[..., None])*\
                           self.rep[-1] + theta_Q[..., None]*self.Q[-1])
 
             if len(self.Q) > 10:
@@ -1063,7 +1083,7 @@ class Seqboost(Vbm_B):
         self.num_particles = locs.shape[0]
         self.num_agents = locs.shape[1]
         
-        self.continuous_actions = torch.zeros(self.num_agents)
+        self.continuous_seq_actions = torch.zeros(self.num_particles, self.num_agents)
             
         "Q and rep"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values

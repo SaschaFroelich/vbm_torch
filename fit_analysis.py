@@ -3,14 +3,11 @@
 """
 Created on Tue Nov  7 17:31:18 2023
 
+Analysis of models fitted to behaviour.
+
 @author: sascha
 """
 
-#%%
-'''
-Analysis_tools
-'''
-#%%
 "----- Open Files"
 # import sys
 # sys.modules[__name__].__dict__.clear() # Clear variables
@@ -26,6 +23,8 @@ import torch
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = utils.get_data_from_file()
 param_names = params_df.iloc[:, 0:-3].columns
 
+ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
+post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
 assert len(param_names) == num_params
 
 # if isinstance(measures, list):
@@ -39,13 +38,13 @@ assert len(param_names) == num_params
 # expdata_df = expdata_df[expdata_df['ag_idx'] < 48]
 # params_df = params_df[params_df['ag_idx'] < 48]
 
-inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 'ag_idx', 'group'], as_index = False).mean())
+inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 'ag_idx', 'group', 'ID', 'handedness'], as_index = False).mean())
 inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
-if 'ID' in expdata_df.columns:
-    inf_mean_df['ID'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['ID']
+# if 'ID' in expdata_df.columns:
+#     inf_mean_df['ID'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['ID']
     
-if 'handedness' in expdata_df.columns:
-    inf_mean_df['handedness'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['handedness']
+# if 'handedness' in expdata_df.columns:
+#     inf_mean_df['handedness'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['handedness']
 
 model = post_sample_df['model'][0]
 num_agents = len(post_sample_df['ag_idx'].unique())
@@ -133,7 +132,8 @@ inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row[
 post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 
-anal.daydiff(inf_mean_df, sign_level = 0.01)
+diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
+diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
 anal.violin(inf_mean_df)
 
 anal.daydiff(post_sample_df, sign_level = 0.01)
@@ -171,6 +171,19 @@ anal.daydiff(post_sample_df[(post_sample_df['group']==1) | (post_sample_df['grou
 # import numpy as np
 # scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
 # # post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
+#%%
+'''
+Correlations of Daydiffs with Age
+'''
+import scipy
+
+num_params = len(diffs_df.columns) - 5
+for param_idx in range(num_params):
+    param = diffs_df.columns[param_idx]
+    print(param)
+    r,p = scipy.stats.pearsonr(diffs_df['Age'], diffs_df[param])
+    print(r)
+    print(p)
 
 #%%
 '''
@@ -465,7 +478,7 @@ ID_agidx_df = pd.DataFrame(list(ID_agidx_dict.items()), columns=['ID', 'ag_idx']
 # df = pd.DataFrame(data = ID_agidx_dict, index = range(num_agents))
 
 filteered_sociopsy_df = sociopsy_df[sociopsy_df['ID'].isin(ID_agidx_df['ID'])]
-complete_df = pd.merge(inf_mean_df,filteered_sociopsy_df, on = 'ID')
+complete_df = pd.merge(inf_mean_df, filteered_sociopsy_df, on = 'ID')
 
 import scipy
 for param in param_names:
@@ -479,3 +492,34 @@ for param in param_names:
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['lr_day2'])
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day2'])
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day2'])
+
+""" Errors """
+error_df = anal.compute_errors(expdata_df)
+complete_df = pd.merge(error_df, complete_df, on='ID')
+
+r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_dtt'])
+print('DTT')
+print(r)
+print(p)
+
+r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_stt'])
+print('STT')
+print(r)
+print(p)
+
+r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_total'])
+print('Total')
+print(r)
+print(p)
+
+""" RT """
+no_error_df = expdata_df.loc[:, ['ID', 'RT', 'choices']]
+no_error_df = no_error_df[no_error_df['choices'] != -1]
+no_error_df = no_error_df[no_error_df['choices'] != -2]
+no_error_df = pd.DataFrame(no_error_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+complete_df = pd.merge(no_error_df, complete_df, on='ID')
+
+r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['RT'])
+print('RT vs Age:')
+print(r)
+print(p)

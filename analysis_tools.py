@@ -847,7 +847,6 @@ def compute_errors(df):
     
 def daydiff(df, sign_level = 0.05):
     '''
-    
 
     Parameters
     ----------
@@ -860,17 +859,24 @@ def daydiff(df, sign_level = 0.05):
 
     Returns
     -------
-    None.
+    diffs_df : DataFrame
 
     '''
+    
+    """ 
+        Step 1: If provided posterior samples, check for each participant 
+        if the two days are significantly different from each other.
+    """
     from scipy import stats
     
-    df_temp = df.drop(['ag_idx', 'model', 'group'], axis = 1)
+    df_temp = df.drop(['ag_idx', 'model', 'group', 'ID', 'handedness'], axis = 1)
     parameter_names = df_temp.columns
+    del df_temp
     from_posterior = 0
     
     if len(df[df['ag_idx']==df['ag_idx'].unique()[0]][parameter_names[0]]) > 1:
-        'df contains posterior dostros for each agents.'
+        print("Evaluating posterior samples.")
+        'df contains posterior distros for each agents.'
         from_posterior = 1
         
         diff_dict = {}
@@ -892,13 +898,25 @@ def daydiff(df, sign_level = 0.05):
                     else:
                         print("Excluding agent %d for parameter %s (p-value %.4f)"%(ag_idx, param[0:-5], p_value))
         
+    else:
+        print("No posterior samples provided.")
+        
+    diffs_df = pd.DataFrame() # Will contain the differences for each participant
+        
     num_pars = 0
     for par in parameter_names:
         if 'day1' in par:
+            diffs_df[par[0:-1] + '2-' + par] = df[par[0:-1] + '2']-df[par]
             num_pars += 1
     
-    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
+    diffs_df['ag_idx'] = df['ag_idx']
+    diffs_df['ID'] = df['ID']
     
+    
+    """
+        Plot Day 2 - Day 1
+    """
+    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
     num_plot_cols = 3
     num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
                     (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
@@ -908,10 +926,11 @@ def daydiff(df, sign_level = 0.05):
         if 'day1' in par:
             if from_posterior:
                 del df
+                print("Check ag_idx!!!!")
                 df = pd.DataFrame({par : diff_dict[par], 
                                    par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
                                    'ag_idx' : range(len(diff_dict[par]))})
-                
+            
             param_idx += 1
             plot_col_idx = param_idx % num_plot_cols
             plot_row_idx = (param_idx // num_plot_cols)
@@ -966,3 +985,5 @@ def daydiff(df, sign_level = 0.05):
             # plt.gca().legend([],[], frameon=False)  # Hide the legend
             
     plt.show()
+    
+    return diffs_df

@@ -171,6 +171,7 @@ def get_groupdata(data_dir):
     
     'right/left/ambidextrous: 0/1/2'
     hand = []
+    'male/female : 0/1'
     gender = []
     age = []
     
@@ -210,9 +211,9 @@ def get_groupdata(data_dir):
                 groupdata.append(data)
                 group.append(grp)
                 IDs_included.append(ID)
-                hand.append(sociopsy_df[sociopsy_df['ID'] == ID]['Handedness'])
-                gender.append(sociopsy_df[sociopsy_df['ID'] == ID]['Gender'])
-                age.append(sociopsy_df[sociopsy_df['ID'] == ID]['Age'])
+                hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Handedness'])
+                gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Gender'])
+                age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Age'])
                 
                 q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                 q_notice_a_sequence.append(participant_day2['q2'][0,1][0])

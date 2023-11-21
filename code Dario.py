@@ -10,12 +10,14 @@ Dario's Code to compute the exceedance probability of a model.
 
 with pm.Model() as BMS:
     tau = pm.HalfCauchy('hyper_tau', beta=1.0)
+    "Are log_model_probs"
     model_probs = pm.Dirichlet('model_probs', a=pt.ones(num_models) / tau,
                                 shape=(num_models))
                                 
-    def logp(model_evidence, model_probs=model_probs):
-        log_likelihood = pm.math.log(model_probs, ) + model_evidence
+    def logp(log_model_evidence, model_probs=model_probs):
+        log_likelihood = pm.math.log(model_probs, ) + log_model_evidence
         return pm.math.sum(pm.logsumexp(log_likelihood, axis=1))
+    
     pm.DensityDist('log_joint', model_probs, logp=logp,
                     observed=logEvidences)
     

@@ -185,6 +185,7 @@ class GeneralGroupInference():
 
         # import trace_elbo
         # svi.loss_and_grads_agentelbos = pyro.infer.Trace_ELBO.loss_and_grads_agentelbos
+        '''
         num_iters = 10
         ELBOs = torch.zeros(num_iters, self.agent.num_agents)
         for i in range(num_iters):
@@ -192,8 +193,10 @@ class GeneralGroupInference():
         
         elbos = ELBOs.mean(dim=0)
         std = ELBOs.std(dim=0)
-
+        
         print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
+        '''
+
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
     def sample_posterior(self, n_samples = 1_000, locs = False):

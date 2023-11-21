@@ -33,10 +33,10 @@ HandSeq2
 Random
 '''
 
-model = 'B'
+model = 'Seqboost'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 48
+num_agents = 60
 
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
@@ -61,9 +61,6 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 '''
 Inference
 '''
-import time
-time.sleep(7200)
-
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          group, 
@@ -72,7 +69,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 6_000, num_particles = 10)
+infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
@@ -82,6 +79,7 @@ BIC = infer.compute_IC()
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
 pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC), params_sim_df), open(f"parameter_recovery/param_recov_model_{model}_{timestamp}.p", "wb" ) )
 
 #%%
