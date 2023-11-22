@@ -922,7 +922,8 @@ class Seqboost(Vbm_B):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
         self.V = [(self.param_dict['theta_rep_day1'][..., None]*self.rep[-1] + self.param_dict['theta_Q_day1'][..., None]*self.Q[-1])]
         self.continuous_seq_actions = torch.zeros(self.num_particles, self.num_agents)
-    
+        self.seq_cond_counter = torch.zeros(self.num_particles, self.num_agents)
+        
     def locs_to_pars(self, locs):
         param_dict = {"lr_day1": torch.sigmoid(locs[..., 0]),
                     "theta_Q_day1": torch.exp(locs[..., 1]),
@@ -997,7 +998,7 @@ class Seqboost(Vbm_B):
             self.Q.append(self.Q[-1])
             
             self.V.append(theta_rep[..., None]*self.rep[-1] + theta_Q[..., None]*self.Q[-1])
-            self.continuous_actions = torch.zeros(self.num_agents)
+            self.continuous_seq_actions = torch.zeros(self.num_particles, self.num_agents)
             
         else:
             "----- Update continuous seq-action -----"
@@ -1058,9 +1059,13 @@ class Seqboost(Vbm_B):
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
-            seq_cond = (self.continuous_actions > 8).type(torch.int)
+            seq_cond = (self.continuous_seq_actions > 8).type(torch.int)
+            # print(self.continuous_seq_actions)
             seqblock_bool = blocktype == 0
             
+            self.seq_cond_counter += (seq_cond * seqblock_bool)
+            # print(self.seq_cond_counter)
+
             self.V.append((theta_rep[..., None] + seq_cond[..., None]*seq_param[..., None]*seqblock_bool[..., None])*\
                           self.rep[-1] + theta_Q[..., None]*self.Q[-1])
 
@@ -1084,6 +1089,7 @@ class Seqboost(Vbm_B):
         self.num_agents = locs.shape[1]
         
         self.continuous_seq_actions = torch.zeros(self.num_particles, self.num_agents)
+        self.seq_cond_counter = torch.zeros(self.num_particles, self.num_agents)
             
         "Q and rep"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
@@ -1970,14 +1976,46 @@ class Conflict(Vbm_B):
         _, mask = self.Qoutcomp(self.V[-1], option2)
         Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
         
+        '''
+        Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
         DeltaQ = self.Q[-1][0, torch.arange(self.num_agents), option1] - self.Q[-1][0, torch.arange(self.num_agents), option2]
 
+        '''
+        Rep(option1) - Rep(option2) --> DeltaRep > 0 if Rep(option1) > Rep(option2)
+        '''
         DeltaRep = self.rep[-1][0, torch.arange(self.num_agents), option1] - self.rep[-1][0, torch.arange(self.num_agents), option2]
+        
+        '''
+        incong_bool :   0 if congruent trial
+                        1 if incongruent trial
+                        
+                        sign(DeltaQ) can be -1, 0, 1.
+                        --> (1*1 -1)/-2 = 0
+                        
+                            (0*1 -1)/-2 = 0.5 -> 0
+                            (1*0 -1)/-2 = 0.5 -> 0
+                            
+                            (1*-1 -1)/-2 = 1
+                            (-1*1 -1)/-2 = 1
+        '''
         incong_bool = ((torch.sign(DeltaQ).type(torch.int) * torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
-        conflict_value = DeltaQ - DeltaRep
+        conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
+        
+        '''
+        opt1_GD :   1 if option1 is goal-directed response
+                    -1 if option2 is goal-directed response
+        '''
+        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        
+        '''
+        seq_bool :  0 random condition
+                    1 sequential condition
+        '''
         seq_bool = (blocktype == 0).type(torch.int)
         
-        probs = self.softmax(torch.stack((Vopt1 + incong_bool*conflict_value*conflict_param*seq_bool, 
+        "If incongruent trial and sequential condition -> "
+        probs = self.softmax(torch.stack((Vopt1 + incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param, 
                                           Vopt2), 2))
 
         return probs
