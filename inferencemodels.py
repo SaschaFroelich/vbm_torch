@@ -185,19 +185,22 @@ class GeneralGroupInference():
 
         # import trace_elbo
         # svi.loss_and_grads_agentelbos = pyro.infer.Trace_ELBO.loss_and_grads_agentelbos
-        '''
+        
+        print("Computing first-level ELBOs.")
         num_iters = 10
         ELBOs = torch.zeros(num_iters, self.agent.num_agents)
         for i in range(num_iters):
-            ELBOs[i,:] = svi.step_agent_elbos()
+            print(f"Iteration {i} of {num_iters}")
+            ELBOs[i, :] = svi.step_agent_elbos()
         
         elbos = ELBOs.mean(dim=0)
         std = ELBOs.std(dim=0)
         
         print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
-        '''
-
+        
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
+        
+        return (elbos, std)
         
     def sample_posterior(self, n_samples = 1_000, locs = False):
         '''
@@ -373,10 +376,10 @@ class BayesianModelSelection():
         ----------
         num_models : int
             number of models
-            
+
         num_agents : int
             number of participants
-            
+
         data : torch tensor, shape [num_agents, num_models]
 
         Returns
@@ -388,7 +391,7 @@ class BayesianModelSelection():
         self.num_models = num_models
         self.num_agents = num_agents
         # self.data = data
-        self.data = torch.rand(num_agents, num_models)
+        self.elbos = torch.rand(num_agents, num_models)
         
     def model(self):
         scale = torch.tensor([1.0])
@@ -405,10 +408,14 @@ class BayesianModelSelection():
         print("m is")
         print(m)
         
-        model_evidences = (self.data * m).sum(dim=1)
+        "m is one-hot vector"
+        "log p(y|m) = m_1 *(ELBO(m_1) + ln r_1) + m_2 *(ELBO(m_2) + ln r_2) + m_3* ..."
+        log_likelihood = (self.elbos * m + torch.log(r)).sum(dim=1)
+        
+        log_odds = torch.log(torch.exp)
         
         pyro.sample('res',
-                    dist.Categorical(probs = r),
+                    dist.Categorical(logits = log_odds),
                     obs = model_evidences)
 
     def guide(self):

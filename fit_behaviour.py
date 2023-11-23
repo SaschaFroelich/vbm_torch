@@ -30,7 +30,7 @@ BQ
 BK
 '''
 
-model = 'Seqboost'
+model = 'B_oneday'
 #%%
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
@@ -51,6 +51,9 @@ num_agents = len(expdata_df['ag_idx'].unique())
 print(f"Starting inference of model {model} for {num_agents} agents.")
 
 #%%
+import time
+time.sleep(9*3600)
+
 '''
 Prepare Inference
 '''
@@ -67,7 +70,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-infer.infer_posterior(iter_steps = 2, num_particles = 10, block_max = 14)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 10_000, num_particles = 10, block_max = 14)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior( )
@@ -90,4 +93,4 @@ BIC = infer.compute_IC()
 # ELBOs = infer.compute_ELBOS()
 # loo_prediction = infer.loo_predict()
 # posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
-# pickle.dump( (post_sample_df, expdata_df, (infer.loss, BIC), params_sim_df), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
+pickle.dump( (post_sample_df, expdata_df, (infer.loss, BIC), params_sim_df, agent_elbo_tuple), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
