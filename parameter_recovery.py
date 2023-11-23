@@ -22,10 +22,12 @@ Vbm
 Vbm_twodays
 random
 B
+B_oneday
 Conflict
 Seqboost
 Seqboost_nolr
 Bhand
+Bhand_oneday
 BQ
 BK
 HandSeq
@@ -33,7 +35,7 @@ HandSeq2
 Random
 '''
 
-model = 'Seqboost'
+model = 'Conflict'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 60

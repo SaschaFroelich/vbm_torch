@@ -13,7 +13,7 @@ with pm.Model() as BMS:
     "Are log_model_probs"
     model_probs = pm.Dirichlet('model_probs', a=pt.ones(num_models) / tau,
                                 shape=(num_models))
-                                
+
     def logp(log_model_evidence, model_probs=model_probs):
         log_likelihood = pm.math.log(model_probs, ) + log_model_evidence
         return pm.math.sum(pm.logsumexp(log_likelihood, axis=1))

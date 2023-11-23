@@ -366,11 +366,50 @@ class GeneralGroupInference():
 
 class BayesianModelSelection():
     
-    def __init__(self, num_models):
+    def __init__(self, num_models, num_agents, data):
+        '''
+
+        Parameters
+        ----------
+        num_models : int
+            number of models
+            
+        num_agents : int
+            number of participants
+            
+        data : torch tensor, shape [num_agents, num_models]
+
+        Returns
+        -------
+        None.
+
+        '''
+        
         self.num_models = num_models
+        self.num_agents = num_agents
+        # self.data = data
+        self.data = torch.rand(num_agents, num_models)
         
     def model(self):
-        alpha_zero = torch.ones(self.num_models)/self.num_models
+        scale = torch.tensor([1.0])
+        tau = pyro.sample('hyper_tau', dist.HalfCauchy(scale))
+        
+        alpha_zero = torch.ones(self.num_agents, self.num_models)/tau
         r = pyro.sample('r', dist.Dirichlet(alpha_zero))
+        print("r shape is")
+        print(r.shape)
         
         m = pyro.sample('m', dist.Multinomial(1, probs = r))
+        print("m shape is")
+        print(m.shape)
+        print("m is")
+        print(m)
+        
+        model_evidences = (self.data * m).sum(dim=1)
+        
+        pyro.sample('res',
+                    dist.Categorical(probs = r),
+                    obs = model_evidences)
+
+    def guide(self):
+        alpha

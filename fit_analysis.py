@@ -19,32 +19,26 @@ import pandas as pd
 import utils
 import analysis_tools as anal
 import torch
+import pickle
 
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = utils.get_data_from_file()
+
 param_names = params_df.iloc[:, 0:-3].columns
 
 ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
 post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
 assert len(param_names) == num_params
 
-# if isinstance(measures, list):
-#     loss = measures
-    
-# elif isinstance(measures, tuple):
-#     loss, BIC = measures
+post_sample_df=post_sample_df.drop(['ID_x'],axis=1)
+post_sample_df=post_sample_df.rename(columns={'ID_y': 'ID'})
 
-# print("=======================================================")
-# post_sample_df = post_sample_df[post_sample_df['ag_idx'] < 48]
-# expdata_df = expdata_df[expdata_df['ag_idx'] < 48]
-# params_df = params_df[params_df['ag_idx'] < 48]
+inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+                                                   'ag_idx', 
+                                                   'group', 
+                                                   'ID', 
+                                                   'handedness'], as_index = False).mean())
 
-inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 'ag_idx', 'group', 'ID', 'handedness'], as_index = False).mean())
 inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
-# if 'ID' in expdata_df.columns:
-#     inf_mean_df['ID'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['ID']
-    
-# if 'handedness' in expdata_df.columns:
-#     inf_mean_df['handedness'] = expdata_df.groupby(['ag_idx', 'ID', 'model', 'group'], as_index = False).mean().sort_values(by=['ag_idx'])['handedness']
 
 model = post_sample_df['model'][0]
 num_agents = len(post_sample_df['ag_idx'].unique())
@@ -106,6 +100,7 @@ import matplotlib.cm as cm
 
 anal.violin(inf_mean_df)
 
+complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df)
 #%%
 '''
 Check for how many participants Seqboost is different from 0:
@@ -134,6 +129,7 @@ post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2'
 
 diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
 diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
+
 anal.violin(inf_mean_df)
 
 anal.daydiff(post_sample_df, sign_level = 0.01)
@@ -473,19 +469,12 @@ utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
 '''
 Association with sociopsy data
 '''
-ID_agidx_dict = dict(zip(expdata_df['ID'], expdata_df['ag_idx']))
-ID_agidx_df = pd.DataFrame(list(ID_agidx_dict.items()), columns=['ID', 'ag_idx'])
-# df = pd.DataFrame(data = ID_agidx_dict, index = range(num_agents))
-
-filteered_sociopsy_df = sociopsy_df[sociopsy_df['ID'].isin(ID_agidx_df['ID'])]
-complete_df = pd.merge(inf_mean_df, filteered_sociopsy_df, on = 'ID')
 
 import scipy
 for param in param_names:
     r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df[param])
-    print(param)
-    print(r)
-    print(p)
+    print(f'Age vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day1'])
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day1'])
 
@@ -494,32 +483,60 @@ for param in param_names:
 # r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day2'])
 
 """ Errors """
-error_df = anal.compute_errors(expdata_df)
-complete_df = pd.merge(error_df, complete_df, on='ID')
-
 r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_dtt'])
-print('DTT')
-print(r)
-print(p)
+print('ER(DTT) vs Age: r=%.4f, p=%.4f\n'%(r,p))
 
 r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_stt'])
-print('STT')
-print(r)
-print(p)
+print('ER(STT) vs Age: r=%.4f, p=%.4f\n'%(r,p))
 
 r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_total'])
-print('Total')
-print(r)
-print(p)
+print(f'ER(Total) vs Age: r=%.4f, p=%.4f\n'%(r,p))
 
+for param in [*param_names]:
+    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_total'])
+    print(f'ER(Total) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+    
+    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_dtt'])
+    print(f'ER(dtt) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+    
+    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_stt'])
+    print(f'ER(stt) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+    
 """ RT """
-no_error_df = expdata_df.loc[:, ['ID', 'RT', 'choices']]
-no_error_df = no_error_df[no_error_df['choices'] != -1]
-no_error_df = no_error_df[no_error_df['choices'] != -2]
-no_error_df = pd.DataFrame(no_error_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-complete_df = pd.merge(no_error_df, complete_df, on='ID')
-
 r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['RT'])
-print('RT vs Age:')
-print(r)
-print(p)
+print(f'RT vs Age: r={r}, p={p}\n')
+
+r,p = scipy.stats.pearsonr(complete_df['ER_dtt'], complete_df['RT'])
+print(f'ER(DTT) vs RT: r={r}, p={p}\n')
+
+r,p = scipy.stats.pearsonr(complete_df['ER_stt'], complete_df['RT'])
+print(f'ER(STT) vs RT: r={r}, p={p}\n')
+#%%
+'''
+Test sequence knowledge vs inferred parameters and sociopsy Data
+'''
+
+from scipy.stats import ttest_ind
+for param in [*param_names, 'RT']:
+    t_statistic, p_value = ttest_ind(pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 0][param]), 
+                                     pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 1][param]))
+    print(f"for noticed a seq vs {param}: p=%.4f\n"%p_value)
+
+t_statistic, p_value = ttest_ind(complete_df[complete_df['q_notice_a_sequence'] == 0]['Age'], 
+                                 complete_df[complete_df['q_notice_a_sequence'] == 1]['Age'])
+print(f"for noticed a seq vs Age: p={p_value}\n")
+
+
+for param in [*param_names, 'RT']:
+    t_statistic, p_value = ttest_ind(pd.to_numeric(complete_df[complete_df['gender'] == 0][param]), 
+                                     pd.to_numeric(complete_df[complete_df['gender'] == 1][param]))
+    print(f"for gender vs {param}: p={p_value}\n")
+
+t_statistic, p_value = ttest_ind(complete_df[complete_df['gender'] == 0]['Age'], 
+                                 complete_df[complete_df['gender'] == 1]['Age'])
+print(f"for gender vs Age: p={p_value}")
+
+#%%
+import pingouin as pg
+pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day1', covar='Age')
+pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='Age')

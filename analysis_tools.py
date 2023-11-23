@@ -765,7 +765,6 @@ def compute_errors(df):
     # pd.DataFrame(df_dtt.groupby(['ID', 'model', 'ag_idx', 'group'], as_index=False))
     
     group = []
-    ag_idx = []
     IDs = []
     ER_dtt = []
     ER_stt = []
@@ -782,68 +781,14 @@ def compute_errors(df):
         
         IDs.append(ID)
         group.append(df[df['ID'] == ID]['group'].unique()[0])
-        ag_idx.append(df[df['ID'] == ID]['ag_idx'].unique()[0])
     
-    er_df = pd.DataFrame({'ag_idx': ag_idx,
-                          'group': group,
+    er_df = pd.DataFrame({'group': group,
                           'ID': IDs,
                           'ER_dtt': ER_dtt,
                           'ER_stt': ER_stt,
                           'ER_total': ER_total})
     
     return er_df
-    
-    # df_dtt = pd.DataFrame(df_dtt.drop(['model', 'group'], axis = 1).groupby(['ag_idx', 'ID', 'choices'], as_index = False).mean())
-    # df_dtt[]
-    
-    # # new_df = 
-    
-    # num_agents = len(df['ag_idx'].unique())
-    # errorrates = np.zeros((3, num_agents)) # STT, DTT, Total
-    # errorrates_day1 = np.zeros((3, num_agents)) # STT, DTT, Total
-    # errorrates_day2 = np.zeros((3, num_agents)) # STT, DTT, Total
-    # dfgh
-    # for ag_idx in np.sort(df['ag_idx'].unique()):
-    #     "----- Both days"
-    #     ag_df = df[df['ag_idx'] == ag_idx]
-    #     "Remove new block trials"
-    #     ag_df = ag_df[ag_df['choices'] != -1]
-    #     "Total error rates"
-    #     errorrates[-1, ag_idx] = (ag_df['choices'] == -2).sum() / len(ag_df)
-    #     ag_df_stt = ag_df[ag_df['trialsequence'] < 10]
-    #     "Error Rates STT"
-    #     errorrates[0, ag_idx] = (ag_df_stt['choices'] == -2).sum() / len(ag_df_stt)
-    #     ag_df_dtt = ag_df[ag_df['trialsequence'] > 10]
-    #     "Error Rates DTT"
-    #     errorrates[1, ag_idx] = (ag_df_dtt['choices'] == -2).sum() / len(ag_df_dtt)
-        
-    #     "----- Day 1"
-    #     ag_df_day1 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] <= 5)]
-    #     "Remove new block trials"
-    #     ag_df_day1 = ag_df_day1[ag_df_day1['choices'] != -1]
-    #     "Total error rates"
-    #     errorrates_day1[-1, ag_idx] = (ag_df_day1['choices'] == -2).sum() / len(ag_df_day1)
-    #     ag_df_day1_stt = ag_df_day1[ag_df_day1['trialsequence'] < 10]
-    #     "Error Rates STT"
-    #     errorrates_day1[0, ag_idx] = (ag_df_day1_stt['choices'] == -2).sum() / len(ag_df_day1_stt)
-    #     ag_df_day1_dtt = ag_df_day1[ag_df_day1['trialsequence'] > 10]
-    #     "Error Rates DTT"
-    #     errorrates_day1[1, ag_idx] = (ag_df_day1_dtt['choices'] == -2).sum() / len(ag_df_day1_dtt)
-    
-    #     "----- Day 2"
-    #     ag_df_day2 = df[(df['ag_idx'] == ag_idx) & (df['blockidx'] > 5)]
-    #     "Remove new block trials"
-    #     ag_df_day2 = ag_df_day2[ag_df_day2['choices'] != -1]
-    #     "Total error rates"
-    #     errorrates_day2[-1, ag_idx] = (ag_df_day2['choices'] == -2).sum() / len(ag_df_day2)
-    #     ag_df_day2_stt = ag_df_day2[ag_df_day2['trialsequence'] < 10]
-    #     "Error Rates STT"
-    #     errorrates_day2[0, ag_idx] = (ag_df_day2_stt['choices'] == -2).sum() / len(ag_df_day2_stt)
-    #     ag_df_day2_dtt = ag_df_day2[ag_df_day2['trialsequence'] > 10]
-    #     "Error Rates DTT"
-    #     errorrates_day2[1, ag_idx] = (ag_df_day2_dtt['choices'] == -2).sum() / len(ag_df_day2_dtt)
-
-    # return errorrates, errorrates_day1, errorrates_day2
     
 def daydiff(df, sign_level = 0.05):
     '''

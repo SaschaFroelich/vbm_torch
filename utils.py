@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 import models_torch as models
 import multiprocessing as mp
 
+import pickle
+import analysis_tools as anal
+
 from statistics import mean, stdev
 from math import sqrt
 
@@ -108,13 +111,17 @@ def load_matfiles(matfile_dir,
         torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
             jokertypes
 
-def get_groupdata(data_dir):
+def get_groupdata(data_dir, getall = False):
     '''
 
     Parameters
     ----------
     data_dir : str
         Directory with data.
+        
+    getall : bool
+        True: Get all data collected so far
+        False: Make sure to get the same number of participants in every group
 
     Returns
     -------
@@ -207,7 +214,7 @@ def get_groupdata(data_dir):
             # if ID not in handedness.keys():
             #     raise Exception('Handedness missing for ID %s'%ID)
             
-            if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
+            if getall:
                 groupdata.append(data)
                 group.append(grp)
                 IDs_included.append(ID)
@@ -217,8 +224,20 @@ def get_groupdata(data_dir):
                 
                 q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                 q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
-                # q_sequence_repro.append(participant_day2['q3'][0,1][0])
-                # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
+                
+            else:
+                if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
+                    groupdata.append(data)
+                    group.append(grp)
+                    IDs_included.append(ID)
+                    hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Handedness'])
+                    gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Gender'])
+                    age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Age'])
+                    
+                    q_sometimes_easier.append(participant_day2['q1'][0,1][0])
+                    q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
+                    # q_sequence_repro.append(participant_day2['q3'][0,1][0])
+                    # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
     
     q_sometimes_easier = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
     q_notice_a_sequence  = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_notice_a_sequence]
@@ -245,7 +264,8 @@ def get_groupdata(data_dir):
     
     group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
     print(group_distro)
-    assert np.abs(np.diff(group_distro)).sum() == 0
+    if not getall:
+        assert np.abs(np.diff(group_distro)).sum() == 0
     
     return newgroupdata, groupdata_df
 
@@ -682,6 +702,58 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
+    if model =='B_oneday':
+        num_params = models.Vbm_B_oneday.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]*0.1
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*2
+            
+            
+        else:
+            assert isinstance(params, dict)
+            print("Setting initial parameters as provided.\n")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+        
+        newagent = models.Vbm_B_oneday(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    if model =='Bhand_oneday':
+        num_params = models.Handedness_oneday.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]*0.1
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*2
+            param_dict['hand_param'] = (params_uniform[2:3, :]-0.5)*3
+            
+            
+        else:
+            assert isinstance(params, dict)
+            print("Setting initial parameters as provided.\n")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['hand_param'] = params['hand_param'][None,...]
+        
+        newagent = models.Handedness_oneday(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
     elif model == 'Vbm_twodays':
         num_params = models.Vbm_twodays.num_params #number of latent model parameters
         param_dict = {}
@@ -755,12 +827,12 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.5
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
             param_dict['conflict_param_day1'] = (params_uniform[3:4, :]-0.5)*6
             
-            param_dict['lr_day2'] = params_uniform[4:5, :]*0.01
+            param_dict['lr_day2'] = params_uniform[4:5, :]*0.5
             param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
             param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
             param_dict['conflict_param_day2'] = (params_uniform[7:8, :]-0.5)*6
@@ -1745,3 +1817,40 @@ def get_data_from_file():
     sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
     
     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
+
+def create_complete_df(inf_mean_df, sociopsy_df):
+    _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
+    expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
+    
+    expdata_df_wseq = expdata_df_wseq.drop(['ag_idx'], axis=1)
+    complete_df_temp = pd.merge(inf_mean_df, 
+                           sociopsy_df[sociopsy_df['ID'].isin(inf_mean_df['ID'])], 
+                           on = 'ID')
+    
+    error_df = anal.compute_errors(expdata_df_wseq)
+    
+    complete_df = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], complete_df_temp, on='ID')
+    assert np.all(complete_df['group_x'] == complete_df['group_y'])
+    complete_df = complete_df.drop(['group_x'], axis = 1)
+    complete_df.rename(columns={'group_y': 'group'}, inplace = True)
+        
+    RT_df = expdata_df_wseq.loc[:, ['ID', 'RT', 'choices']]
+    RT_df = RT_df[RT_df['choices'] != -1]
+    RT_df = RT_df[RT_df['choices'] != -2]
+    RT_df = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    complete_df = pd.merge(RT_df, complete_df, on='ID')
+
+    newdf2 = pd.DataFrame(expdata_df_wseq.loc[:, ['ID',
+                            'q_notice_a_sequence',
+                            'gender']].groupby(['ID'], as_index = False).mean())
+
+    complete_df = pd.merge(complete_df, newdf2, on='ID')    
+
+    diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
+    complete_df = pd.merge(complete_df, diffs_df, on='ID')
+    assert np.all(complete_df['ag_idx_x'] == complete_df['ag_idx_y'])
+    complete_df = complete_df.drop(['ag_idx_x'], axis = 1)
+    complete_df.rename(columns={'ag_idx_y': 'ag_idx'}, inplace = True)
+
+    assert len(complete_df) == len(inf_mean_df)
+    return complete_df

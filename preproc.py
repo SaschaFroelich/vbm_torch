@@ -10,6 +10,12 @@ import pickle
 import numpy as np
 import utils
 
-exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/')
+exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/', getall = False)
 
 pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data.p", "wb" ) )
+
+# exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/', getall = True)
+
+# pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_all.p", "wb" ) )
+
+
