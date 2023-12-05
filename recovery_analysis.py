@@ -17,7 +17,7 @@ import analysis_tools as anal
 import numpy as np
 import matplotlib.pylab as plt
 
-post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = utils.get_data_from_file()
+post_sample_df, expdata_df, loss, params_df, num_params, _ = utils.get_data_from_file()
 
 # params_df['paramtype'] = ['sim']*len(params_df)
 
@@ -55,14 +55,26 @@ ax = gs.subplots()
 for param_idx in range(num_params):
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
-    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
-    # ca.plot([0,0], ca.get_ylim())
-    ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
-    if plot_col_idx > 0:
-        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+    if num_params > 3:
+        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
+        # ca.plot([0,0], ca.get_ylim())
+        ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
+        if plot_col_idx > 0:
+            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
         
-    if plot_row_idx > 0:
-        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+    else:
+        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_col_idx])
+        # ca.plot([0,0], ca.get_ylim())
+        ax[plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
+        if plot_col_idx > 0:
+            ax[plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_col_idx].get_position().y0 += 10        
+
 plt.show()
 
 '''
@@ -76,17 +88,31 @@ for param_idx in range(num_params):
     param = params_df.columns[param_idx]
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
-    ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
-    ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
-    # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
-    # ca.plot([0,0], ca.get_ylim())
-    ax[plot_row_idx, plot_col_idx].set_xlabel(param)
-    ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
-    if plot_col_idx > 0:
-        ax[plot_row_idx, plot_col_idx].set_ylabel(None)
-        
-    if plot_row_idx > 0:
-        ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+    if num_params > 3:
+        ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
+        ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+        # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+        # ca.plot([0,0], ca.get_ylim())
+        ax[plot_row_idx, plot_col_idx].set_xlabel(param)
+        ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
+        if plot_col_idx > 0:
+            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+            
+    else:
+        ax[plot_col_idx].scatter(params_df[param], inf_mean_df[param])
+        ax[plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+        # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+        # ca.plot([0,0], ca.get_ylim())
+        ax[plot_col_idx].set_xlabel(param)
+        ax[plot_col_idx].set_ylabel('inferred')
+        if plot_col_idx > 0:
+            ax[plot_col_idx].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[plot_col_idx].get_position().y0 += 10
         
 # fig.suptitle(f"Model {model}", fontsize = 32)
 fig.suptitle('Dot = Mean of Posterior')

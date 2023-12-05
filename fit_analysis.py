@@ -21,22 +21,45 @@ import analysis_tools as anal
 import torch
 import pickle
 
-post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = utils.get_data_from_file()
+from sklearn.linear_model import LinearRegression
+import scipy
+import itertools
+
+out = utils.get_data_from_file()
+
+if len(out) == 7:
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
+    
+elif len(out) == 6:
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
+    
+else:
+    raise Exception("Output length invalid.")
 
 param_names = params_df.iloc[:, 0:-3].columns
-
-ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
-post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
+if 'ID' in expdata_df.columns:
+    "For compatibility with param_recov data"
+    ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
+    "Ad IDs"
+    post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
+    
 assert len(param_names) == num_params
 
-post_sample_df=post_sample_df.drop(['ID_x'],axis=1)
-post_sample_df=post_sample_df.rename(columns={'ID_y': 'ID'})
+if 'ID_x' in post_sample_df.columns:
+    post_sample_df=post_sample_df.drop(['ID_x'],axis=1)
+    post_sample_df=post_sample_df.rename(columns={'ID_y': 'ID'})
 
-inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
-                                                   'ag_idx', 
-                                                   'group', 
-                                                   'ID', 
-                                                   'handedness'], as_index = False).mean())
+if 'ID' in post_sample_df:
+    inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+                                                       'ag_idx', 
+                                                       'group', 
+                                                       'ID', 
+                                                       'handedness'], as_index = False).mean())
+    
+else:
+    inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+                                                       'ag_idx', 
+                                                       'group'], as_index = False).mean())    
 
 inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
 
@@ -53,6 +76,7 @@ plt.title(f"ELBO for model {model} ({num_agents} agents)")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
 plt.show()
+print(np.array(loss[-1000:]).mean())
 
 num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
@@ -87,7 +111,6 @@ for param_idx in range(num_params):
         
     # ca.plot([0,0], ca.get_ylim())
 
-
 plt.show()
 
 '''
@@ -100,7 +123,9 @@ import matplotlib.cm as cm
 
 anal.violin(inf_mean_df)
 
-complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df)
+if 'ID' in inf_mean_df.columns:
+    complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df)
+
 #%%
 '''
 Check for how many participants Seqboost is different from 0:
@@ -124,15 +149,16 @@ Differences day 1 & day 2
 
 inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
+
 post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 
-diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
+diffs_df = anal.daydiff(inf_mean_df, sign_level = 0.01)
 diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
 
 anal.violin(inf_mean_df)
 
-anal.daydiff(post_sample_df, sign_level = 0.01)
+diffs_df=anal.daydiff(post_sample_df, sign_level = 0.01)
 
 anal.daydiff(post_sample_df[post_sample_df['group']==0], sign_level = 0.01)
 anal.daydiff(post_sample_df[post_sample_df['group']==1], sign_level = 0.01)
@@ -167,6 +193,96 @@ anal.daydiff(post_sample_df[(post_sample_df['group']==1) | (post_sample_df['grou
 # import numpy as np
 # scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
 # # post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
+
+#%%
+'''
+    Theta Q_day1
+'''
+
+fig, ax = plt.subplots()
+ax.scatter(complete_df['theta_Q_day1'], complete_df['theta_Q_day2-theta_Q_day1'])
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+ax.set_xlabel('theta_Q_day1')
+ax.set_ylabel('theta_Q_day2-theta_Q_day1')
+# plt.grid()
+# plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+# plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+# plt.title('Delta R vs Delta Q')
+plt.show()
+
+r,p = scipy.stats.pearsonr(complete_df['theta_Q_day1'], complete_df['theta_Q_day2-theta_Q_day1'])
+print(f'r=%.4f, p=%.4f'%(r,p))
+
+if p < 0.05:
+    x = np.array(complete_df['theta_Q_day1']).reshape(-1,1)
+    y = np.array(complete_df['theta_Q_day2-theta_Q_day1']).reshape(-1,1)
+    linmodel = LinearRegression()
+    linmodel.fit(x, y)
+    print(f"slope: {linmodel.coef_}\n")
+
+#%%
+"Cluster Analysis is based on absolute values"
+
+normalized_mean_df = pd.DataFrame()
+for param in [*param_names, 'Age', 'RT', 'ER_dtt', 'ER_stt']:
+    normalized_mean_df[param] = (complete_df.loc[:, param] - complete_df.loc[:, param].mean())/complete_df.loc[:, param].std()
+
+kmeans, cluster_groups_bothdays, _ = anal.kmeans(complete_df.loc[:, 
+                                                [*param_names, 'Age', 'RT', 'ER_dtt', 'ER_stt']],
+                                                 inf_mean_df, 
+                                                 n_clusters = 2,
+                                                 num_reps = 100)
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[0])],
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[1])])
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[2])],
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[3])])
+
+#%%
+"Cluster Analysis based on Daydifferences"
+
+kmeans, cluster_groups_bothdays, _ = anal.kmeans(inf_mean_df.loc[:, 
+                                                          ['ID', 'theta_Q_day2', 'theta_Q_day1', 
+                                                          'theta_rep_day2', 'theta_rep_day1']], 
+                                         inf_mean_df, 
+                                         n_clusters = 2,
+                                         num_reps = 100)
+
+fig, ax = plt.subplots()
+ax.scatter(diffs_df['theta_Q_day2-theta_Q_day1'], diffs_df['theta_rep_day2-theta_rep_day1'], color='blue')
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+plt.grid()
+plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+plt.title('Delta R vs Delta Q')
+plt.show()
+
+fig, ax = plt.subplots()
+ax.scatter(diffs_df['theta_Q_day2-theta_Q_day1'], diffs_df['Q/R_day2-Q/R_day1'], color='blue')
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 2], color='red')
+plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 2], color='red')
+plt.grid()
+plt.title('Delta Q/R vs Delta Q')
+plt.show()
+
+fig, ax = plt.subplots()
+ax.scatter(diffs_df['theta_rep_day2-theta_rep_day1'], diffs_df['Q/R_day2-Q/R_day1'], color='blue')
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+plt.scatter(kmeans.cluster_centers_[0, 1], kmeans.cluster_centers_[0, 2], color='red')
+plt.scatter(kmeans.cluster_centers_[1, 1], kmeans.cluster_centers_[1, 2], color='red')
+plt.grid()
+plt.title('Delta Q/R vs Delta R')
+plt.show()
+
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[0])],
+                      expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothdays[1])])
+
 #%%
 '''
 Correlations of Daydiffs with Age
@@ -192,7 +308,7 @@ anal.param_corr(inf_mean_df)
 '''
 Correlations within subjects
 '''
-corr_dict = anal.within_subject_corr(post_sample_df)
+corr_df = anal.within_subject_corr(post_sample_df, param_names)
 
 # corr_dict_errors = corr_dict.copy()
 # corr_dict_errors['errors_stt'] = errorrates[0, :]
@@ -202,17 +318,17 @@ corr_dict = anal.within_subject_corr(post_sample_df)
 '''
 Kdeplots of within-subject  correlations
 '''
-for key in corr_dict.keys():
-    sns.kdeplot(corr_dict[key])
-    plt.title(key)
-    plt.show()
+# for key in corr_dict.keys():
+#     sns.kdeplot(corr_dict[key])
+#     plt.title(key)
+#     plt.show()
 
 #%%
 '''
 Correlation analysis_tools both days
 '''
-leavnodes = anal.cluster_analysis(corr_dict, title = 'all correlations exp')
-kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_dict, 
+leavnodes = anal.cluster_analysis(corr_df, title = 'all correlations exp')
+kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_df, 
                                          inf_mean_df, 
                                          n_clusters = 2,
                                          num_reps = 100)
@@ -467,64 +583,66 @@ utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
 
 #%%
 '''
-Association with sociopsy data
+Correlation with sociopsy data
 '''
 
-import scipy
-for param in param_names:
-    r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df[param])
-    print(f'Age vs {param}: r=%.4f, p=%.4f\n'%(r,p))
-
-# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day1'])
-# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day1'])
-
-# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['lr_day2'])
-# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_Q_day2'])
-# r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['theta_rep_day2'])
+""" Age """
+for param_x, param_y in itertools.product(['Age'],['ER_dtt', 'ER_stt', 'ER_total',
+                                                   'RT', *param_names]):
+    r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
+    print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
+    
+    if p < 0.05:
+        x = np.array(complete_df[param_x]).reshape(-1,1)
+        y = np.array(complete_df[param_y]).reshape(-1,1)
+        linmodel = LinearRegression()
+        linmodel.fit(x, y)
+        print(f"slope: {linmodel.coef_}\n")
 
 """ Errors """
-r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_dtt'])
-print('ER(DTT) vs Age: r=%.4f, p=%.4f\n'%(r,p))
-
-r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_stt'])
-print('ER(STT) vs Age: r=%.4f, p=%.4f\n'%(r,p))
-
-r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['ER_total'])
-print(f'ER(Total) vs Age: r=%.4f, p=%.4f\n'%(r,p))
-
-for param in [*param_names]:
-    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_total'])
-    print(f'ER(Total) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+for param_x, param_y in itertools.product(['ER_total', 'ER_stt', 'ER_dtt'],
+                                          [*param_names, 'RT']):
     
-    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_dtt'])
-    print(f'ER(dtt) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+    r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
+    print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
     
-    r,p = scipy.stats.pearsonr(complete_df[param], complete_df['ER_stt'])
-    print(f'ER(stt) vs {param}: r=%.4f, p=%.4f\n'%(r,p))
+    if p < 0.05:
+        x = np.array(complete_df[param_x]).reshape(-1,1)
+        y = np.array(complete_df[param_y]).reshape(-1,1)
+        linmodel = LinearRegression()
+        linmodel.fit(x, y)
+        print(f"slope: {linmodel.coef_}\n")
+
+""" Points """
+for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_Q_day2'], 
+                                          ['points_day1', 'points_day2',
+                                           'points_stt_day1', 'points_stt_day2',
+                                           'points_dtt_day1', 'points_dtt_day2',
+                                           'points_randomdtt_day1', 'points_congruent_day1', 'points_incongruent_day1',
+                                           'points_randomdtt_day2', 'points_congruent_day2', 'points_incongruent_day2']):
     
-""" RT """
-r,p = scipy.stats.pearsonr(complete_df['Age'], complete_df['RT'])
-print(f'RT vs Age: r={r}, p={p}\n')
+    print(f"\n~~~~~ {param_x} ~~~~~")
+    r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
+    print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
+    
+    if p < 0.05:
+        x = np.array(complete_df[param_x]).reshape(-1,1)
+        y = np.array(complete_df[param_y]).reshape(-1,1)
+        linmodel = LinearRegression()
+        linmodel.fit(x, y)
+        print(f"slope: {linmodel.coef_}\n")
 
-r,p = scipy.stats.pearsonr(complete_df['ER_dtt'], complete_df['RT'])
-print(f'ER(DTT) vs RT: r={r}, p={p}\n')
-
-r,p = scipy.stats.pearsonr(complete_df['ER_stt'], complete_df['RT'])
-print(f'ER(STT) vs RT: r={r}, p={p}\n')
 #%%
 '''
 Test sequence knowledge vs inferred parameters and sociopsy Data
 '''
 
 from scipy.stats import ttest_ind
-for param in [*param_names, 'RT']:
-    t_statistic, p_value = ttest_ind(pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 0][param]), 
-                                     pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 1][param]))
-    print(f"for noticed a seq vs {param}: p=%.4f\n"%p_value)
 
-t_statistic, p_value = ttest_ind(complete_df[complete_df['q_notice_a_sequence'] == 0]['Age'], 
-                                 complete_df[complete_df['q_notice_a_sequence'] == 1]['Age'])
-print(f"for noticed a seq vs Age: p={p_value}\n")
+for param_y in [*param_names, 'RT', 'Age']:
+    t_statistic, p_value = ttest_ind(pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 0][param_y]), 
+                                     pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 1][param_y]))
+    print(f"for noticed a seq vs {param_y}: p=%.4f, t = %.4f\n"%(p_value, t_statistic))
 
 
 for param in [*param_names, 'RT']:

@@ -21,16 +21,24 @@ import utils
 Modelle:
 Vbm
 Vbm_twodays
-random
+
+B_oneday
 B
+
 Conflict
+
 Seqboost
+
+Bhand_oneday
 Bhand
+
+ConflictHand
+
 BQ
 BK
 '''
 
-model = 'B_oneday'
+model = 'SeqConflictHand'
 #%%
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
@@ -51,8 +59,8 @@ num_agents = len(expdata_df['ag_idx'].unique())
 print(f"Starting inference of model {model} for {num_agents} agents.")
 
 #%%
-import time
-time.sleep(9*3600)
+# import time
+# time.sleep(15*3600)
 
 '''
 Prepare Inference
@@ -70,7 +78,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 10_000, num_particles = 10, block_max = 14)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 1, num_particles = 10, block_max = 14)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior( )
@@ -89,8 +97,9 @@ for col in params_sim_df.columns:
 params_sim_df['ag_idx']  = None
 params_sim_df['group']  = None
 params_sim_df['model']  = model
-BIC = infer.compute_IC()
+BIC, AIC = infer.compute_IC()
 # ELBOs = infer.compute_ELBOS()
 # loo_prediction = infer.loo_predict()
 # posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
-pickle.dump( (post_sample_df, expdata_df, (infer.loss, BIC), params_sim_df, agent_elbo_tuple), open(f"behav_fit/behav_fit_model_{model}_{timestamp}.p", "wb" ) )
+pickle.dump( (post_sample_df, expdata_df, (infer.loss, BIC, AIC), params_sim_df, agent_elbo_tuple), 
+            open(f"behav_fit/behav_fit_model_{model}_{timestamp}_{num_agents}agents.p", "wb" ) )

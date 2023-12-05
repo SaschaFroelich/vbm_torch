@@ -15,9 +15,9 @@ import inferencemodels
 from datetime import datetime
 import pickle
 
-#%%
 '''
 Modelle:
+
 Vbm
 Vbm_twodays
 random
@@ -35,7 +35,7 @@ HandSeq2
 Random
 '''
 
-model = 'Conflict'
+model = 'SeqConflictHand'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 60
@@ -63,6 +63,8 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 '''
 Inference
 '''
+import time
+time.sleep(10*3600)
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          group, 
@@ -71,18 +73,19 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-infer.infer_posterior(iter_steps = 10_000, num_particles = 10)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()
 post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: groupdata_dict['group'][0][x])
 post_sample_df['model'] = [model]*len(post_sample_df)
-BIC = infer.compute_IC()
+BIC, AIC = infer.compute_IC()
 
 "----- Save results to file"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
-pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC), params_sim_df), open(f"parameter_recovery/param_recov_model_{model}_{timestamp}.p", "wb" ) )
+pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC, AIC), params_sim_df, agent_elbo_tuple), 
+            open(f"parameter_recovery/param_recov_model_{model}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 #%%
 # log_like = infer.compute_ll()

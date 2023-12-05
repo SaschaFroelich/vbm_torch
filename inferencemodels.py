@@ -57,7 +57,7 @@ class GeneralGroupInference():
         self.num_params = len(self.agent.param_names) # number of parameters
         self.loss = []
 
-    def model(self):
+    def model(self, *args):
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
         a = pyro.param('a', torch.ones(self.num_params), constraint=dist.constraints.positive)
@@ -192,6 +192,7 @@ class GeneralGroupInference():
         for i in range(num_iters):
             print(f"Iteration {i} of {num_iters}")
             ELBOs[i, :] = svi.step_agent_elbos()
+            # ELBOs[i, :] = self.step_agent_elbos(svi)
         
         elbos = ELBOs.mean(dim=0)
         std = ELBOs.std(dim=0)
@@ -199,8 +200,6 @@ class GeneralGroupInference():
         print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
         
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
-        
-        return (elbos, std)
         
     def sample_posterior(self, n_samples = 1_000, locs = False):
         '''
@@ -288,9 +287,12 @@ class GeneralGroupInference():
         return log_likelihood
     
     def compute_IC(self, df=None):
-        print("BIC only approx. right.")
+        print("BIC and AIC only approx. right, since would have to use maximized values of log-likelihood in reality")
         '''
             BIC = k*ln(n) - 2*ll --> the lower, the better
+            ll = maximized log-likelihood value
+            k = number of parameters
+            n = number of observations
         '''
         
         data_df = pd.DataFrame(self.data).explode(list(self.data.keys()))
@@ -302,7 +304,15 @@ class GeneralGroupInference():
         BIC = torch.tensor(self.agent.num_params)*torch.log(torch.tensor(n)) -\
             2*self.compute_ll(df = df)
             
-        return BIC
+        '''
+            AIC = 2*k - 2*ll --> the lower, the better
+            ll = maximized log-likelihood value
+            k = number of parameters
+        '''
+            
+        AIC = 2*torch.tensor(self.agent.num_params) - 2*self.compute_ll(df = df)
+        
+        return BIC, AIC
     
     def compute_ELBOS(self):
         
@@ -366,57 +376,3 @@ class GeneralGroupInference():
         probs_means = torch.tensor(chosen_prob_means).sum(axis=0) / torch.ceil(torch.tensor(chosen_prob_means)).sum(axis = 0)
         
         return probs_means
-
-class BayesianModelSelection():
-    
-    def __init__(self, num_models, num_agents, data):
-        '''
-
-        Parameters
-        ----------
-        num_models : int
-            number of models
-
-        num_agents : int
-            number of participants
-
-        data : torch tensor, shape [num_agents, num_models]
-
-        Returns
-        -------
-        None.
-
-        '''
-        
-        self.num_models = num_models
-        self.num_agents = num_agents
-        # self.data = data
-        self.elbos = torch.rand(num_agents, num_models)
-        
-    def model(self):
-        scale = torch.tensor([1.0])
-        tau = pyro.sample('hyper_tau', dist.HalfCauchy(scale))
-        
-        alpha_zero = torch.ones(self.num_agents, self.num_models)/tau
-        r = pyro.sample('r', dist.Dirichlet(alpha_zero))
-        print("r shape is")
-        print(r.shape)
-        
-        m = pyro.sample('m', dist.Multinomial(1, probs = r))
-        print("m shape is")
-        print(m.shape)
-        print("m is")
-        print(m)
-        
-        "m is one-hot vector"
-        "log p(y|m) = m_1 *(ELBO(m_1) + ln r_1) + m_2 *(ELBO(m_2) + ln r_2) + m_3* ..."
-        log_likelihood = (self.elbos * m + torch.log(r)).sum(dim=1)
-        
-        log_odds = torch.log(torch.exp)
-        
-        pyro.sample('res',
-                    dist.Categorical(logits = log_odds),
-                    obs = model_evidences)
-
-    def guide(self):
-        alpha

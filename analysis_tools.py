@@ -16,8 +16,6 @@ import numpy
 import scipy
 
 import utils
-import models_torch as models
-import env 
 
 import pandas as pd
 import matplotlib.pylab as plt
@@ -88,11 +86,11 @@ def violin(df,
         ylims = [[0, 0.04], # lr
                   [0, 8], # theta_Q
                   [0.5, 5], # theta_rep
-                  [-0.4, 0.5], # conflict param
+                  [0, 3], # conflict param
                   [0, 0.04], # lr
                   [0, 8], # theta_Q
                   [0.5, 5], # theta_rep
-                  [-0.5, 0.5]] # conflict param
+                  [0, 3]] # conflict param
         
     elif model == 'Seqparam' or model == 'Seqboost':
         ylims = [[0, 0.04], # lr
@@ -240,7 +238,7 @@ def param_corr(df):
     # r,p = scipy.stats.pearsonr(df_inf["omega"], df_inf["Decision Temp"])
     
     
-def within_subject_corr(df):
+def within_subject_corr(df, param_names):
     '''
 
     Parameters
@@ -249,315 +247,88 @@ def within_subject_corr(df):
         Columns
             Parameters
             ag_idx
-
+            
+    param_names : list
+        list of parameter names for pairwise correlation.
+    
     Returns
     -------
-    corr_dict : TYPE
-        DESCRIPTION.
+    corr_df : DataFrame
+        Contains column ID as well as one column for each parameter pair that has been correlated
+        length num_agents
 
     '''
     
-    if 'ID' in df.columns:
-        df_temp = df.drop(['model', 'group', 'ag_idx', 'ID'], axis = 1)
-        df = df.drop(['model', 'group', 'ID'], axis = 1)
-        num_params = len(df_temp.columns)
-        param_names = df_temp.columns
+    num_params = len(param_names)
+    
+    df = df.loc[:, ['ID', 'ag_idx', *param_names]]
+    
+    # if 'ID' in df.columns:
+    #     df = df.drop(['model', 'group', 'ID'], axis = 1)
         
-    else:
-        df_temp = df.drop(['model', 'group', 'ag_idx'], axis = 1)
-        df = df.drop(['model', 'group'], axis = 1)
-        num_params = len(df_temp.columns)
-        param_names = df_temp.columns
+    # else:
+    #     df = df.drop(['model', 'group'], axis = 1)
         
     corr_dict = {}
+    corr_dict['ID'] = []
     for param1_idx in range(num_params):
         for param2_idx in range(param1_idx+1, num_params):
             corr_dict[param_names[param1_idx]+'_vs_' + param_names[param2_idx]] = []
     
     for ag_idx in np.sort(df['ag_idx'].unique()):
         df_ag = df[df['ag_idx'] == ag_idx]
+        corr_dict['ID'].append(df_ag['ID'].unique()[0])
+        
         for param1_idx in range(num_params):
             for param2_idx in range(param1_idx+1, num_params):
+                assert len(df_ag['ID'].unique()) == 1
                 corr_dict[param_names[param1_idx] + '_vs_' + param_names[param2_idx]].append(\
                            df_ag.loc[:, param_names[param1_idx]].corr(df_ag.loc[:, param_names[param2_idx]]))
 
-    return corr_dict
 
-# def simulate_inferred(data_dir, df, model, k, Q_init, published_results = 0, plot_Qdiff = 0):
-#     """Generate data based on inferred values and compare real/ simulated data
-#     data_dir : Directory of behavioural (mat)-files to iterate over
-#     df : dataframe of all inferred parameters for all participants
-#     model : which model to use for simulation
-#     """
+    corr_df = pd.DataFrame(data = corr_dict)
 
-#     df_group_sim = pd.DataFrame()
-#     df_group_true = pd.DataFrame()
+    return corr_df
 
-#     pb = -1
-#     for group in range(4):
-#         files_day1 = glob.glob(data_dir + "Grp%d/csv/*Tag1*.mat"%(group+1))
-        
-#         for file1 in files_day1:
-#             "Loop over participants"
-#             pb += 1
-#             print("=======================================")
-#             print(file1)
-            
-#             data, prolific_ID = utils.get_participant_data(file1, group, data_dir, published_results = published_results)
-        
-#             if group == 0:
-#                 agent_Q_init = Q_init
-#                 env_rewprobs = [0.8, 0.2, 0.2, 0.8]
-#                 block_order = 1
-#                 seqtype = 1
-                
-#             elif group == 1:
-#                 agent_Q_init = Q_init
-#                 env_rewprobs = [0.8, 0.2, 0.2, 0.8]
-#                 block_order = 2
-#                 seqtype = 1
-                
-#             elif group == 2:
-#                 agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
-#                 env_rewprobs = [0.2, 0.8, 0.8, 0.2]
-#                 block_order = 1
-#                 seqtype = 2
-                
-#             elif group == 3:
-#                 agent_Q_init = [Q_init[2], Q_init[3], Q_init[0], Q_init[1]]
-#                 env_rewprobs = [0.2, 0.8, 0.8, 0.2]
-#                 block_order = 2
-#                 seqtype = 2
-                
-#             else:
-#                 raise Exception("Da isch a Fehla!")
-                
-#             if model == 'original':
-#                 omega_inf = df[df["participant"]==prolific_ID]["inf_omega"].item()
-#                 dectemp_inf = df[df["participant"]==prolific_ID]["inf_dectemp"].item()
-#                 lr_inf = df[df["participant"]==prolific_ID]["inf_lr"].item()
-                    
-#                 newagent = models.Vbm(omega = omega_inf, \
-#                                       dectemp = dectemp_inf, \
-#                                       lr = lr_inf, k=k, Q_init = agent_Q_init)
-            
-#             elif model == 'A':
-#                 inf_dectemp_day1 = df[df["participant"]==prolific_ID]["inf_dectemp_day1"].item()
-#                 inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
-#                 inf_omega_day1 = df[df["participant"]==prolific_ID]["inf_omega_day1"].item()
-                
-#                 inf_dectemp_day2 = df[df["participant"]==prolific_ID]["inf_dectemp_day2"].item()
-#                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
-#                 inf_omega_day2 = df[df["participant"]==prolific_ID]["inf_omega_day2"].item()
-                                
-#                 newagent = models.Vbm_A(dectemp_day1 = inf_dectemp_day1, \
-#                                         lr_day1 = inf_lr_day1, \
-#                                         omega_day1 = inf_omega_day1, \
-#                                         dectemp_day2 = inf_dectemp_day2, \
-#                                         lr_day2 = inf_lr_day2, \
-#                                         omega_day2 = inf_omega_day2, \
-#                                         k=k, Q_init = agent_Q_init)
-            
-#             elif model == 'B':
-#                 inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
-#                 inf_theta_Q_day1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1"].item()
-#                 inf_theta_rep_day1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1"].item()
-                
-#                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
-#                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
-#                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
-                
-#                 newagent = models.Vbm_B(lr_day1 = inf_lr_day1, \
-#                                         theta_Q_day1 = inf_theta_Q_day1, \
-#                                         theta_rep_day1 = inf_theta_rep_day1, \
-#                                         lr_day2 = inf_lr_day2, \
-#                                         theta_Q_day2 = inf_theta_Q_day2, \
-#                                         theta_rep_day2 = inf_theta_rep_day2, \
-#                                         k=k, Q_init = agent_Q_init)
-                    
-#             elif model == 'B_onlydual':
-#                 inf_lr_day1 = df[df["participant"]==prolific_ID]["inf_lr_day1"].item()
-#                 inf_theta_Q_day1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1"].item()
-#                 inf_theta_rep_day1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1"].item()
-                
-#                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
-#                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
-#                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
-                
-#                 newagent = models.Vbm_B_onlydual(lr_day1 = inf_lr_day1, \
-#                                         theta_Q_day1 = inf_theta_Q_day1, \
-#                                         theta_rep_day1 = inf_theta_rep_day1, \
-#                                         lr_day2 = inf_lr_day2, \
-#                                         theta_Q_day2 = inf_theta_Q_day2, \
-#                                         theta_rep_day2 = inf_theta_rep_day2, \
-#                                         k=k, Q_init = agent_Q_init)
-                
-                    
-#             elif model == 'B_2':
-#                 inf_lr_day1_1 = df[df["participant"]==prolific_ID]["inf_lr_day1_1"].item()
-#                 inf_theta_Q_day1_1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1_1"].item()
-#                 inf_theta_rep_day1_1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1_1"].item()
-
-#                 inf_lr_day1_2 = df[df["participant"]==prolific_ID]["inf_lr_day1_2"].item()
-#                 inf_theta_Q_day1_2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1_2"].item()
-#                 inf_theta_rep_day1_2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1_2"].item()
-                
-#                 inf_lr_day2 = df[df["participant"]==prolific_ID]["inf_lr_day2"].item()
-#                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
-#                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
-                
-#                 newagent = models.Vbm_B_2(lr_day1_1 = inf_lr_day1_1, \
-#                                         theta_Q_day1_1 = inf_theta_Q_day1_1, \
-#                                         theta_rep_day1_1 = inf_theta_rep_day1_1, \
-                                            
-#                                         lr_day1_2 = inf_lr_day1_2, \
-#                                         theta_Q_day1_2 = inf_theta_Q_day1_2, \
-#                                         theta_rep_day1_2 = inf_theta_rep_day1_2, \
-                                            
-#                                         lr_day2 = inf_lr_day2, \
-#                                         theta_Q_day2 = inf_theta_Q_day2, \
-#                                         theta_rep_day2 = inf_theta_rep_day2, \
-#                                         k=k, Q_init = agent_Q_init)
-                    
-#             elif model == 'B_3':
-#                 inf_theta_Q_day1_1 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1_1"].item()
-#                 inf_theta_rep_day1_1 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1_1"].item()
-
-#                 inf_theta_Q_day1_2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day1_2"].item()
-#                 inf_theta_rep_day1_2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day1_2"].item()
-                
-#                 inf_theta_Q_day2 = df[df["participant"]==prolific_ID]["inf_theta_Q_day2"].item()
-#                 inf_theta_rep_day2 = df[df["participant"]==prolific_ID]["inf_theta_rep_day2"].item()
-                
-#                 newagent = models.Vbm_B_3(theta_Q_day1_1 = inf_theta_Q_day1_1, \
-#                                         theta_rep_day1_1 = inf_theta_rep_day1_1, \
-                                            
-#                                         theta_Q_day1_2 = inf_theta_Q_day1_2, \
-#                                         theta_rep_day1_2 = inf_theta_rep_day1_2, \
-                                            
-#                                         theta_Q_day2 = inf_theta_Q_day2, \
-#                                         theta_rep_day2 = inf_theta_rep_day2, \
-#                                         k=k, Q_init = agent_Q_init)
-
-
-#             print("Group %d"%group)
-
-#             "--- Simulate ---"
-#             if published_results:
-#                 newenv = env.Env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/published/')
-#             else:
-#                 newenv = env.Env(newagent, rewprobs=env_rewprobs, matfile_dir = './matlabcode/clipre/')
-                
-            
-#             newenv.run(block_order = block_order, sequence = seqtype)
-            
-#             "--- --- ---"
-                
-#             if model == 'B_3':
-#                 data_inf = {"Choices": newenv.choices, \
-#                             "Outcomes": newenv.outcomes, \
-#                             "Trialsequence": newenv.data["trialsequence"], \
-#                             "Blocktype": newenv.data["blocktype"],\
-#                             "Jokertypes": newenv.data["jokertypes"], \
-#                             "Blockidx": newenv.data["blockidx"], \
-#                             "Participant": pb}
-                    
-#             else:
-#                 data_inf = {"Choices": newenv.choices, \
-#                             "Outcomes": newenv.outcomes, \
-#                             "Trialsequence": newenv.data["trialsequence"], \
-#                             "Blocktype": newenv.data["blocktype"],\
-#                             "Jokertypes": newenv.data["jokertypes"], \
-#                             "Blockidx": newenv.data["blockidx"], \
-#                             "Participant": pb}
-#                             # "Qdiff": [(newenv.agent.Q[i][...,0] + newenv.agent.Q[i][...,3])/2 - (newenv.agent.Q[i][...,1] + newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-                    
-                    
-#             assert(data["Blocktype"] == data_inf["Blocktype"])
-            
-#             if not data["Trialsequence"] == data_inf["Trialsequence"]:
-#                 ipdb.set_trace()
-            
-#             assert(data["Trialsequence"] == data_inf["Trialsequence"])
-            
-#             data["Jokertypes"] = data_inf["Jokertypes"]
-#             data["Blockidx"] = data_inf["Blockidx"]
-                        
-#             if model == 'original':
-#                 df_sim, df_true = utils.plot_results(data, \
-#                                    data_inf, \
-#                                    omega_inf=omega_inf, \
-#                                    dectemp_inf=dectemp_inf,\
-#                                    lr_inf=lr_inf, \
-#                                    ymin=0.3, \
-#                                    group = group)
-#                                    #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
-#                                    #plotname = prolific_ID)
-
-#             else:
-#                 df_sim, df_true = utils.plot_results(data, \
-#                                    data_inf, \
-#                                    ymin=0.3, \
-#                                    group = group)
-#                                    #savedir = "/home/sascha/Desktop/vb_model/vbm_torch/behav_fit/sims_model%s"%model,\
-#                                    #plotname = prolific_ID)
-
-#             df_sim["Group"] = group
-#             df_sim["Participant"] = prolific_ID
-            
-#             df_true["Group"] = group
-#             df_true["Participant"] = prolific_ID
-            
-#             df_group_sim = pd.concat((df_group_sim, df_sim))
-#             df_group_true = pd.concat((df_group_true, df_true))
-                        
-#     "Groups 0 and 2 saw the same block order, groups 1 and 3 saw the same block order"
-#     "Change Blockidx -> Blockno, so that Block no 0 is the random block for each participant"
-#     df_group_sim.rename(columns = {"Blockidx": "Blockno"}, inplace = True)
-#     df_group_true.rename(columns = {"Blockidx": "Blockno"}, inplace = True)
-#     for grp in [1, 3]:
-#         pbs = df_group_sim[df_group_sim["Group"] == grp]["Participant"].unique()
-        
-#         for p in pbs:
-#             df_group_sim.loc[df_group_sim["Participant"] == p, "Blockno"] = df_group_sim.loc[df_group_sim["Participant"] == p, "Blockno"].map(lambda x: x-1 if x in [1,3,5,7,9,11,13] else x+1)
-#             df_group_true.loc[df_group_true["Participant"] == p, "Blockno"] = df_group_true.loc[df_group_true["Participant"] == p, "Blockno"].map(lambda x: x-1 if x in [1,3,5,7,9,11,13] else x+1)
-
-#     df_group_sim["datatype"] = "simulated"
-#     df_group_true["datatype"] = "experimental"
+def cluster_analysis(df, title= ''):
+    '''
     
-#     "Plot group-level behaviour"
-#     # ipdb.set_trace()
-#     df_together = pd.concat((df_group_sim, df_group_true))
-#     fig, ax = plt.subplots()
-#     sns.relplot(x="Blockno", y="HPCF", hue = "Trialtype", data=df_together, kind="line", col = "datatype")
-    
-#     # g = sns.relplot(x="Blockno", y="HPCF", hue = "Trialtype", data=df_together, kind="line", col = "datatype")
-#     # for (row_val, col_val), ax in g.axes_dict.items():
-#     #     if col_val == 'datatype = simulated' or col_val == 'datatype = actual':
-#     #         ax.plot([5.5, 5.5], [0.5, 1], color='k')
-    
-#     # plt.plot([5.5, 5.5], [0.5, 1], color='k')
-#     # plt.title(f"Model {model}")
-#     plt.show()
+    Parameters
+    ----------
+    df : DataFrame
+        Column ID plus
+        One column per vector space dimension. length num_agents.
+        
+    title : str, optional
+        DESCRIPTION. The default is ''.
 
-def cluster_analysis(corr_dict, title= ''):
+    Returns
+    -------
+    list
+        list of leavnodes of the cluster analysis
+
+    '''
+    
+    
     import ipdb
     import scipy.cluster.hierarchy as spc
-    keys = corr_dict.keys()
-    num_agents = len(corr_dict[list(keys)[0]])
-    num_corrs = len(corr_dict.keys())
     
+    keys = df.drop(['ID'], axis=1).columns
+    num_agents = len(df)
+    num_corrs = len(df.columns) - 1
+    
+    "Distance matrix for the vector space"
     distance = np.zeros((num_agents, num_agents))
     
     for ag_idx1 in range(num_agents):
         for ag_idx2 in range(num_agents):
-            v1 = np.zeros(len(corr_dict))
-            v2 = np.zeros(len(corr_dict))
+            v1 = np.zeros(num_corrs)
+            v2 = np.zeros(num_corrs)
             
             for key_idx in range(num_corrs):
-                key = list(corr_dict.keys())[key_idx]
-                v1[key_idx] = corr_dict[key][ag_idx1]
-                v2[key_idx] = corr_dict[key][ag_idx2]
+                key = keys[key_idx]
+                v1[key_idx] = df[key][ag_idx1]
+                v2[key_idx] = df[key][ag_idx2]
     
             distance[ag_idx1, ag_idx2] = np.sqrt(np.sum((v1 - v2)**2))
     
@@ -628,7 +399,7 @@ def compare_lists(leavnode1, leavnode2):
           f"Number of elements in union: {union}.")
         
         
-def kmeans(corr_dict, 
+def kmeans(data, 
            inf_mean_df, 
            n_clusters, 
            num_reps = 1, 
@@ -638,8 +409,10 @@ def kmeans(corr_dict,
 
     Parameters
     ----------
-    corr_dict : TYPE
-        DESCRIPTION.
+    data : DataFrame
+        Data to perform kmeans clustering over.
+        One column per vector space dimension. num_agent rows.
+        Must not contain any other columns.
         
     inf_mean_df : DataFrame
         For ag_idx and groups
@@ -662,6 +435,15 @@ def kmeans(corr_dict,
         Distances between clusters.
     '''
     
+    print("Correct this later")    
+    if 'ID' in data.columns:
+        data = data.drop(['ID'], axis=1)
+    
+    if isinstance(data, pd.DataFrame):
+        assert 'ID' not in data.columns
+        assert 'ag_idx' not in data.columns
+        assert 'model' not in data.columns
+        
     num_agents = len(inf_mean_df['ag_idx'].unique())
     
     from sklearn.cluster import KMeans
@@ -674,7 +456,7 @@ def kmeans(corr_dict,
     c_distances = []
     
     for rep in range(num_reps):
-        kmeans = kmean.fit(pd.DataFrame(corr_dict).to_numpy())
+        kmeans = kmean.fit(data.to_numpy())
         
         for clus1 in range(n_clusters):
             for clus2 in range(clus1+1, n_clusters):
@@ -738,6 +520,8 @@ def kmeans(corr_dict,
         
     # dfgh
         
+    print("Make sure agent idxs and groups are assigned correctly via inf_mean_df!")
+    
     return kmeans, cluster_groups, c_distances
 
 def compute_errors(df):
@@ -814,7 +598,13 @@ def daydiff(df, sign_level = 0.05):
     """
     from scipy import stats
     
-    df_temp = df.drop(['ag_idx', 'model', 'group', 'ID', 'handedness'], axis = 1)
+    if 'ID' in df.columns:
+        df_temp = df.drop(['ag_idx', 'model', 'group', 'ID', 'handedness'], axis = 1)
+        
+    else:
+        "For compatibility with recov data"
+        df_temp = df.drop(['ag_idx', 'model', 'group'], axis = 1)
+        
     parameter_names = df_temp.columns
     del df_temp
     from_posterior = 0
@@ -854,81 +644,82 @@ def daydiff(df, sign_level = 0.05):
             diffs_df[par[0:-1] + '2-' + par] = df[par[0:-1] + '2']-df[par]
             num_pars += 1
     
-    diffs_df['ag_idx'] = df['ag_idx']
-    diffs_df['ID'] = df['ID']
-    
-    
-    """
-        Plot Day 2 - Day 1
-    """
-    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
-    num_plot_cols = 3
-    num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
-                    (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
-    gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
-    param_idx = 0
-    for par in parameter_names:
-        if 'day1' in par:
-            if from_posterior:
-                del df
-                print("Check ag_idx!!!!")
-                df = pd.DataFrame({par : diff_dict[par], 
-                                   par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
-                                   'ag_idx' : range(len(diff_dict[par]))})
-            
-            param_idx += 1
-            plot_col_idx = param_idx % num_plot_cols
-            plot_row_idx = (param_idx // num_plot_cols)
-            
-            df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
-            t_statistic, p_value = scipy.stats.ttest_rel(df[par], df[par[0:-4]+'day2'])
-            if t_statistic > 0:
-                print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+    if num_pars > 0:
+        diffs_df['ag_idx'] = df['ag_idx']
+        if 'ID' in df.columns:
+            diffs_df['ID'] = df['ID']
+        
+        """
+            Plot Day 2 - Day 1
+        """
+        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
+        num_plot_cols = 3
+        num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
+                        (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
+        gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
+        param_idx = 0
+        for par in parameter_names:
+            if 'day1' in par:
+                if from_posterior:
+                    del df
+                    print("Check ag_idx!!!!")
+                    df = pd.DataFrame({par : diff_dict[par], 
+                                       par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
+                                       'ag_idx' : range(len(diff_dict[par]))})
                 
-            else:
-                print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
-            
-            for name, group in df_plot.groupby('ag_idx'):
-                x = np.arange(len(group))
-                y = group['value']
-                slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
-                color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
+                param_idx += 1
+                plot_col_idx = param_idx % num_plot_cols
+                plot_row_idx = (param_idx // num_plot_cols)
                 
-                if num_plot_rows > 1:
-                    group.plot('variable', 
-                               'value', 
-                               kind = 'line', 
-                               ax = ax[plot_row_idx, plot_col_idx], 
-                               color = color, 
-                               legend = False)
-                    
-                    df_plot.plot('variable', 
-                                 'value', 
-                                 kind='scatter', 
-                                 ax=ax[plot_row_idx, plot_col_idx], 
-                                 color='black', 
-                                 legend=False)
+                df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
+                t_statistic, p_value = scipy.stats.ttest_rel(df[par], df[par[0:-4]+'day2'])
+                if t_statistic > 0:
+                    print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
                     
                 else:
-                    group.plot('variable', 
-                               'value', 
-                               kind = 'line', 
-                               ax = ax[plot_col_idx], 
-                               color = color, 
-                               legend = False)
+                    print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+                
+                for name, group in df_plot.groupby('ag_idx'):
+                    x = np.arange(len(group))
+                    y = group['value']
+                    slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
+                    color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
                     
-                    df_plot.plot('variable', 
-                                 'value', 
-                                 kind='scatter', 
-                                 ax = ax[plot_col_idx], 
-                                 color='black', 
-                                 legend=False)
-                    
-            # for line in plt.gca().get_lines():
-            #     line.set_linewidth(0.3)
-            
-            # plt.gca().legend([],[], frameon=False)  # Hide the legend
-            
-    plt.show()
-    
-    return diffs_df
+                    if num_plot_rows > 1:
+                        group.plot('variable', 
+                                   'value', 
+                                   kind = 'line', 
+                                   ax = ax[plot_row_idx, plot_col_idx], 
+                                   color = color, 
+                                   legend = False)
+                        
+                        df_plot.plot('variable', 
+                                     'value', 
+                                     kind='scatter', 
+                                     ax=ax[plot_row_idx, plot_col_idx], 
+                                     color='black', 
+                                     legend=False)
+                        
+                    else:
+                        group.plot('variable', 
+                                   'value', 
+                                   kind = 'line', 
+                                   ax = ax[plot_col_idx], 
+                                   color = color, 
+                                   legend = False)
+                        
+                        df_plot.plot('variable', 
+                                     'value', 
+                                     kind='scatter', 
+                                     ax = ax[plot_col_idx], 
+                                     color='black', 
+                                     legend=False)
+                        
+                # for line in plt.gca().get_lines():
+                #     line.set_linewidth(0.3)
+                
+                # plt.gca().legend([],[], frameon=False)  # Hide the legend
+                
+        plt.show()
+        
+        return diffs_df
