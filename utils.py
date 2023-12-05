@@ -7,7 +7,6 @@ Created on Fri Jun  9 12:52:24 2023
 """
 
 import time
-import env 
 import ipdb
 import torch
 import numpy as np
@@ -16,7 +15,6 @@ import glob
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import models_torch as models
 import multiprocessing as mp
 
 import pickle
@@ -133,7 +131,7 @@ def get_groupdata(data_dir, getall = False):
             outcomes : nested list, 'shape' [num_trials, num_agents]
             trialsequence : nested list, 'shape' [num_trials, num_agents]
             blocktype : nested list, 'shape' [num_trials, num_agents]
-            jokertypes
+            jokertypes : -1/0/1/2 : no joker/random/congruent/incongruent
             blockidx : nested list, 'shape' [num_trials, num_agents]
             RT : nested list, 'shape' [num_trials, num_agents]
             group : list, len [num_trials, num_agents]. 0-indexed
@@ -188,13 +186,13 @@ def get_groupdata(data_dir, getall = False):
     q_sequence_repro_with_help = []
     
     sociopsy_df = pd.read_csv(data_dir + 'sociopsy_data.csv')
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded\xa0(0)', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded\xa0(1)', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous\xa0(2)', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous', 'Handedness'] = 2
     
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female\xa0(0)', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female', 'Handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male', 'Handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other', 'Handedness'] = 2
     
     pb = -1
     for grp in range(4):
@@ -661,6 +659,7 @@ def init_agent(model, group, num_agents=1, params = None):
 
     '''
     
+    import models_torch as models
     print("Setting Q_init.")
     Qs = torch.tensor([[0.2, 0., 0., 0.2],
                        [0.2, 0., 0., 0.2],
@@ -702,7 +701,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    if model =='B_oneday':
+    elif model =='B_oneday':
         num_params = models.Vbm_B_oneday.num_params #number of latent model parameters
         param_dict = {}
         
@@ -727,7 +726,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    if model =='Bhand_oneday':
+    elif model =='Bhand_oneday':
         num_params = models.Handedness_oneday.num_params #number of latent model parameters
         param_dict = {}
         
@@ -796,13 +795,13 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.5 # shape (1, num_agents)
-            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.04 # shape (1, num_agents)
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*2
             
-            param_dict['lr_day2'] = params_uniform[3:4, :]*0.5
-            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
-            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            param_dict['lr_day2'] = params_uniform[3:4, :]*0.007
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*7
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*2
             
         else:
             print("Setting initial parameters as provided.")
@@ -1032,15 +1031,15 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
-            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-            param_dict['hand_param_day1'] = (params_uniform[3:4, :]-0.5)*5
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*1.75
+            param_dict['hand_param_day1'] = (params_uniform[3:4, :]-0.4)*2.5
             
-            param_dict['lr_day2'] = params_uniform[4:5, :]*0.01
-            param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
-            param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-            param_dict['hand_param_day2'] = (params_uniform[7:8, :]-0.5)*5
+            param_dict['lr_day2'] = params_uniform[4:5, :]*0.08
+            param_dict['theta_Q_day2'] = params_uniform[5:6, :]*7
+            param_dict['theta_rep_day2'] = params_uniform[6:7, :]*2
+            param_dict['hand_param_day2'] = (params_uniform[7:8, :]-0.4)*2.5
             
         else:
             print("Setting initial parameters as provided.")
@@ -1059,53 +1058,57 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'HandSeq':
-        num_params = models.HandSeq.num_params #number of latent model parameters
+    elif model == 'SeqHand':
+        num_params = models.SeqHand.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
             # print("Setting random parameters.")
             # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-            # param_dict = models.HandSeq.locs_to_pars('None', locs)
+            # param_dict = models.SeqHand.locs_to_pars('None', locs)
             
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['theta_Q_day1'] = params_uniform[0:1, :]*6
-            param_dict['theta_rep_day1'] = params_uniform[1:2, :]*6
-            param_dict['hand_param_day1'] = (params_uniform[2:3, :]-0.5)*5
-            param_dict['seq_param_day1'] = params_uniform[3:4, :]*0.5
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*1.5
+            param_dict['seq_param_day1'] = (params_uniform[3:4, :]-1)*0.4
+            param_dict['hand_param_day1'] = (params_uniform[4:5, :]-0.25)*2
             
-            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
-            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-            param_dict['hand_param_day2'] = (params_uniform[6:7, :]-0.5)*5
-            param_dict['seq_param_day2'] = params_uniform[7:8, :]*0.5
+            param_dict['lr_day2'] = params_uniform[5:6, :]*0.007
+            param_dict['theta_Q_day2'] = params_uniform[6:7, :]*7
+            param_dict['theta_rep_day2'] = params_uniform[7:8, :]*1.5
+            param_dict['seq_param_day2'] = params_uniform[8:9, :]-0.5
+            param_dict['hand_param_day2'] = (params_uniform[9:10, :]-0.5)*5
             
         else:
             print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
             param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
             param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
             param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
+            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
             
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
             param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
             param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
+            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
 
-        newagent = models.HandSeq(param_dict,
+        newagent = models.SeqHand(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'HandSeq2':
-        num_params = models.HandSeq2.num_params #number of latent model parameters
+    elif model == 'SeqHand2':
+        num_params = models.SeqHand2.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
             # print("Setting random parameters.")
             # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-            # param_dict = models.HandSeq.locs_to_pars('None', locs)
+            # param_dict = models.SeqHand.locs_to_pars('None', locs)
             
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
@@ -1134,7 +1137,140 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
             param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
 
-        newagent = models.HandSeq2(param_dict,
+        newagent = models.SeqHand2(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'SeqConflict':
+        num_params = models.SeqConflict.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.ConflictHand.locs_to_pars('None', locs)
+            
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.1
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            param_dict['seq_param_day1'] = params_uniform[3:4, :]*6
+            param_dict['conflict_param_day1'] = (params_uniform[4:5, :]-0.5)*5
+            
+            param_dict['lr_day2'] = params_uniform[5:6, :]*0.1
+            param_dict['theta_Q_day2'] = params_uniform[6:7, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[7:8, :]*6
+            param_dict['seq_param_day2'] = params_uniform[8:9, :]*6
+            param_dict['conflict_param_day2'] = (params_uniform[9:10, :]-0.5)*5
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
+            param_dict['conflict_param_day1'] = params['conflict_param_day1'][None,...]
+            
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
+            param_dict['conflict_param_day2'] = params['conflict_param_day2'][None,...]
+
+        newagent = models.SeqConflict(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'ConflictHand':
+        num_params = models.ConflictHand.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.ConflictHand.locs_to_pars('None', locs)
+            
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*2
+            param_dict['conflict_param_day1'] = params_uniform[3:4, :]*1.5
+            param_dict['hand_param_day1'] = (params_uniform[4:5, :]-0.3)*2
+            
+            param_dict['lr_day2'] = params_uniform[5:6, :]*0.007
+            param_dict['theta_Q_day2'] = params_uniform[6:7, :]*7
+            param_dict['theta_rep_day2'] = params_uniform[7:8, :]*3
+            param_dict['conflict_param_day2'] = params_uniform[8:9, :]*2.5
+            param_dict['hand_param_day2'] = (params_uniform[9:10, :]-0.5)*2.5
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['conflict_param_day1'] = params['conflict_param_day1'][None,...]
+            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
+            
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['conflict_param_day2'] = params['conflict_param_day2'][None,...]
+            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
+
+        newagent = models.ConflictHand(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'SeqConflictHand':
+        num_params = models.SeqConflictHand.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            # print("Setting random parameters.")
+            # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
+            # param_dict = models.ConflictHand.locs_to_pars('None', locs)
+            
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.1
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            param_dict['seq_param_day1'] = params_uniform[3:4, :]*6
+            param_dict['conflict_param_day1'] = (params_uniform[4:5, :]-0.5)*5
+            param_dict['hand_param_day1'] = (params_uniform[5:6, :]-0.5)*5
+            
+            param_dict['lr_day2'] = params_uniform[6:7, :]*0.1
+            param_dict['theta_Q_day2'] = params_uniform[7:8, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[8:9, :]*6
+            param_dict['seq_param_day2'] = params_uniform[9:10, :]*6
+            param_dict['conflict_param_day2'] = (params_uniform[10:11, :]-0.5)*5
+            param_dict['hand_param_day2'] = (params_uniform[11:12, :]-0.5)*5
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
+            param_dict['conflict_param_day1'] = params['conflict_param_day1'][None,...]
+            param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
+            
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
+            param_dict['conflict_param_day2'] = params['conflict_param_day2'][None,...]
+            param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
+
+        newagent = models.SeqConflictHand(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1206,7 +1342,7 @@ def simulate_data(model,
 
     '''
     
-    
+    import env 
     start = time.time()
     print("Simulating %d agents."%num_agents)
 
@@ -1768,7 +1904,6 @@ def get_data_from_file():
     print(button)
     button.pack()
     root.mainloop()
-    
     # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
     res = pickle.load(open( filenames[0], "rb" ))
     if len(res) == 4:
@@ -1777,14 +1912,47 @@ def get_data_from_file():
             loss = res_2[0]
             BIC = res_2[1]
             
+            fit_version = 1
+            
         else:
             loss = res_2
         
+            fit_version = 2
+            
     elif len(res) == 5:
-        post_sample_df, expdata_df, loss, params_df, BIC = res
-       
+        if not isinstance(res[4], tuple):
+            post_sample_df, expdata_df, loss, params_df, BIC = res
+            
+            fit_version = 3
+            
+        else:
+            post_sample_df, expdata_df, res_2, params_df, elbo_tuple = res
+            if isinstance(res_2, tuple):
+                if len(res_2) == 2:
+                    loss = res_2[0]
+                    BIC = res_2[1]
+                    
+                    fit_version = 4
+                    
+                elif len(res_2) == 3:
+                    loss = res_2[0]
+                    BIC = res_2[1]
+                    AIC = res_2[2]
+                    
+                    fit_version = 5
+                    
+            else:
+                loss = res_2
+                
+                fit_version = 6
     try:
         print("BIC = %.2f"%BIC)
+        
+    except:
+        pass
+    
+    try:
+        print("AIC = %.2f"%AIC)
         
     except:
         pass
@@ -1816,9 +1984,13 @@ def get_data_from_file():
     sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
     sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
     
-    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
-
-def create_complete_df(inf_mean_df, sociopsy_df):
+    if fit_version > 3:
+        return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple
+    
+    elif fit_version <= 3:
+        return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
+        
+def create_complete_df(inf_mean_df, sociopsy_df, expdata_df):
     _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
     expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
     
@@ -1847,10 +2019,84 @@ def create_complete_df(inf_mean_df, sociopsy_df):
     complete_df = pd.merge(complete_df, newdf2, on='ID')    
 
     diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
-    complete_df = pd.merge(complete_df, diffs_df, on='ID')
-    assert np.all(complete_df['ag_idx_x'] == complete_df['ag_idx_y'])
-    complete_df = complete_df.drop(['ag_idx_x'], axis = 1)
-    complete_df.rename(columns={'ag_idx_y': 'ag_idx'}, inplace = True)
+    try:
+        complete_df = pd.merge(complete_df, diffs_df, on='ID')
+    except:
+        pass
+        
+    if 'ag_idx_x' in complete_df.columns:
+        assert np.all(complete_df['ag_idx_x'] == complete_df['ag_idx_y'])
+        complete_df = complete_df.drop(['ag_idx_x'], axis = 1)
+        complete_df.rename(columns={'ag_idx_y': 'ag_idx'}, inplace = True)
 
+    '''
+        Next: Points gained by participants.
+    '''
+    expdata_df = expdata_df[expdata_df['outcomes'] != -1]
+    expdata_df = expdata_df[expdata_df['outcomes'] != -2]
+    
+    "Total"
+    points_total = expdata_df.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_total.rename(columns={'outcomes': 'points_total'}, inplace = True)
+    
+    "Day 1"
+    expdata_df_day1 = expdata_df[expdata_df['blockidx'] <= 5 ]
+    points_day1 = expdata_df_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_day1.rename(columns={'outcomes': 'points_day1'}, inplace = True)
+    
+    "Day 2"
+    expdata_df_day2 = expdata_df[expdata_df['blockidx'] > 5 ]
+    points_day2 = expdata_df_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_day2.rename(columns={'outcomes': 'points_day2'}, inplace = True)
+    
+    "STT Day 1"
+    expdata_df_stt_day1 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] <= 5)]
+    points_stt_df_day1 = expdata_df_stt_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    points_stt_df_day1.rename(columns = {'outcomes' : 'points_stt_day1'}, inplace = True)
+    
+    "STT Day 2"
+    expdata_df_stt_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5)]
+    points_stt_df_day2 = expdata_df_stt_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    points_stt_df_day2.rename(columns = {'outcomes' : 'points_stt_day2'}, inplace = True)
+
+    
+    "DTT Jokertypes Day 1"
+    "-1/0/1/2 : no joker/random/congruent/incongruent"
+    expdata_df_dtt_day1 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] <= 5)]
+    points_dtt_df_jokertypes_day1 = expdata_df_dtt_day1.loc[:, ['ID', 'outcomes', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).sum()
+    points_dtt_df_jokertypes_day1_pivoted = points_dtt_df_jokertypes_day1.pivot(index='ID', columns='jokertypes', values = 'outcomes').reset_index()
+    points_dtt_df_jokertypes_day1_pivoted.rename(columns={0: 'points_randomdtt_day1',
+                                               1: 'points_congruent_day1',
+                                               2: 'points_incongruent_day1'}, inplace=True)
+    
+    "DTT Day 1"
+    expdata_df_dtt_day1 = expdata_df_dtt_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    expdata_df_dtt_day1.rename(columns = {'outcomes' : 'points_dtt_day1'}, inplace = True)
+    
+    "DTT Jokertypes Day 2"
+    expdata_df_dtt_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5)]
+    points_dtt_df_jokertypes_day2 = expdata_df_dtt_day2.loc[:, ['ID', 'outcomes', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).sum()
+    points_dtt_df_jokertypes_day2_pivoted = points_dtt_df_jokertypes_day2.pivot(index='ID', columns='jokertypes', values = 'outcomes').reset_index()
+    points_dtt_df_jokertypes_day2_pivoted.rename(columns={0: 'points_randomdtt_day2',
+                                               1: 'points_congruent_day2',
+                                               2: 'points_incongruent_day2'}, inplace=True)
+    
+    "DTT Day 2"
+    expdata_df_dtt_day2 = expdata_df_dtt_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    expdata_df_dtt_day2.rename(columns = {'outcomes' : 'points_dtt_day2'}, inplace = True)
+    
+    complete_df = pd.merge(complete_df, points_total, on = 'ID')
+    complete_df = pd.merge(complete_df, points_day1, on = 'ID')
+    complete_df = pd.merge(complete_df, points_day2, on = 'ID')
+    complete_df = pd.merge(complete_df, points_stt_df_day1, on = 'ID')
+    complete_df = pd.merge(complete_df, points_stt_df_day2, on = 'ID')
+    
+    complete_df = pd.merge(complete_df, points_dtt_df_jokertypes_day1_pivoted, on = 'ID')
+    complete_df = pd.merge(complete_df, points_dtt_df_jokertypes_day2_pivoted, on = 'ID')
+    
+    complete_df = pd.merge(complete_df, expdata_df_dtt_day1, on = 'ID')
+    complete_df = pd.merge(complete_df, expdata_df_dtt_day2, on = 'ID')
     assert len(complete_df) == len(inf_mean_df)
+    
+    complete_df = complete_df.sort_values(by=['ag_idx'])
     return complete_df
