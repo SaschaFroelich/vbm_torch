@@ -3,7 +3,7 @@
 """
 Created on Tue Nov  7 17:32:39 2023
 
-@author: sascha
+@author: Sascha
 """
 
 "----- Open Files"
@@ -65,26 +65,22 @@ ax = gs.subplots()
 for param_idx in range(num_params):
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
+    
     if num_params > 3:
-        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
-        # ca.plot([0,0], ca.get_ylim())
-        ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
-        
-        if plot_col_idx > 0:
-            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
-            
-        if plot_row_idx > 0:
-            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        ax_idxs = [plot_row_idx, plot_col_idx]
         
     else:
-        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_col_idx])
-        # ca.plot([0,0], ca.get_ylim())
-        ax[plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
-        if plot_col_idx > 0:
-            ax[plot_col_idx].set_ylabel(None)
-            
-        if plot_row_idx > 0:
-            ax[plot_col_idx].get_position().y0 += 10        
+        ax_idxs = [plot_col_idx]
+        
+    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[*ax_idxs])
+    # ca.plot([0,0], ca.get_ylim())
+    ax[*ax_idxs].set_xlabel(post_sample_df.columns[param_idx])
+    
+    if plot_col_idx > 0:
+        ax[*ax_idxs].set_ylabel(None)
+        
+    if plot_row_idx > 0:
+        ax[*ax_idxs].get_position().y0 += 10      
 
 plt.show()
 
@@ -99,56 +95,36 @@ for param_idx in range(num_params+1):
     param = params_df.columns[param_idx]
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
+
     if num_params > 3:
+        ax_idxs = [plot_row_idx, plot_col_idx]
         
-        if param_idx < num_params:
-            r,p = scipy.stats.pearsonr(params_df[param], inf_mean_df[param])
-            print(f"r, and p for {param} : r=%.4f, p=%.4f"%(r,p))
-            # ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
-            ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
-            sns.regplot(x = params_df[param], y=inf_mean_df[param], color='green', ax = ax[plot_row_idx, plot_col_idx])
-            # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
-            # ca.plot([0,0], ca.get_ylim())
-            ax[plot_row_idx, plot_col_idx].set_xlabel(param)
-            ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
-            if plot_col_idx > 0:
-                ax[plot_row_idx, plot_col_idx].set_ylabel(None)
-                
-            if plot_row_idx > 0:
-                ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
-                
-        else:
-            '''
-                Plot ELBO
-            '''
-            ax[plot_row_idx, plot_col_idx].plot(loss)
-            ax[plot_row_idx, plot_col_idx].set_xlabel('iteration')
-            ax[plot_row_idx, plot_col_idx].set_ylabel('-ELBO')
+    else:
+        ax_idxs = [plot_col_idx]
+
+    if param_idx < num_params:
+        r,p = scipy.stats.pearsonr(params_df[param], inf_mean_df[param])
+        print(f"r, and p for {param} : r=%.4f, p=%.4f"%(r,p))
+        # ax[*ax_idxs].scatter(params_df[param], inf_mean_df[param])
+        ax[*ax_idxs].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+        sns.regplot(x = params_df[param], y=inf_mean_df[param], color='green', ax = ax[*ax_idxs])
+        # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+        # ca.plot([0,0], ca.get_ylim())
+        ax[*ax_idxs].set_xlabel(param)
+        ax[*ax_idxs].set_ylabel('inferred')
+        if plot_col_idx > 0:
+            ax[*ax_idxs].set_ylabel(None)
+            
+        if plot_row_idx > 0:
+            ax[*ax_idxs].get_position().y0 += 10
             
     else:
-        
-        if param_idx < num_params:
-            # ax[plot_col_idx].scatter(params_df[param], inf_mean_df[param])
-            sns.regplot(x = params_df[param], y=inf_mean_df[param], color='green' , ax = ax[plot_col_idx])
-            ax[plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
-            # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
-            # ca.plot([0,0], ca.get_ylim())
-            ax[plot_col_idx].set_xlabel(param)
-            ax[plot_col_idx].set_ylabel('inferred')
-            if plot_col_idx > 0:
-                ax[plot_col_idx].set_ylabel(None)
-                
-            if plot_row_idx > 0:
-                ax[plot_col_idx].get_position().y0 += 10
-                
-                
-        else:
-            '''
-                Plot ELBO
-            '''
-            ax[plot_col_idx].plot(loss)
-            ax[plot_col_idx].set_xlabel('iteration')
-            ax[plot_col_idx].set_ylabel('-ELBO')
+        '''
+            Plot ELBO
+        '''
+        ax[*ax_idxs].plot(loss)
+        ax[*ax_idxs].set_xlabel('iteration')
+        ax[*ax_idxs].set_ylabel('-ELBO')
             
         
 # fig.suptitle(f"Model {model}", fontsize = 32)

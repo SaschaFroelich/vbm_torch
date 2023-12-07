@@ -725,42 +725,27 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                     y = group['value']
                     slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
                     color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
-                    
+
                     if num_plot_rows > 1:
-                        group.plot('variable', 
-                                   'value', 
-                                   kind = 'line', 
-                                   ax = ax[plot_row_idx, plot_col_idx], 
-                                   color = color, 
-                                   legend = False)
-                        
-                        df_plot.plot('variable', 
-                                     'value', 
-                                     kind='scatter', 
-                                     ax=ax[plot_row_idx, plot_col_idx], 
-                                     color='black', 
-                                     legend=False)
+                        ax_idxs = [plot_row_idx, plot_col_idx]
                         
                     else:
-                        group.plot('variable', 
-                                   'value', 
-                                   kind = 'line', 
-                                   ax = ax[plot_col_idx], 
-                                   color = color, 
-                                   legend = False)
+                        ax_idxs = [plot_col_idx]
                         
-                        df_plot.plot('variable', 
-                                     'value', 
-                                     kind='scatter', 
-                                     ax = ax[plot_col_idx], 
-                                     color='black', 
-                                     legend=False)
+                    group.plot('variable', 
+                               'value', 
+                               kind = 'line', 
+                               ax = ax[*ax_idxs], 
+                               color = color, 
+                               legend = False)
+                    
+                    df_plot.plot('variable', 
+                                 'value', 
+                                 kind='scatter', 
+                                 ax=ax[*ax_idxs], 
+                                 color='black', 
+                                 legend=False)
                         
-                # for line in plt.gca().get_lines():
-                #     line.set_linewidth(0.3)
-                
-                # plt.gca().legend([],[], frameon=False)  # Hide the legend
-                
         plt.show()
         
         return diffs_df

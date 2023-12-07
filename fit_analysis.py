@@ -80,6 +80,9 @@ ax.set_ylabel("ELBO")
 plt.show()
 print(np.array(loss[-1000:]).mean())
 
+'''
+Plot Parameter Distributions
+'''
 num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
                 (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
@@ -91,25 +94,21 @@ ax = gs.subplots()
 for param_idx in range(num_params):
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
+    
     if num_params > 3:
-        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
-        ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])    
-
-        if plot_col_idx > 0:
-            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
-            
-        if plot_row_idx > 0:
-            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        ax_idxs = [plot_row_idx, plot_col_idx]
         
     else:
-        ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_col_idx])
-        ax[plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])    
-        
-        if plot_col_idx > 0:
-            ax[plot_col_idx].set_ylabel(None)
-            
-        if plot_row_idx > 0:
-            ax[plot_col_idx].get_position().y0 += 10
+        ax_idxs = [plot_col_idx]
+    
+    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[*ax_idxs])
+    ax[*ax_idxs].set_xlabel(post_sample_df.columns[param_idx])    
+
+    if plot_col_idx > 0:
+        ax[*ax_idxs].set_ylabel(None)
+
+    if plot_row_idx > 0:
+        ax[*ax_idxs].get_position().y0 += 10
 
     # ca.plot([0,0], ca.get_ylim())
 
