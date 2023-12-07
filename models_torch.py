@@ -23,7 +23,7 @@ device = torch.device("cpu")
 torch.set_default_tensor_type(torch.DoubleTensor)
 
 '''
-    1-Day Models
+    1-Day Models with learning rate
 '''
 class Vbm():
     '''
@@ -733,7 +733,7 @@ class Handedness_oneday(Vbm_B_oneday):
             return choice_python_stt.clone().detach()
 
 '''
-    2-Day Models
+    2-Day Models with learning rate
 '''
 "----- VBM Original but for 2 days"
 class Vbm_twodays(Vbm):
@@ -2677,8 +2677,214 @@ class SeqConflictHand(Seqboost):
             # assert choice_python_stt.ndim == 1
             return choice_python_stt.clone().detach()
     
+'''
+    2-Day Models with decaying learning rate on day 1
+'''
+class Vbm_B_lrdec(Vbm):
     
-"----- Random Model"
+    param_names = ['lr0', 
+                   'lrk',
+                    'theta_Q_day1',
+                    'theta_rep_day1',
+                    
+                    'theta_Q_day2',
+                    'theta_rep_day2']
+    
+    num_params = len(param_names)
+    
+    def specific_init(self):
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        self.V = [self.compute_V(self.param_dict['theta_rep_day1'], 
+                                 self.param_dict['theta_Q_day1'])]
+        
+        self.lr = self.param_dict['lr0']
+    
+    def compute_V(self, theta_rep, theta_Q):
+        
+        return theta_rep[..., None]*self.rep[-1] + \
+                theta_Q[..., None]*self.Q[-1]
+        
+    def locs_to_pars(self, locs):
+        param_dict = {'lr0': torch.sigmoid(locs[..., 0]),
+                      'lrk': torch.sigmoid(locs[..., 1]),
+                    'theta_Q_day1': torch.exp(locs[..., 2]),
+                    'theta_rep_day1': torch.exp(locs[..., 3]),
+                    
+                    'theta_Q_day2': torch.exp(locs[..., 4]),
+                    'theta_rep_day2': torch.exp(locs[..., 5])}
+        
+        return param_dict
+    
+    def compute_probs(self, trial, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        probs = self.softmax(torch.stack((Vopt1, Vopt2), 2))
+        
+        
+        return probs
+    
+    def update(self, choices, outcomes, blocktype, day, **kwargs):
+        '''
+        Parameters
+        ----------
+        choices : torch.tensor or list with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+                        
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        # assert torch.is_tensor(choices)
+        # assert torch.is_tensor(outcomes)
+        # assert torch.is_tensor(blocktype)
+        # assert day == 1 or day == 2
+        
+        if day == 1:
+            'lr = lr0/(1+lrk*t)'
+            self.lr = 1/(1/self.lr + self.param_dict['lrk']/self.param_dict['lr0'])
+            theta_Q = self.param_dict['theta_Q_day1']
+            theta_rep = self.param_dict['theta_rep_day1']
+
+        elif day == 2:
+            self.lr = torch.zeros(self.param_dict['lr0'].shape)
+            theta_Q = self.param_dict['theta_Q_day2']
+            theta_rep = self.param_dict['theta_rep_day2']
+        
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.ones(self.lr.shape[0], self.lr.shape[1], self.NA)/self.NA)
+            self.Q.append(self.Q[-1])
+            
+            self.V.append(self.compute_V(theta_rep, theta_Q))
+            # self.V.append(theta_rep[..., None]*self.rep[-1] + theta_Q[..., None]*self.Q[-1])
+            
+        else:
+            "----- Update GD-values -----"
+            # outcome is either -2 (error), 0, or 1
+            # assert torch.all(outcomes <= 1)
+            # # assert torch.all(outcomes > -1)
+            
+            "--- Group!!! ----"
+            "mask contains 1s where Qoutcomp() contains non-zero entries"
+            Qout, mask = self.Qoutcomp(self.Q[-1], choices)
+            Qnew = self.Q[-1] + self.lr[..., None]*(outcomes[None,...,None]-Qout)*mask
+            
+            self.Q.append(Qnew)
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters and repetition values of self.rep -----"
+            self.seq_counter[torch.arange(self.num_agents),
+                            blocktype,
+                            self.pppchoice,
+                            self.ppchoice,
+                            self.pchoice,
+                            choices] += 1
+        
+            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        self.ppchoice, 
+                                        self.pchoice, 
+                                        choices, 
+                                        0:4].sum(axis=-1)
+            
+            new_rows = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        self.ppchoice, 
+                                        self.pchoice, 
+                                        choices, 
+                                        0:4] / seqs_sum[...,None]
+
+            self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
+            
+            "----- Compute new V-values for next trial -----"
+            self.V.append(self.compute_V(theta_rep, theta_Q))
+            # self.V.append(theta_rep[..., None]*self.rep[-1] + theta_Q[..., None]*self.Q[-1])
+            # dfgh
+
+            if len(self.Q) > 10:
+                "Free up some memory space"
+                self.V[0:-2] = []
+                self.Q[0:-2] = []
+                self.rep[0:-2] = []
+
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = choices
+
+    def reset(self, locs):
+        
+        self.param_dict = self.locs_to_pars(locs)
+        
+        "Setup"
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and rep"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)*1./self.NA] # habitual values (repetition values)
+        
+        "Compute V"
+        self.V.append(self.param_dict['theta_rep_day1'][..., None]*self.rep[-1] + self.param_dict['theta_Q_day1'][..., None]*self.Q[-1])
+        self.lr = self.param_dict['lr0']
+        
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-2 in seq_counter for errors"
+        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
+        self.seq_counter = self.init_seq_counter.clone().detach()
+        
+    
+'''
+    Random Models
+'''
 class Random_v0(Vbm):
     'Always 50% response probability.'
 

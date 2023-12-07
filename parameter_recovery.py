@@ -35,7 +35,7 @@ HandSeq2
 Random
 '''
 
-model = 'SeqConflictHand'
+model = 'B_lrdec'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
 num_agents = 60
@@ -63,8 +63,8 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 '''
 Inference
 '''
-import time
-time.sleep(10*3600)
+# import time
+# time.sleep(10*3600)
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
                          group, 
@@ -73,7 +73,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 2_500, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()

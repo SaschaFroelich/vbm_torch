@@ -10,6 +10,7 @@ Created on Tue Nov  7 17:32:39 2023
 # import sys
 # sys.modules[__name__].__dict__.clear() # Clear variables
 
+import scipy
 import utils
 import pandas as pd
 import seaborn as sns
@@ -17,7 +18,16 @@ import analysis_tools as anal
 import numpy as np
 import matplotlib.pylab as plt
 
-post_sample_df, expdata_df, loss, params_df, num_params, _ = utils.get_data_from_file()
+out = utils.get_data_from_file()
+
+if len(out) == 7:
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
+    
+elif len(out) == 6:
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
+    BIC = loss[1]
+    AIC = loss[2]
+    loss = loss[0]
 
 # params_df['paramtype'] = ['sim']*len(params_df)
 
@@ -32,18 +42,18 @@ print(f"Recovery of model {model} for {num_agents} agents after %d inference ste
 '''
 Plot ELBO
 '''
-import matplotlib.pyplot as plt
-import seaborn as sns
-fig, ax = plt.subplots()
-plt.plot(loss[-2000:])
-plt.title(f"ELBO for model {model}")
-ax.set_xlabel("Number of iterations")
-ax.set_ylabel("ELBO")
-plt.show()
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# fig, ax = plt.subplots()
+# plt.plot(loss)
+# plt.title(f"ELBO for model {model}")
+# ax.set_xlabel("Number of iterations")
+# ax.set_ylabel("ELBO")
+# plt.show()
 
 num_plot_cols = 3
-num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
-                (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
+num_plot_rows = int((num_params+1 <= num_plot_cols) + \
+                (num_params+1 > num_plot_cols) * np.ceil((num_params+1) / num_plot_cols))
 
 '''
 Plot parameter distributions
@@ -59,6 +69,7 @@ for param_idx in range(num_params):
         ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[plot_row_idx, plot_col_idx])
         # ca.plot([0,0], ca.get_ylim())
         ax[plot_row_idx, plot_col_idx].set_xlabel(post_sample_df.columns[param_idx])
+        
         if plot_col_idx > 0:
             ax[plot_row_idx, plot_col_idx].set_ylabel(None)
             
@@ -84,35 +95,61 @@ fig = plt.figure(figsize=(16,12), dpi=100)
 gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.1)
 ax = gs.subplots()
 # params_df.columns
-for param_idx in range(num_params):
+for param_idx in range(num_params+1):
     param = params_df.columns[param_idx]
     plot_col_idx = param_idx % num_plot_cols
     plot_row_idx = (param_idx // num_plot_cols)
     if num_params > 3:
-        ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
-        ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
-        # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
-        # ca.plot([0,0], ca.get_ylim())
-        ax[plot_row_idx, plot_col_idx].set_xlabel(param)
-        ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
-        if plot_col_idx > 0:
-            ax[plot_row_idx, plot_col_idx].set_ylabel(None)
-            
-        if plot_row_idx > 0:
-            ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+        
+        if param_idx < num_params:
+            r,p = scipy.stats.pearsonr(params_df[param], inf_mean_df[param])
+            print(f"r, and p for {param} : r=%.4f, p=%.4f"%(r,p))
+            # ax[plot_row_idx, plot_col_idx].scatter(params_df[param], inf_mean_df[param])
+            ax[plot_row_idx, plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+            sns.regplot(x = params_df[param], y=inf_mean_df[param], color='green', ax = ax[plot_row_idx, plot_col_idx])
+            # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+            # ca.plot([0,0], ca.get_ylim())
+            ax[plot_row_idx, plot_col_idx].set_xlabel(param)
+            ax[plot_row_idx, plot_col_idx].set_ylabel('inferred')
+            if plot_col_idx > 0:
+                ax[plot_row_idx, plot_col_idx].set_ylabel(None)
+                
+            if plot_row_idx > 0:
+                ax[plot_row_idx, plot_col_idx].get_position().y0 += 10
+                
+        else:
+            '''
+                Plot ELBO
+            '''
+            ax[plot_row_idx, plot_col_idx].plot(loss)
+            ax[plot_row_idx, plot_col_idx].set_xlabel('iteration')
+            ax[plot_row_idx, plot_col_idx].set_ylabel('-ELBO')
             
     else:
-        ax[plot_col_idx].scatter(params_df[param], inf_mean_df[param])
-        ax[plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
-        # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
-        # ca.plot([0,0], ca.get_ylim())
-        ax[plot_col_idx].set_xlabel(param)
-        ax[plot_col_idx].set_ylabel('inferred')
-        if plot_col_idx > 0:
-            ax[plot_col_idx].set_ylabel(None)
+        
+        if param_idx < num_params:
+            # ax[plot_col_idx].scatter(params_df[param], inf_mean_df[param])
+            sns.regplot(x = params_df[param], y=inf_mean_df[param], color='green' , ax = ax[plot_col_idx])
+            ax[plot_col_idx].plot(params_df[param], params_df[param], color='r', linewidth=0.05)
+            # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = )
+            # ca.plot([0,0], ca.get_ylim())
+            ax[plot_col_idx].set_xlabel(param)
+            ax[plot_col_idx].set_ylabel('inferred')
+            if plot_col_idx > 0:
+                ax[plot_col_idx].set_ylabel(None)
+                
+            if plot_row_idx > 0:
+                ax[plot_col_idx].get_position().y0 += 10
+                
+                
+        else:
+            '''
+                Plot ELBO
+            '''
+            ax[plot_col_idx].plot(loss)
+            ax[plot_col_idx].set_xlabel('iteration')
+            ax[plot_col_idx].set_ylabel('-ELBO')
             
-        if plot_row_idx > 0:
-            ax[plot_col_idx].get_position().y0 += 10
         
 # fig.suptitle(f"Model {model}", fontsize = 32)
 fig.suptitle('Dot = Mean of Posterior')

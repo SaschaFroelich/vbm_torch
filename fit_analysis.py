@@ -20,21 +20,23 @@ import utils
 import analysis_tools as anal
 import torch
 import pickle
+import arviz as az
 
 from sklearn.linear_model import LinearRegression
 import scipy
 import itertools
 
 out = utils.get_data_from_file()
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
 
-if len(out) == 7:
-    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
+# if len(out) == 7:
+#     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
     
-elif len(out) == 6:
-    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
+# elif len(out) == 6:
+#     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
     
-else:
-    raise Exception("Output length invalid.")
+# else:
+#     raise Exception("Output length invalid.")
 
 param_names = params_df.iloc[:, 0:-3].columns
 if 'ID' in expdata_df.columns:
@@ -108,7 +110,7 @@ for param_idx in range(num_params):
             
         if plot_row_idx > 0:
             ax[plot_col_idx].get_position().y0 += 10
-        
+
     # ca.plot([0,0], ca.get_ylim())
 
 plt.show()
@@ -121,26 +123,42 @@ import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
 
-anal.violin(inf_mean_df)
+anal.violin(inf_mean_df.loc[:, [*param_names]], model)
 
 if 'ID' in inf_mean_df.columns:
     complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df)
-
+    anal.violin(complete_df.loc[:, ['Age', 'ER_stt', 'ER_dtt', 'RT']], 'sociopsy')
 #%%
 '''
-Check for how many participants Seqboost is different from 0:
+Check for how many participants parameters are 0:
 '''
-sign_level = 0.001
+"Frequentist Approach"
+# sign_level = 0.0001
 
-from scipy.stats import ttest_1samp
+# from scipy.stats import ttest_1samp
+# for param in post_sample_df.columns:
+#     if param != 'group' and param != 'model' and param != 'ag_idx':
+#         print("----- Testing parameter %s"%param)
+#         for ag_idx in post_sample_df['ag_idx'].unique():
+#             t_statistic, p_value = ttest_1samp(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param], 0)
+            
+#             if p_value > sign_level:
+#                 print(f"{param} for agent {ag_idx} is zero (p=%.6f)."%p_value)
+
+
+threshold = 0
+hdi_prob = 0.95
+"Bayesian Approach"
 for param in post_sample_df.columns:
-    if param != 'group' and param != 'model' and param != 'ag_idx':
+    if param not in ['group', 'model', 'ag_idx', 'ID', 'handedness']:
+    # if param != 'group' and param != 'model' and param != 'ag_idx' and param != 'ID' and param !=:
         print("----- Testing parameter %s"%param)
         for ag_idx in post_sample_df['ag_idx'].unique():
-            t_statistic, p_value = ttest_1samp(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param], 0)
+            lower, higher = az.hdi(np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]), 
+                                   hdi_prob = hdi_prob)
             
-            if p_value > sign_level:
-                print(f"{param} for agent {ag_idx} is zero.")
+            if lower < threshold and higher > threshold:
+                print(f"threshold is in 95% HDI of parameter {param} for agent {ag_idx}")
 
 #%%
 '''
@@ -153,12 +171,12 @@ inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row[
 post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 
-diffs_df = anal.daydiff(inf_mean_df, sign_level = 0.01)
+diffs_df = anal.daydiff(inf_mean_df)
 diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
 
-anal.violin(inf_mean_df)
+anal.violin(inf_mean_df, model)
 
-diffs_df=anal.daydiff(post_sample_df, sign_level = 0.01)
+diffs_df = anal.daydiff(post_sample_df, BF = 3.2)
 
 anal.daydiff(post_sample_df[post_sample_df['group']==0], sign_level = 0.01)
 anal.daydiff(post_sample_df[post_sample_df['group']==1], sign_level = 0.01)
@@ -220,6 +238,75 @@ if p < 0.05:
     linmodel = LinearRegression()
     linmodel.fit(x, y)
     print(f"slope: {linmodel.coef_}\n")
+
+from sklearn.decomposition import PCA
+pca = PCA(n_components = 1)
+x1 = np.array(complete_df['theta_Q_day1'])
+x2 = np.array(complete_df['theta_Q_day2-theta_Q_day1'])
+principalComponents = pca.fit_transform(np.stack((x1,x2),axis=1))
+
+x = np.array(complete_df[param_x]).reshape(-1,1)
+y = np.array(complete_df[param_y]).reshape(-1,1)
+linmodel = LinearRegression()
+linmodel.fit(x1.reshape(-1,1), x2.reshape(-1,1))
+print(f"slope: {linmodel.coef_}\n")
+
+#%%
+
+'''
+    PCA on θ_Q_day1, θ_Q_day2, Δθ_Q, and Δθ_rep
+'''
+
+
+print("Need to normalize!!!")
+pca = PCA(n_components = 1)
+x1 = np.array(complete_df['theta_Q_day1'])
+x2 = np.array(complete_df['theta_rep_day1'])
+x3 = np.array(complete_df['theta_Q_day2-theta_Q_day1'])
+x4 = np.array(complete_df['theta_rep_day2-theta_rep_day1'])
+principalComponents = pca.fit_transform(np.stack((x1,x2,x3,x4),axis=1))
+
+pca_df = pd.DataFrame(data={'ag_idx': range(num_agents), 'PCA value': principalComponents[:,0]})
+# pca_df = pca_df.sort_values(by='PCA value')
+pca_0_df = pca_df[pca_df['PCA value'] < 0]
+pca_1_df = pca_df[pca_df['PCA value'] >= 0]
+
+
+fig, ax = plt.subplots()
+df = complete_df[complete_df['ag_idx'].isin(pca_0_df['ag_idx'])]
+ax.scatter(df['theta_Q_day1'], df['theta_Q_day2-theta_Q_day1'], color='red')
+df = complete_df[complete_df['ag_idx'].isin(pca_1_df['ag_idx'])]
+ax.scatter(df['theta_Q_day1'], df['theta_Q_day2-theta_Q_day1'], color='blue')
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+ax.set_xlabel('theta_Q_day1')
+ax.set_ylabel('theta_Q_day2-theta_Q_day1')
+# plt.grid()
+# plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+# plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+# plt.title('Delta R vs Delta Q')
+plt.show()
+
+fig, ax = plt.subplots()
+df = complete_df[complete_df['ag_idx'].isin(pca_0_df['ag_idx'])]
+ax.scatter(df['theta_rep_day1'], df['theta_rep_day2-theta_rep_day1'], color='red')
+df = complete_df[complete_df['ag_idx'].isin(pca_1_df['ag_idx'])]
+ax.scatter(df['theta_rep_day1'], df['theta_rep_day2-theta_rep_day1'], color='blue')
+ax.axhline(0, color='k')
+ax.axvline(0, color='k')
+ax.set_xlabel('theta_rep_day1')
+ax.set_ylabel('theta_rep_day2-theta_rep_day1')
+# plt.grid()
+# plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+# plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+# plt.title('Delta R vs Delta Q')
+plt.show()
+
+#%%
+
+anal.perform_PCA(complete_df.loc[:, ['ag_idx', 'theta_Q_day1', 'theta_rep_day1',
+                            'theta_Q_day2-theta_Q_day1',
+                            'theta_rep_day2-theta_rep_day1']], num_components=1)
 
 #%%
 "Cluster Analysis is based on absolute values"

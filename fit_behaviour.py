@@ -38,7 +38,7 @@ BQ
 BK
 '''
 
-model = 'SeqConflictHand'
+model = 'B'
 #%%
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
@@ -78,7 +78,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 1, num_particles = 10, block_max = 14)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10, block_max = 14)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior( )

@@ -15,7 +15,6 @@ import glob
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import multiprocessing as mp
 
 import pickle
 import analysis_tools as anal
@@ -1275,6 +1274,28 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
+    elif model == 'B_lrdec':
+        num_params = models.Vbm_B_lrdec.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr0'] = params_uniform[0:1, :]
+            param_dict['lrk'] = params_uniform[1:2, :]
+            param_dict['theta_Q_day1'] = params_uniform[2:3, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[3:4, :]*6
+            
+            param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            
+        
+        newagent = models.Vbm_B_lrdec(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
     else:
         raise Exception("No model specified")
         
@@ -1906,56 +1927,65 @@ def get_data_from_file():
     root.mainloop()
     # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
     res = pickle.load(open( filenames[0], "rb" ))
-    if len(res) == 4:
-        post_sample_df, expdata_df, res_2, params_df = res
-        if isinstance(res_2, tuple):
-            loss = res_2[0]
-            BIC = res_2[1]
-            
-            fit_version = 1
-            
-        else:
-            loss = res_2
-        
-            fit_version = 2
-            
-    elif len(res) == 5:
-        if not isinstance(res[4], tuple):
-            post_sample_df, expdata_df, loss, params_df, BIC = res
-            
-            fit_version = 3
-            
-        else:
-            post_sample_df, expdata_df, res_2, params_df, elbo_tuple = res
-            if isinstance(res_2, tuple):
-                if len(res_2) == 2:
-                    loss = res_2[0]
-                    BIC = res_2[1]
-                    
-                    fit_version = 4
-                    
-                elif len(res_2) == 3:
-                    loss = res_2[0]
-                    BIC = res_2[1]
-                    AIC = res_2[2]
-                    
-                    fit_version = 5
-                    
-            else:
-                loss = res_2
-                
-                fit_version = 6
-    try:
-        print("BIC = %.2f"%BIC)
-        
-    except:
-        pass
+    # print("len res is %d"%len(res))
+    assert len(res) == 5
+    assert len(res[2]) == 3
+    loss = res[2][0]
+    BIC = res[2][1]
+    AIC = res[2][2]
+    post_sample_df, expdata_df, _, params_df, agent_elbo_tuple = res
     
-    try:
-        print("AIC = %.2f"%AIC)
+    # dfgh
+    # if len(res) == 4:
+    #     post_sample_df, expdata_df, res_2, params_df = res
+    #     if isinstance(res_2, tuple):
+    #         loss = res_2[0]
+    #         BIC = res_2[1]
+            
+    #         fit_version = 1
+            
+    #     else:
+    #         loss = res_2
         
-    except:
-        pass
+    #         fit_version = 2
+            
+    # elif len(res) == 5:
+    #     if not isinstance(res[4], tuple):
+    #         post_sample_df, expdata_df, loss, params_df, BIC = res
+            
+    #         fit_version = 3
+            
+    #     else:
+    #         post_sample_df, expdata_df, res_2, params_df, elbo_tuple = res
+    #         if isinstance(res_2, tuple):
+    #             if len(res_2) == 2:
+    #                 loss = res_2[0]
+    #                 BIC = res_2[1]
+                    
+    #                 fit_version = 4
+                    
+    #             elif len(res_2) == 3:
+    #                 loss = res_2[0]
+    #                 BIC = res_2[1]
+    #                 AIC = res_2[2]
+                    
+    #                 fit_version = 5
+                    
+    #         else:
+    #             loss = res_2
+                
+    #             fit_version = 6
+    # try:
+    #     print("BIC = %.2f"%BIC)
+        
+    # except:
+    #     pass
+    
+    # try:
+    #     print("AIC = %.2f"%AIC)
+        
+    # except:
+    #     pass
     
     if 'ag_idx' not in params_df.columns:
         params_df['ag_idx'] = None
@@ -1984,11 +2014,13 @@ def get_data_from_file():
     sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
     sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
     
-    if fit_version > 3:
-        return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple
+    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
     
-    elif fit_version <= 3:
-        return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
+    # if fit_version > 3:
+    #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
+    
+    # elif fit_version <= 3:
+    #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
         
 def create_complete_df(inf_mean_df, sociopsy_df, expdata_df):
     _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
@@ -2018,7 +2050,7 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df):
 
     complete_df = pd.merge(complete_df, newdf2, on='ID')    
 
-    diffs_df = anal.daydiff(inf_mean_df, sign_level = 1.)
+    diffs_df = anal.daydiff(inf_mean_df)
     try:
         complete_df = pd.merge(complete_df, diffs_df, on='ID')
     except:

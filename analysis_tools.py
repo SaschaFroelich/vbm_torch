@@ -39,6 +39,7 @@ def remap(blockno):
     return blockno_new
 
 def violin(df, 
+           model,
            with_colbar = 1, 
            sharey = False, 
            ylims = None):
@@ -61,14 +62,15 @@ def violin(df,
 
     '''
     
-    model = df['model'].unique()[0]
-    if 'ID' in df.columns:
-        df = df.drop(['ID'], axis = 1)
+    # model = df['model'].unique()[0]
+    
+    # if 'ID' in df.columns:
+    #     df = df.drop(['ID'], axis = 1)
 
-    if 'handedness' in df.columns:
-        df = df.drop(['handedness'], axis = 1)
+    # if 'handedness' in df.columns:
+    #     df = df.drop(['handedness'], axis = 1)
         
-    df = df.drop(['model', 'ag_idx', 'group'], axis = 1)
+    # df = df.drop(['model', 'ag_idx', 'group'], axis = 1)
     
     num_params = len(df.columns)
     
@@ -121,6 +123,12 @@ def violin(df,
                       [0., 8], # theta_Q
                       [0., 2], # theta_rep
                       [-2.5, 2.5]] # hand_param
+         
+    elif model == 'sociopsy':
+        ylims = [[20, 65], # Age
+                  [0., 0.2], # ER_stt
+                  [0., 0.2], # ER_dtt
+                  [290, 480]] # RT
             
     else:
         ylims == None
@@ -574,7 +582,7 @@ def compute_errors(df):
     
     return er_df
     
-def daydiff(df, sign_level = 0.05):
+def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
     '''
 
     Parameters
@@ -597,6 +605,10 @@ def daydiff(df, sign_level = 0.05):
         if the two days are significantly different from each other.
     """
     from scipy import stats
+    import arviz as az
+    
+    if hdi_prob is not None and BF is not None:
+        raise Exception("Only specify either BF or hdi_prob.")
     
     if 'ID' in df.columns:
         df_temp = df.drop(['ag_idx', 'model', 'group', 'ID', 'handedness'], axis = 1)
@@ -604,7 +616,7 @@ def daydiff(df, sign_level = 0.05):
     else:
         "For compatibility with recov data"
         df_temp = df.drop(['ag_idx', 'model', 'group'], axis = 1)
-        
+
     parameter_names = df_temp.columns
     del df_temp
     from_posterior = 0
@@ -623,15 +635,44 @@ def daydiff(df, sign_level = 0.05):
                 diff_dict['ag_idx'] = []
                 for ag_idx in df['ag_idx'].unique():
                     df_ag = df[df['ag_idx'] == ag_idx]
-                    t_statistic, p_value = stats.ttest_ind(df_ag[param], df_ag[param[0:-4] + 'day2'])
+                    # t_statistic, p_value = stats.ttest_ind(df_ag[param], df_ag[param[0:-4] + 'day2'])
+                    difference_distro = np.array(df_ag[param[0:-4] + 'day2']-df_ag[param])
                     
-                    if p_value < sign_level:
-                        diff_dict['ag_idx'].append(ag_idx)
-                        diff_dict[param].append(df_ag[param].mean())
-                        diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
+                    if hdi_prob is not None:
+                    
+                        lower, higher = az.hdi(difference_distro, 
+                                               hdi_prob = hdi_prob)
                         
-                    else:
-                        print("Excluding agent %d for parameter %s (p-value %.4f)"%(ag_idx, param[0:-5], p_value))
+                        if lower < threshold and higher > threshold:
+                            print(f"threshold is in {hdi_prob*100}% HDI of parameter {param[0:-5]} for agent {ag_idx} --> Excluding agent")
+                            
+                        else:
+                            diff_dict['ag_idx'].append(ag_idx)
+                            diff_dict[param].append(df_ag[param].mean())
+                            diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
+                            
+                    elif BF is not None:
+                        
+                        BayesF = (difference_distro > 0).sum() / (difference_distro <= 0).sum()
+                        
+                        if BayesF < BF and BayesF > 1/BF:
+                            print(f"Bayes Factor for day differences for parameter {param[0:-5]} is %.4f for {ag_idx} --> Excluding agent"%BayesF)
+                        
+                        elif BayesF >= BF or BayesF <= 1/BF:
+                            diff_dict['ag_idx'].append(ag_idx)
+                            diff_dict[param].append(df_ag[param].mean())
+                            diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
+                    
+                        else:
+                            raise Exception("Iznogood.")
+                    
+                    # if p_value < sign_level:
+                    #     diff_dict['ag_idx'].append(ag_idx)
+                    #     diff_dict[param].append(df_ag[param].mean())
+                    #     diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
+                        
+                    # else:
+                    #     print("Excluding agent %d for parameter %s (p-value %.4f)"%(ag_idx, param[0:-5], p_value))
         
     else:
         print("No posterior samples provided.")
@@ -723,3 +764,55 @@ def daydiff(df, sign_level = 0.05):
         plt.show()
         
         return diffs_df
+    
+    
+def perform_PCA(df, num_components):
+    '''
+        Normalize df columns
+    '''
+    print("Make sure ag_idx in df is in ascending order.")
+    num_agents = len(df)
+    
+    for col in df.columns:
+        if col != 'ag_idx':
+            df[col] = (df[col]-df[col].mean())/df[col].std()
+
+    from sklearn.decomposition import PCA
+    import itertools
+    pca = PCA(n_components = num_components)
+    
+    df_for_pca = df.drop(['ag_idx'], axis = 1)
+    principalComponents = pca.fit_transform(df_for_pca)
+    
+    for comp in range(num_components):
+        
+        pca_df = pd.DataFrame(data={'ag_idx': range(num_agents), 'PCA value': principalComponents[:,comp]})
+        pca_0_df = pca_df[pca_df['PCA value'] < 0]
+        pca_1_df = pca_df[pca_df['PCA value'] >= 0]
+        
+        for col1_idx in range(len(df.columns)):
+            for col2_idx in range(col1_idx+1, len(df.columns)):
+                col1 = df.columns[col1_idx]
+                col2 = df.columns[col2_idx]
+        
+                fig, ax = plt.subplots()
+                
+                plot_df = df[df['ag_idx'].isin(pca_0_df['ag_idx'])]
+                ax.scatter(plot_df[col1], plot_df[col2], color='red')
+                
+                plot_df = df[df['ag_idx'].isin(pca_1_df['ag_idx'])]
+                ax.scatter(plot_df[col1], plot_df[col2], color='blue')
+                
+                ax.axhline(0, color='k')
+                ax.axvline(0, color='k')
+                ax.set_xlabel(col1)
+                ax.set_ylabel(col2)
+                # plt.grid()
+                # plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+                # plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+                # plt.title('Delta R vs Delta Q')
+                plt.show()
+                # dfgh
+            
+        print(f"Explained variance by component {comp+1}=%.4f"%pca.explained_variance_ratio_[comp])
+
