@@ -185,13 +185,13 @@ def get_groupdata(data_dir, getall = False):
     q_sequence_repro_with_help = []
     
     sociopsy_df = pd.read_csv(data_dir + 'sociopsy_data.csv')
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous', 'handedness'] = 2
     
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'female', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'male', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'other', 'handedness'] = 2
     
     pb = -1
     for grp in range(4):
@@ -209,15 +209,15 @@ def get_groupdata(data_dir, getall = False):
             participant_day2 = scipy.io.loadmat(file_day2)
             
             # if ID not in handedness.keys():
-            #     raise Exception('Handedness missing for ID %s'%ID)
+            #     raise Exception('handedness missing for ID %s'%ID)
             
             if getall:
                 groupdata.append(data)
                 group.append(grp)
                 IDs_included.append(ID)
-                hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Handedness'])
-                gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Gender'])
-                age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Age'])
+                hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['handedness'])
+                gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['gender'])
+                age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['age'])
                 
                 q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                 q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
@@ -227,9 +227,9 @@ def get_groupdata(data_dir, getall = False):
                     groupdata.append(data)
                     group.append(grp)
                     IDs_included.append(ID)
-                    hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Handedness'])
-                    gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Gender'])
-                    age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['Age'])
+                    hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['handedness'])
+                    gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['gender'])
+                    age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['age'])
                     
                     q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                     q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
@@ -675,7 +675,7 @@ def init_agent(model, group, num_agents=1, params = None):
                     params[key] = torch.tensor(params[key])
             
     k = 4.
-    if model =='Vbm':
+    if model == 'Vbm':
         num_params = models.Vbm.num_params #number of latent model parameters
         param_dict = {}
         
@@ -700,7 +700,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model =='B_oneday':
+    elif model == 'B_oneday':
         num_params = models.Vbm_B_oneday.num_params #number of latent model parameters
         param_dict = {}
         
@@ -725,8 +725,8 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model =='Bhand_oneday':
-        num_params = models.Handedness_oneday.num_params #number of latent model parameters
+    elif model == 'Bhand_oneday':
+        num_params = models.handedness_oneday.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -747,7 +747,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep'] = params['theta_rep'][None,...]
             param_dict['hand_param'] = params['hand_param'][None,...]
         
-        newagent = models.Handedness_oneday(param_dict,
+        newagent = models.handedness_oneday(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1019,13 +1019,13 @@ def init_agent(model, group, num_agents=1, params = None):
                               Q_init=Q_init[None, ...])
         
     elif model=='Bhand':
-        num_params = models.Handedness.num_params #number of latent model parameters
+        num_params = models.handedness.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
             # print("Setting random parameters.")
             # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-            # param_dict = models.Handedness.locs_to_pars('None', locs)
+            # param_dict = models.handedness.locs_to_pars('None', locs)
             
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
@@ -1052,7 +1052,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
 
-        newagent = models.Handedness(param_dict,
+        newagent = models.handedness(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1283,14 +1283,13 @@ def init_agent(model, group, num_agents=1, params = None):
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
             param_dict['lr0'] = params_uniform[0:1, :]
-            param_dict['lrk'] = params_uniform[1:2, :]
+            param_dict['lrk'] = params_uniform[1:2, :]*0.1
             param_dict['theta_Q_day1'] = params_uniform[2:3, :]*6
             param_dict['theta_rep_day1'] = params_uniform[3:4, :]*6
             
             param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
             param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
             
-        
         newagent = models.Vbm_B_lrdec(param_dict,
                               
                               k=torch.tensor([k]),
@@ -1575,7 +1574,7 @@ def plot_grouplevel(df1,
                             ax = ax,
                             data = agent_df_1,
                             palette = custom_palette)
-                plt.title(f'Agent {ag_idx}, model {model_1}')
+                plt.title(f'agent {ag_idx}, model {model_1}')
                 ax.get_legend().remove()
                 plt.show()
     
@@ -1975,17 +1974,18 @@ def get_data_from_file():
     #             loss = res_2
                 
     #             fit_version = 6
-    # try:
-    #     print("BIC = %.2f"%BIC)
-        
-    # except:
-    #     pass
     
-    # try:
-    #     print("AIC = %.2f"%AIC)
+    try:
+        print("BIC = %.2f"%BIC)
         
-    # except:
-    #     pass
+    except:
+        pass
+    
+    try:
+        print("AIC = %.2f"%AIC)
+        
+    except:
+        pass
     
     if 'ag_idx' not in params_df.columns:
         params_df['ag_idx'] = None
@@ -2006,13 +2006,13 @@ def get_data_from_file():
     del params_df_temp
     
     sociopsy_df = pd.read_csv('/home/sascha/Desktop/vbm_torch/behav_data/sociopsy_data.csv')
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'righthanded\xa0(0)', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'lefthanded\xa0(1)', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'ambidextrous\xa0(2)', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded\xa0(0)', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded\xa0(1)', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous\xa0(2)', 'handedness'] = 2
     
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'female\xa0(0)', 'Handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'male\xa0(1)', 'Handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['Handedness'] == 'other\xa0(2)', 'Handedness'] = 2
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'female\xa0(0)', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'male\xa0(1)', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'other\xa0(2)', 'handedness'] = 2
     
     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
     
@@ -2022,31 +2022,42 @@ def get_data_from_file():
     # elif fit_version <= 3:
     #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
         
-def create_complete_df(inf_mean_df, sociopsy_df, expdata_df):
+def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names):
     _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
-    expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
+    # expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
     
     expdata_df_wseq = expdata_df_wseq.drop(['ag_idx'], axis=1)
     complete_df_temp = pd.merge(inf_mean_df, 
                            sociopsy_df[sociopsy_df['ID'].isin(inf_mean_df['ID'])], 
                            on = 'ID')
-    
+
+    print("Computing errorrates.")
     error_df = anal.compute_errors(expdata_df_wseq)
     
     complete_df = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], complete_df_temp, on='ID')
     assert np.all(complete_df['group_x'] == complete_df['group_y'])
+    assert np.all(complete_df['handedness_x'] == complete_df['handedness_y'])
+    
     complete_df = complete_df.drop(['group_x'], axis = 1)
     complete_df.rename(columns={'group_y': 'group'}, inplace = True)
+    complete_df = complete_df.drop(['handedness_x'], axis = 1)
+    complete_df.rename(columns={'handedness_y': 'handedness'}, inplace = True)
         
-    RT_df = expdata_df_wseq.loc[:, ['ID', 'RT', 'choices']]
+    RT_df = expdata_df_wseq.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
     RT_df = RT_df[RT_df['choices'] != -1]
     RT_df = RT_df[RT_df['choices'] != -2]
-    RT_df = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day1 = pd.DataFrame(RT_df[RT_df['blockidx']<=5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day1 = RT_df_temp_day1.rename(columns={'RT':'RT_day1'})
+    RT_df_temp_day2 = pd.DataFrame(RT_df[RT_df['blockidx']>5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day2 = RT_df_temp_day2.rename(columns={'RT':'RT_day2'})
+    
+    RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
+    RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
     complete_df = pd.merge(RT_df, complete_df, on='ID')
 
     newdf2 = pd.DataFrame(expdata_df_wseq.loc[:, ['ID',
-                            'q_notice_a_sequence',
-                            'gender']].groupby(['ID'], as_index = False).mean())
+                            'q_notice_a_sequence']].groupby(['ID'], as_index = False).mean())
 
     complete_df = pd.merge(complete_df, newdf2, on='ID')    
 
@@ -2128,7 +2139,19 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df):
     
     complete_df = pd.merge(complete_df, expdata_df_dtt_day1, on = 'ID')
     complete_df = pd.merge(complete_df, expdata_df_dtt_day2, on = 'ID')
-    assert len(complete_df) == len(inf_mean_df)
     
+    corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
+    
+    complete_df = pd.merge(complete_df, corr_df)
+    
+    # assert np.all(complete_df['gender_x'] == complete_df['gender_y'])
+    # complete_df = complete_df.drop(['gender_x'], axis = 1)
+    # complete_df.rename(columns={'gender_y': 'gender'}, inplace = True)
+    
+    firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
+    complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
+    complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
+    
+    assert len(complete_df) == len(inf_mean_df)
     complete_df = complete_df.sort_values(by=['ag_idx'])
     return complete_df

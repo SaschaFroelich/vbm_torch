@@ -38,7 +38,7 @@ Random
 model = 'B_lrdec'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 60
+num_agents = 20
 
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
@@ -73,7 +73,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 2_500, num_particles = 10)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 2_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()

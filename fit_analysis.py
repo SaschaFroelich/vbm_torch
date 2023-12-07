@@ -125,39 +125,29 @@ import matplotlib.cm as cm
 anal.violin(inf_mean_df.loc[:, [*param_names]], model)
 
 if 'ID' in inf_mean_df.columns:
-    complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df)
-    anal.violin(complete_df.loc[:, ['Age', 'ER_stt', 'ER_dtt', 'RT']], 'sociopsy')
+    complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+    anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points_total']], model = 'sociopsy')
 #%%
 '''
 Check for how many participants parameters are 0:
 '''
-"Frequentist Approach"
-# sign_level = 0.0001
-
-# from scipy.stats import ttest_1samp
-# for param in post_sample_df.columns:
-#     if param != 'group' and param != 'model' and param != 'ag_idx':
-#         print("----- Testing parameter %s"%param)
-#         for ag_idx in post_sample_df['ag_idx'].unique():
-#             t_statistic, p_value = ttest_1samp(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param], 0)
-            
-#             if p_value > sign_level:
-#                 print(f"{param} for agent {ag_idx} is zero (p=%.6f)."%p_value)
-
-
 threshold = 0
-hdi_prob = 0.95
+BF = 3.2
+inf_mean_df_nozero = inf_mean_df.copy()
 "Bayesian Approach"
 for param in post_sample_df.columns:
     if param not in ['group', 'model', 'ag_idx', 'ID', 'handedness']:
     # if param != 'group' and param != 'model' and param != 'ag_idx' and param != 'ID' and param !=:
         print("----- Testing parameter %s"%param)
         for ag_idx in post_sample_df['ag_idx'].unique():
-            lower, higher = az.hdi(np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]), 
-                                   hdi_prob = hdi_prob)
+            lt0 = (np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]) <= 0).sum()
+            gt0 = (np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]) > 0).sum()
             
-            if lower < threshold and higher > threshold:
-                print(f"threshold is in 95% HDI of parameter {param} for agent {ag_idx}")
+            if gt0/lt0 <= BF and lt0/gt0 <= BF:
+                print(f"No evidence that {param} is different from 0 for agent {ag_idx}")
+                inf_mean_df_nozero[inf_mean_df_nozero['ag_idx'] == ag_idx] = np.nan
+
+anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
 
 #%%
 '''
@@ -177,40 +167,43 @@ anal.violin(inf_mean_df, model)
 
 diffs_df = anal.daydiff(post_sample_df, BF = 3.2)
 
-anal.daydiff(post_sample_df[post_sample_df['group']==0], sign_level = 0.01)
-anal.daydiff(post_sample_df[post_sample_df['group']==1], sign_level = 0.01)
-anal.daydiff(post_sample_df[post_sample_df['group']==2], sign_level = 0.01)
-anal.daydiff(post_sample_df[post_sample_df['group']==3], sign_level = 0.01)
+anal.daydiff(post_sample_df[post_sample_df['group']==0], BF = 3.2)
+anal.daydiff(post_sample_df[post_sample_df['group']==1], BF = 3.2)
+anal.daydiff(post_sample_df[post_sample_df['group']==2], BF = 3.2)
+anal.daydiff(post_sample_df[post_sample_df['group']==3], BF = 3.2)
 
-anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==1)], sign_level = 0.01)
-anal.daydiff(post_sample_df[(post_sample_df['group']==2) | (post_sample_df['group']==3)], sign_level = 0.01)
+anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==1)], BF = 3.2)
+anal.daydiff(post_sample_df[(post_sample_df['group']==2) | (post_sample_df['group']==3)], BF = 3.2)
 
-anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==2)], sign_level = 0.01)
-anal.daydiff(post_sample_df[(post_sample_df['group']==1) | (post_sample_df['group']==3)], sign_level = 0.01)
+anal.daydiff(post_sample_df[(post_sample_df['group']==0) | (post_sample_df['group']==2)], BF = 3.2)
+anal.daydiff(post_sample_df[(post_sample_df['group']==1) | (post_sample_df['group']==3)], BF = 3.2)
 
-# #%%
-# '''
-# Model B specific analysis_tools
-# Ratios between parameters.
-# '''
+#%%
+'''
+    PCA Analysis
+'''
 
-# Q_R_ratio_day1 = []
-# Q_R_ratio_day2 = []
-# for ag_idx in range(num_agents):
-#     Q_R_ratio_day1.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day1'] / \
-#         post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day1']).mean())
-        
-#     Q_R_ratio_day2.append((post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_Q_day2'] / \
-#         post_sample_df[post_sample_df['ag_idx'] == ag_idx]['theta_rep_day2']).mean())
-        
-# diff = torch.tensor(Q_R_ratio_day1) - torch.tensor(Q_R_ratio_day2)
-# sns.kdeplot(diff)
-# plt.title('Ratio Differences Day 1 - Day 2')
-# import scipy
-# import numpy as np
-# scipy.stats.ttest_1samp(np.asarray(diff), popmean=0)
-# # post_sample_df.groupby.iloc[:, 0:-2][('ag_idx')]
+"----- On absolute values"
+pca_parameters = ['ag_idx', 'age',
+                  'theta_Q_day1', 'theta_Q_day2', 
+                  'theta_rep_day1', 'theta_rep_day2',
+                  'ER_total_day1', 'ER_total_day2',
+                  'RT_day1', 'RT_day2']
 
+anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 4, correctfor='age')
+
+"----- On within-subject correlations"
+corr_df = anal.within_subject_corr(post_sample_df, ['theta_Q_day1', 'theta_Q_day2', 
+                                                    'theta_rep_day1', 'theta_rep_day2'])
+
+corr_df = pd.merge(corr_df, complete_df.loc[:, ['ID', 'age']], on ='ID')
+
+anal.perform_PCA(corr_df.drop(['ID'], axis=1), 1, correctfor = 'age')
+
+new_pca_df = pd.merge(corr_df, complete_df.loc[:, ['ID', *pca_parameters]], on='ID')
+
+new_pca_df = new_pca_df.rename(columns={'age_x':'age'})
+anal.perform_PCA(new_pca_df.drop(['ID', 'age_y'], axis=1), 10, correctfor = 'age')
 #%%
 '''
     Theta Q_day1
@@ -255,7 +248,6 @@ print(f"slope: {linmodel.coef_}\n")
 '''
     PCA on θ_Q_day1, θ_Q_day2, Δθ_Q, and Δθ_rep
 '''
-
 
 print("Need to normalize!!!")
 pca = PCA(n_components = 1)
@@ -311,11 +303,11 @@ anal.perform_PCA(complete_df.loc[:, ['ag_idx', 'theta_Q_day1', 'theta_rep_day1',
 "Cluster Analysis is based on absolute values"
 
 normalized_mean_df = pd.DataFrame()
-for param in [*param_names, 'Age', 'RT', 'ER_dtt', 'ER_stt']:
+for param in [*param_names, 'age', 'RT', 'ER_dtt', 'ER_stt']:
     normalized_mean_df[param] = (complete_df.loc[:, param] - complete_df.loc[:, param].mean())/complete_df.loc[:, param].std()
 
 kmeans, cluster_groups_bothdays, _ = anal.kmeans(complete_df.loc[:, 
-                                                [*param_names, 'Age', 'RT', 'ER_dtt', 'ER_stt']],
+                                                [*param_names, 'age', 'RT', 'ER_dtt', 'ER_stt']],
                                                  inf_mean_df, 
                                                  n_clusters = 2,
                                                  num_reps = 100)
@@ -371,7 +363,7 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothda
 
 #%%
 '''
-Correlations of Daydiffs with Age
+Correlations of Daydiffs with age
 '''
 import scipy
 
@@ -379,7 +371,7 @@ num_params = len(diffs_df.columns) - 5
 for param_idx in range(num_params):
     param = diffs_df.columns[param_idx]
     print(param)
-    r,p = scipy.stats.pearsonr(diffs_df['Age'], diffs_df[param])
+    r,p = scipy.stats.pearsonr(diffs_df['age'], diffs_df[param])
     print(r)
     print(p)
 
@@ -672,8 +664,8 @@ utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
 Correlation with sociopsy data
 '''
 
-""" Age """
-for param_x, param_y in itertools.product(['Age'],['ER_dtt', 'ER_stt', 'ER_total',
+""" age """
+for param_x, param_y in itertools.product(['age'],['ER_dtt', 'ER_stt', 'ER_total',
                                                    'RT', *param_names]):
     r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
     print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
@@ -700,7 +692,7 @@ for param_x, param_y in itertools.product(['ER_total', 'ER_stt', 'ER_dtt'],
         print(f"slope: {linmodel.coef_}\n")
 
 """ Points """
-for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_Q_day2'], 
+for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_Q_day2', 'theta_rep_day1', 'theta_rep_day2'], 
                                           ['points_day1', 'points_day2',
                                            'points_stt_day1', 'points_stt_day2',
                                            'points_dtt_day1', 'points_dtt_day2',
@@ -725,7 +717,7 @@ Test sequence knowledge vs inferred parameters and sociopsy Data
 
 from scipy.stats import ttest_ind
 
-for param_y in [*param_names, 'RT', 'Age']:
+for param_y in [*param_names, 'RT', 'age']:
     t_statistic, p_value = ttest_ind(pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 0][param_y]), 
                                      pd.to_numeric(complete_df[complete_df['q_notice_a_sequence'] == 1][param_y]))
     print(f"for noticed a seq vs {param_y}: p=%.4f, t = %.4f\n"%(p_value, t_statistic))
@@ -736,11 +728,11 @@ for param in [*param_names, 'RT']:
                                      pd.to_numeric(complete_df[complete_df['gender'] == 1][param]))
     print(f"for gender vs {param}: p={p_value}\n")
 
-t_statistic, p_value = ttest_ind(complete_df[complete_df['gender'] == 0]['Age'], 
-                                 complete_df[complete_df['gender'] == 1]['Age'])
-print(f"for gender vs Age: p={p_value}")
+t_statistic, p_value = ttest_ind(complete_df[complete_df['gender'] == 0]['age'], 
+                                 complete_df[complete_df['gender'] == 1]['age'])
+print(f"for gender vs age: p={p_value}")
 
 #%%
 import pingouin as pg
-pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day1', covar='Age')
-pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='Age')
+pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day1', covar='age')
+pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='age')

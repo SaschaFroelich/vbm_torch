@@ -128,7 +128,8 @@ def violin(df,
         ylims = [[20, 65], # Age
                   [0., 0.2], # ER_stt
                   [0., 0.2], # ER_dtt
-                  [290, 480]] # RT
+                  [290, 480], # RT
+                  [2750, 3800]] # points
             
     else:
         ylims == None
@@ -150,7 +151,7 @@ def violin(df,
             sns.stripplot(x = 'variable',
                           y = 'value',
                           data = dataseries,
-                          edgecolor = 'gray',
+                          edgecolor = 'auto',
                           linewidth = 1,
                           jitter=True,
                           ax=ax[par])
@@ -559,26 +560,56 @@ def compute_errors(df):
     group = []
     IDs = []
     ER_dtt = []
+    ER_dtt_day1 = []
+    ER_dtt_day2 = []
+    
     ER_stt = []
+    ER_stt_day1 = []
+    ER_stt_day2 = []
+    
     ER_total = []
+    ER_total_day1 = []
+    ER_total_day2 = []
     for ID in df['ID'].unique():
         ER_dtt.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
                  len(df[(df['trialsequence'] > 10) & (df['ID'] == ID)]))
 
+        ER_dtt_day1.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+
+        ER_dtt_day2.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+            
         ER_stt.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
                  len(df[(df['trialsequence'] < 10) & (df['ID'] == ID)]))
-        
+
+        ER_stt_day1.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+            
+        ER_stt_day2.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+            
         ER_total.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
                         len(df[(df['trialsequence'] > -1) & (df['ID'] == ID)]))
-        
+
+        ER_total_day1.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+            
+        ER_total_day2.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+            
         IDs.append(ID)
         group.append(df[df['ID'] == ID]['group'].unique()[0])
     
     er_df = pd.DataFrame({'group': group,
                           'ID': IDs,
                           'ER_dtt': ER_dtt,
+                          'ER_dtt_day1': ER_dtt_day1,
+                          'ER_dtt_day2': ER_dtt_day2,
                           'ER_stt': ER_stt,
-                          'ER_total': ER_total})
+                          'ER_total': ER_total,
+                          'ER_total_day1': ER_total_day1,
+                          'ER_total_day2': ER_total_day2})
     
     return er_df
     
@@ -691,7 +722,7 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
             diffs_df['ID'] = df['ID']
         
         """
-            Plot Day 2 - Day 1
+            Plot Day 2 - Day 1 with connecting lines
         """
         fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
         num_plot_cols = 3
@@ -716,7 +747,7 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                 t_statistic, p_value = scipy.stats.ttest_rel(df[par], df[par[0:-4]+'day2'])
                 if t_statistic > 0:
                     print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
-                    
+
                 else:
                     print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
                 
@@ -731,7 +762,7 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                         
                     else:
                         ax_idxs = [plot_col_idx]
-                        
+                    
                     group.plot('variable', 
                                'value', 
                                kind = 'line', 
@@ -745,19 +776,102 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                                  ax=ax[*ax_idxs], 
                                  color='black', 
                                  legend=False)
-                        
+                    
+        plt.show()
+        
+
+        """
+            Plot Day 2 - Day 1 as scatterplots
+        """
+        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
+        gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
+        param_idx = 0
+        for par in parameter_names:
+            if 'day1' in par:
+                if from_posterior:
+                    del df
+                    print("Check ag_idx!!!!")
+                    df = pd.DataFrame({par : diff_dict[par], 
+                                       par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
+                                       'ag_idx' : range(len(diff_dict[par]))})
+                
+                param_idx += 1
+                plot_col_idx = param_idx % num_plot_cols
+                plot_row_idx = (param_idx // num_plot_cols)
+                
+                # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
+                
+                if num_plot_rows > 1:
+                    ax_idxs = [plot_row_idx, plot_col_idx]
+                    
+                else:
+                    ax_idxs = [plot_col_idx]
+                
+                df['difference'] = df[par[0:-4]+'day2']-df[par]
+                sns.regplot(data = df, x=par, y='difference', color='green', ax = ax[*ax_idxs])
+                # sns.scatterplot(data = df, x=par, y='difference', ax =ax[*ax_idxs])
+                ax[*ax_idxs].axhline(0, color='k')
+                r,p = scipy.stats.pearsonr(df[par], df['difference'])
+                # dfgh
+                ax[*ax_idxs].text(df[par].min(), df['difference'].min(), "Pearson r=%.4f, p=%.4f"%(r,p))
+                    
         plt.show()
         
         return diffs_df
     
     
-def perform_PCA(df, num_components):
+def perform_PCA(df, num_components, plot = False, correctfor = None):
+    '''
+    
+
+    Parameters
+    ----------
+    df : DataFrame
+        Only parameter columns and ag_idx
+        
+    num_components : TYPE
+        DESCRIPTION.
+    plot : TYPE, optional
+        DESCRIPTION. The default is False.
+        
+    correctfor : TYPE, optional
+        Correct for this confounding variable with linear regression. The default is None.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
     '''
         Normalize df columns
     '''
     print("Make sure ag_idx in df is in ascending order.")
     num_agents = len(df)
     
+    if correctfor is not None:
+        from sklearn.linear_model import LinearRegression
+        df_corrected = pd.DataFrame(columns = df.columns)
+        
+        if 'ag_idx' in df.columns:
+            df_corrected['ag_idx'] = df['ag_idx']
+        
+        for col in df.columns:
+            if col != 'ag_idx' and col != correctfor:
+                y = np.array(df[col]).reshape(-1,1)
+                x = np.array(df[correctfor]).reshape(-1,1)
+                linmodel = LinearRegression()
+                linmodel.fit(x, y)
+                predictions = linmodel.predict(x)
+                residuals = y - predictions
+                
+                df_corrected[col] = np.squeeze(residuals)
+                
+            
+        df = df_corrected
+        df = df.drop((correctfor), axis=1)
+
+    print("Normalizing...")
     for col in df.columns:
         if col != 'ag_idx':
             df[col] = (df[col]-df[col].mean())/df[col].std()
@@ -766,7 +880,13 @@ def perform_PCA(df, num_components):
     import itertools
     pca = PCA(n_components = num_components)
     
-    df_for_pca = df.drop(['ag_idx'], axis = 1)
+    print("PCA\n\n")
+    if 'ag_idx' in df.columns:
+        df_for_pca = df.drop(['ag_idx'], axis = 1)
+        
+    else:
+        df_for_pca = df
+        
     principalComponents = pca.fit_transform(df_for_pca)
     
     for comp in range(num_components):
@@ -775,29 +895,32 @@ def perform_PCA(df, num_components):
         pca_0_df = pca_df[pca_df['PCA value'] < 0]
         pca_1_df = pca_df[pca_df['PCA value'] >= 0]
         
-        for col1_idx in range(len(df.columns)):
-            for col2_idx in range(col1_idx+1, len(df.columns)):
-                col1 = df.columns[col1_idx]
-                col2 = df.columns[col2_idx]
-        
-                fig, ax = plt.subplots()
-                
-                plot_df = df[df['ag_idx'].isin(pca_0_df['ag_idx'])]
-                ax.scatter(plot_df[col1], plot_df[col2], color='red')
-                
-                plot_df = df[df['ag_idx'].isin(pca_1_df['ag_idx'])]
-                ax.scatter(plot_df[col1], plot_df[col2], color='blue')
-                
-                ax.axhline(0, color='k')
-                ax.axvline(0, color='k')
-                ax.set_xlabel(col1)
-                ax.set_ylabel(col2)
-                # plt.grid()
-                # plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
-                # plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
-                # plt.title('Delta R vs Delta Q')
-                plt.show()
-                # dfgh
+        if plot:
+            for col1_idx in range(len(df.columns)):
+                for col2_idx in range(col1_idx+1, len(df.columns)):
+                    col1 = df.columns[col1_idx]
+                    col2 = df.columns[col2_idx]
             
-        print(f"Explained variance by component {comp+1}=%.4f"%pca.explained_variance_ratio_[comp])
-
+                    fig, ax = plt.subplots()
+                    
+                    plot_df = df[df['ag_idx'].isin(pca_0_df['ag_idx'])]
+                    ax.scatter(plot_df[col1], plot_df[col2], color='red')
+                    
+                    plot_df = df[df['ag_idx'].isin(pca_1_df['ag_idx'])]
+                    ax.scatter(plot_df[col1], plot_df[col2], color='blue')
+                    
+                    ax.axhline(0, color='k')
+                    ax.axvline(0, color='k')
+                    ax.set_xlabel(col1)
+                    ax.set_ylabel(col2)
+                    # plt.grid()
+                    # plt.scatter(kmeans.cluster_centers_[0, 0], kmeans.cluster_centers_[0, 1], color='red')
+                    # plt.scatter(kmeans.cluster_centers_[1, 0], kmeans.cluster_centers_[1, 1], color='red')
+                    # plt.title('Delta R vs Delta Q')
+                    plt.show()
+                    # dfgh
+            
+        print(f"Explained variance by component {comp+1} is %.4f"%pca.explained_variance_ratio_[comp])
+        print(f"Direction of component {comp+1} is {pca.components_[comp,:]}\n")
+        
+    print(f"The first {num_components} components (of possible {len(df_for_pca.columns)}) explain %.4f percent of the variance."%(pca.explained_variance_ratio_.sum()*100))

@@ -42,14 +42,14 @@ print(f"Recovery of model {model} for {num_agents} agents after %d inference ste
 '''
 Plot ELBO
 '''
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# fig, ax = plt.subplots()
-# plt.plot(loss)
-# plt.title(f"ELBO for model {model}")
-# ax.set_xlabel("Number of iterations")
-# ax.set_ylabel("ELBO")
-# plt.show()
+import matplotlib.pyplot as plt
+import seaborn as sns
+fig, ax = plt.subplots()
+plt.plot(loss[-500:])
+plt.title(f"ELBO for model {model}")
+ax.set_xlabel("Number of iterations")
+ax.set_ylabel("ELBO")
+plt.show()
 
 num_plot_cols = 3
 num_plot_rows = int((num_params+1 <= num_plot_cols) + \
