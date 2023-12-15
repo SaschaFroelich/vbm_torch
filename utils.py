@@ -266,7 +266,115 @@ def get_groupdata(data_dir, getall = False):
     
     return newgroupdata, groupdata_df
 
-def get_participant_data(file_day1, group, data_dir):
+
+def get_old_groupdata(data_dir, getall = False, oldpub = True):
+    '''
+
+    Parameters
+    ----------
+    data_dir : str
+        Directory with data.
+        
+    getall : bool
+        True: Get all data collected so far
+        False: Make sure to get the same number of participants in every group
+
+    Returns
+    -------
+    newgroupdata : dict
+        Contains experimental data.
+        Keys
+            choices : nested list, 'shape' [num_trials, num_agents]
+            choices_GD
+            outcomes : nested list, 'shape' [num_trials, num_agents]
+            trialsequence : nested list, 'shape' [num_trials, num_agents]
+            blocktype : nested list, 'shape' [num_trials, num_agents]
+            jokertypes : -1/0/1/2 : no joker/random/congruent/incongruent
+            blockidx : nested list, 'shape' [num_trials, num_agents]
+            RT : nested list, 'shape' [num_trials, num_agents]
+            group : list, len [num_trials, num_agents]. 0-indexed
+            ag_idx
+            ID
+            
+    groupdata_df : DataFrame
+
+    '''
+    
+    groupdata = []
+    group = []
+    
+    
+    IDs_included = []
+    
+    'right/left/ambidextrous: 0/1/2'
+    # hand = []
+    'male/female : 0/1'
+    # gender = []
+    # age = []
+    
+    q_sometimes_easier = []
+    q_notice_a_sequence = []
+    q_sequence_repro = []
+    q_sequence_repro_with_help = []
+    
+    pb = -1
+    for grp in range(4):
+        files_day1 = glob.glob(data_dir + "Grp%d/csv/*Tag1*.mat"%(grp+1))
+        
+        for file1 in files_day1:
+            "Loop over participants"
+            pb += 1
+            print(f"Doing pb {pb}")
+            data, ID = get_participant_data(file1, 
+                                            grp, 
+                                            data_dir,
+                                            oldpub = oldpub)
+            
+            file_day2 = glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(grp+1, ID))[0]
+            participant_day2 = scipy.io.loadmat(file_day2)
+            
+            # if ID not in handedness.keys():
+            #     raise Exception('handedness missing for ID %s'%ID)
+            
+            groupdata.append(data)
+            group.append(grp)
+            IDs_included.append(ID)
+            
+            q_sometimes_easier.append(participant_day2['q1'][0,1][0])
+            q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
+                
+    q_sometimes_easier = [1 if q == 'Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
+    q_notice_a_sequence  = [1 if q == 'Yes' else (0 if q == 'No' else 2) for q in q_notice_a_sequence]
+    
+    newgroupdata = comp_groupdata(groupdata)
+    num_trials = len(newgroupdata['trialsequence'])
+    num_agents = len(newgroupdata['trialsequence'][0])
+    newgroupdata['group'] = [group]*num_trials
+    # newgroupdata['handedness'] = [hand]*num_trials
+    # newgroupdata['age'] = [age]*num_trials
+    # newgroupdata['gender'] = [gender]*num_trials
+    
+    newgroupdata['q_sometimes_easier'] = [q_sometimes_easier]*num_trials
+    newgroupdata['q_notice_a_sequence'] = [q_notice_a_sequence]*num_trials
+    # newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
+    # newgroupdata['q_sequence_repro_with_help'] = [q_sequence_repro_with_help]*num_trials
+    
+    newgroupdata['ID'] = [IDs_included]*num_trials
+    newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
+    newgroupdata['model'] = [['Experiment']*num_agents]*num_trials
+    groupdata_df = pd.DataFrame(newgroupdata).explode(list(newgroupdata.keys()))
+    #
+    dfnew = pd.DataFrame(groupdata_df.loc[:, ['ID', 'group']].groupby(['ID'], as_index = False).mean())
+    
+    group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
+    print(group_distro)
+    if not getall:
+        assert np.abs(np.diff(group_distro)).sum() == 0
+    
+    return newgroupdata, groupdata_df
+
+
+def get_participant_data(file_day1, group, data_dir, oldpub = False):
     '''
     Get data of an individual participant.
     
@@ -293,6 +401,9 @@ def get_participant_data(file_day1, group, data_dir):
             outcomes : list of list of ints
             blocktype : list of list of ints
             jokertypes : list
+                DTT Types
+                (clipre) -1/0/1/2 : no joker/random/congruent/incongruent
+                (published) : -1/0/1/2/3/4 : no joker/random choice/congruent/incongruent/NLP/NHP
             blockidx
             RT : list of list of floats (RT in ms)
         
@@ -303,7 +414,7 @@ def get_participant_data(file_day1, group, data_dir):
     
     assert group < 4
     
-    ID = file_day1.split("/")[-1][4:28] # Prolific ID
+    ID = file_day1.split("/")[-1][4:9] # Prolific ID
 
     # print(data_dir)
     # print(glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID)))
@@ -321,7 +432,11 @@ def get_participant_data(file_day1, group, data_dir):
     RT = []
     
     "Block order is switched pairwise for groups 2 & 4"
-    block_order_day1 = [[0,1,2,3,4,5], [1,0,3,2,5,4], [0,1,2,3,4,5], [1,0,3,2,5,4]]
+    if oldpub:
+        block_order_day1 = [[0,1,2,3,4,5], [0,1,2,3,4,5], [0,1,2,3,4,5], [0,1,2,3,4,5]]
+        
+    else:
+        block_order_day1 = [[0,1,2,3,4,5], [1,0,3,2,5,4], [0,1,2,3,4,5], [1,0,3,2,5,4]]
     
     for i in block_order_day1[group]:
         "Mark beginning of new block with -1"
@@ -332,10 +447,15 @@ def get_participant_data(file_day1, group, data_dir):
         
         correct.extend(np.squeeze(participant_day1["correct_all_cell"][0][i]).tolist())
         choices.extend(np.squeeze(participant_day1["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
-        outcomes.extend(np.squeeze(participant_day1["rew_cell"][0][i]).tolist())
+        if 'rew_cell' in participant_day1.keys():
+            outcomes.extend(np.squeeze(participant_day1["rew_cell"][0][i]).tolist())
         RT.extend(np.squeeze(participant_day1["RT_cell"][0][i]).tolist())
+
+    if oldpub:
+        block_order_day2 = [[0,1,2,3,4,5,6,7], [0,1,2,3,4,5,6,7], [0,1,2,3,4,5,6,7], [0,1,2,3,4,5,6,7]]
         
-    block_order_day2 = [[0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6], [0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6]]
+    else:
+        block_order_day2 = [[0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6], [0,1,2,3,4,5,6,7], [1,0,3,2,5,4,7,6]]
         
     for i in block_order_day2[group]:
         "Mark beginning of new block with -1"
@@ -346,7 +466,8 @@ def get_participant_data(file_day1, group, data_dir):
         
         correct.extend(np.squeeze(participant_day2["correct_all_cell"][0][i]).tolist())
         choices.extend(np.squeeze(participant_day2["resps_response_digit_cell"][0][i]).tolist()) # Still 1-indexed
-        outcomes.extend(np.squeeze(participant_day2["rew_cell"][0][i]).tolist())
+        if 'rew_cell' in participant_day2.keys():
+            outcomes.extend(np.squeeze(participant_day2["rew_cell"][0][i]).tolist())
         RT.extend(np.squeeze(participant_day2["RT_cell"][0][i]).tolist())
     
     'So far, choices is list containing -1 (new block trial), 0 (error), and resp options 1,2,3,4,'
@@ -369,7 +490,9 @@ def get_participant_data(file_day1, group, data_dir):
     indices_corr = [i for i, x in enumerate(correct) if x == -1]
     
     assert indices_ch == indices_corr
-    assert indices_ch == indices_out
+    
+    if 'rew_cell' in participant_day2.keys():
+        assert indices_ch == indices_out
     
     trialsequence = []
     trialsequence_wo_jokers = []
@@ -384,9 +507,15 @@ def get_participant_data(file_day1, group, data_dir):
         blocktype.append(-1)
         blockidx.append(block)
         
-        seq, seq_wo_jokers, jtypes, btype = get_trialseq('./matlabcode/clipre/',
-                                                 group, 
-                                                 block)
+        if oldpub:
+            seq, seq_wo_jokers, jtypes, btype = get_trialseq('./matlabcode/published/',
+                                                     group, 
+                                                     block)
+
+        else:
+            seq, seq_wo_jokers, jtypes, btype = get_trialseq('./matlabcode/clipre/',
+                                                     group, 
+                                                     block)
         
         trialsequence.extend(seq)
         trialsequence_wo_jokers.extend(seq_wo_jokers)
@@ -395,41 +524,95 @@ def get_participant_data(file_day1, group, data_dir):
         blockidx.extend([block]*len(seq))
     
     assert len(trialsequence) == len(choices)
-    assert len(outcomes) == len(choices)
-    assert len(outcomes) == len(blocktype)
+    
+    if 'rew_cell' in participant_day2.keys():
+        assert len(outcomes) == len(choices)
+        assert len(outcomes) == len(blocktype)
     
     num_trials = len(choices)
     
-    assert len(trialsequence) == num_trials and len(trialsequence_wo_jokers) == num_trials and len(jokertypes) == num_trials and \
-        len(outcomes) == num_trials and len(blocktype) == num_trials and len(blockidx) == num_trials and len(RT) == num_trials
+    assert  len(trialsequence) == num_trials and \
+            len(trialsequence_wo_jokers) == num_trials and \
+            len(jokertypes) == num_trials and \
+            len(blocktype) == num_trials and \
+            len(blockidx) == num_trials and \
+            len(RT) == num_trials
     
+    if 'rew_cell' in participant_day2.keys():
+        len(outcomes) == num_trials
+        
     jokertypes = [[jokertypes[i]] for i in range(num_trials)]
     trialsequence = [[trialsequence[i]] for i in range(num_trials)]
     trialsequence_wo_jokers = [[trialsequence_wo_jokers[i]] for i in range(num_trials)]
     choices = [[choices[i]] for i in range(num_trials)]
-    outcomes = [[outcomes[i]] for i in range(num_trials)]
+    if 'rew_cell' in participant_day2.keys():
+        outcomes = [[outcomes[i]] for i in range(num_trials)]
     blocktype = [[blocktype[i]] for i in range(num_trials)]
     blockidx = [[blockidx[i]] for i in range(num_trials)]
     RT = [[RT[i]] for i in range(num_trials)]
-        
-    if group == 0 or group == 1:
-        choices_GD = torch.where(torch.logical_or(torch.tensor(choices) == 0, torch.tensor(choices) == 3), torch.ones(torch.tensor(choices).shape), torch.zeros(torch.tensor(choices).shape))
-        
-    elif group == 2 or group == 3:
-        choices_GD = torch.where(torch.logical_or(torch.tensor(choices) == 1, torch.tensor(choices) == 2), torch.ones(torch.tensor(choices).shape), torch.zeros(torch.tensor(choices).shape))
-        
-    choices_GD = torch.where(torch.tensor(outcomes) == -1, -1*torch.ones(torch.tensor(choices).shape), choices_GD)
-    assert torch.all(choices_GD <= 1)
+
+    choices_torch = torch.squeeze(torch.tensor(choices))
+
+    if oldpub:
+        "For old published data."
+        if group == 0 or group == 3:
+            "High Reward prob is top left and bottom right"
+            choices_GD = torch.logical_or(choices_torch == 0, choices_torch == 3) * 1 +\
+                        (choices_torch == -2) * -2 + (choices_torch == -1) * -1
+            
+        elif group == 1 or group == 2:
+            "High Reward prob is top right and bottom left"
+            choices_GD = torch.logical_or(choices_torch == 1, choices_torch == 2) * 1 +\
+                        (choices_torch == -2) * -2 + (choices_torch == -1) * -1
+            
+    else:
+        "For new fresh, and crispy data."
+        if group == 0 or group == 1:
+            "High Reward prob is top left and bottom right"
+            choices_GD = torch.logical_or(choices_torch == 0, choices_torch == 3) * 1 +\
+                        (choices_torch == -2) * -2 + (choices_torch == -1) * -1
+            
+            
+        elif group == 2 or group == 3:
+            "High Reward prob is top right and bottom left"
+            choices_GD = torch.logical_or(choices_torch == 1, choices_torch == 2) * 1 +\
+                        (choices_torch == -2) * -2 + (choices_torch == -1) * -1
+            
     
-    data = {'trialsequence': trialsequence,
-            'trialsequence_no_jokers': trialsequence_wo_jokers,
-            'jokertypes' : jokertypes,
-            'choices': choices,
-            'choices_GD' : choices_GD.type(torch.int).tolist(),
-            'outcomes': outcomes,
-            'blocktype': blocktype,
-            'blockidx': blockidx,
-            'RT': RT}
+    "Set -1 (new block trial) where appropriate"
+    # choices_GD = torch.where(choices_torch == -1, -1*torch.ones(choices_torch.shape), choices_GD)
+    assert torch.all(choices_GD <= 1)
+    choices_GD = [[cgd.item()] for cgd in choices_GD]
+    
+    "Make sure that all answers at NLP are either error, new block trial, or not GD"
+    nlpresps = torch.squeeze(torch.tensor(choices_GD))[torch.squeeze(torch.tensor(jokertypes)) == 3]
+    nhpresps = torch.squeeze(torch.tensor(choices_GD))[torch.squeeze(torch.tensor(jokertypes)) == 4]
+    assert torch.all(torch.tensor([resp in [-2, -1, 0] for resp in nlpresps]))
+    assert torch.all(torch.tensor([resp in [-2, -1, 1] for resp in nhpresps]))
+    
+    # dfgh
+    if 'rew_cell' in participant_day2.keys():
+        data = {'trialsequence': trialsequence,
+                'trialsequence_no_jokers': trialsequence_wo_jokers,
+                'jokertypes' : jokertypes,
+                'choices': choices,
+                'choices_GD' : choices_GD,
+                'outcomes': outcomes,
+                'blocktype': blocktype,
+                'blockidx': blockidx,
+                'RT': RT}
+        
+    else:
+        "Because of old published data"
+        data = {'trialsequence': trialsequence,
+                'trialsequence_no_jokers': trialsequence_wo_jokers,
+                'jokertypes' : jokertypes,
+                'choices': choices,
+                'choices_GD' : choices_GD,
+                'blocktype': blocktype,
+                'blockidx': blockidx,
+                'RT': RT}
+        
     return data, ID
     
 def get_trialseq(matfile_dir, 
@@ -458,7 +641,8 @@ def get_trialseq(matfile_dir,
 
     jokertypes : list
         DTT Types
-        -1/0/1/2 : no joker/random/congruent/incongruent
+        (clipre) -1/0/1/2 : no joker/random/congruent/incongruent
+        (published) : -1/0/1/2/3/4 : no joker/random choice/congruent/incongruent/NLP/NHP
 
     blocktype : int
         0/1 : sequential/ random block
@@ -467,73 +651,184 @@ def get_trialseq(matfile_dir,
     
     "NB: in mat-files, the block order was already swapped, as if all participants saw the first group's block order! Have to correct for this!"
     
-    "This is the blockorder participants actually saw in the 4 groups."
-    blockorder = [["random1", "trainblock1", 
-                   "random2", "trainblock2", 
-                   "random3", "trainblock3", 
-                   "trainblock4", "random4", 
-                   "trainblock5", "random5", 
-                   "trainblock6", "random6", 
-                   "trainblock7", "random7"],
-                  
-                  ["trainblock1", "random1", 
-                   "trainblock2", "random2", 
-                   "trainblock3", "random3", 
-                   "random4", "trainblock4", 
-                   "random5", "trainblock5", 
-                   "random6", "trainblock6", 
-                   "random7", "trainblock7"],
-                  
-                  ["mirror_random1", "mirror_trainblock1", 
-                   "mirror_random2", "mirror_trainblock2", 
-                   "mirror_random3", "mirror_trainblock3", 
-                   "mirror_trainblock4", "mirror_random4", 
-                   "mirror_trainblock5", "mirror_random5", 
-                   "mirror_trainblock6", "mirror_random6", 
-                   "mirror_trainblock7", "mirror_random7"],
-                  
-                  ["mirror_trainblock1", "mirror_random1", 
-                   "mirror_trainblock2", "mirror_random2", 
-                   "mirror_trainblock3", "mirror_random3", 
-                   "mirror_random4", "mirror_trainblock4", 
-                   "mirror_random5", "mirror_trainblock5", 
-                   "mirror_random6", "mirror_trainblock6", 
-                   "mirror_random7", "mirror_trainblock7"]]    
-
-    types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
-             [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0],
-              [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
-              [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0]]
+    'This is the blockorder participants actually saw in the 4 groups.'
     
-    seqs = [1, 1, 2, 2]
-    sequence = seqs[group]
+    if 'published' in matfile_dir:
+        blockorder = [["random1", "trainblock1", 
+                       "random2", "trainblock2", 
+                       "random3", "trainblock3", 
+                       "trainblock4", "random4", 
+                       "trainblock5", "random5", 
+                       "trainblock6", "random6", 
+                       "trainblock7", "random7"],
+                      
+                      ["mirror_random1", "mirror_trainblock1", 
+                       "mirror_random2", "mirror_trainblock2", 
+                       "mirror_random3", "mirror_trainblock3", 
+                       "mirror_trainblock4", "mirror_random4", 
+                       "mirror_trainblock5", "mirror_random5", 
+                       "mirror_trainblock6", "mirror_random6", 
+                       "mirror_trainblock7", "mirror_random7"],
+                      
+                      ["mirror_random1", "mirror_trainblock1", 
+                       "mirror_random2", "mirror_trainblock2", 
+                       "mirror_random3", "mirror_trainblock3", 
+                       "mirror_trainblock4", "mirror_random4", 
+                       "mirror_trainblock5", "mirror_random5", 
+                       "mirror_trainblock6", "mirror_random6", 
+                       "mirror_trainblock7", "mirror_random7"],
+                      
+                    ["random1", "trainblock1", 
+                     "random2", "trainblock2", 
+                     "random3", "trainblock3", 
+                     "trainblock4", "random4", 
+                     "trainblock5", "random5", 
+                     "trainblock6", "random6", 
+                     "trainblock7", "random7"]]    
+        
+        '1 = random, 0 = seq'
+        types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                 [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                 [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                 [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1]]
 
+        seqs = [1, 2, 2, 1]
+        
+    elif 'clipre' in matfile_dir:
+        blockorder = [["random1", "trainblock1", 
+                       "random2", "trainblock2", 
+                       "random3", "trainblock3", 
+                       "trainblock4", "random4", 
+                       "trainblock5", "random5", 
+                       "trainblock6", "random6", 
+                       "trainblock7", "random7"],
+                      
+                      ["trainblock1", "random1", 
+                       "trainblock2", "random2", 
+                       "trainblock3", "random3", 
+                       "random4", "trainblock4", 
+                       "random5", "trainblock5", 
+                       "random6", "trainblock6", 
+                       "random7", "trainblock7"],
+                      
+                      ["mirror_random1", "mirror_trainblock1", 
+                       "mirror_random2", "mirror_trainblock2", 
+                       "mirror_random3", "mirror_trainblock3", 
+                       "mirror_trainblock4", "mirror_random4", 
+                       "mirror_trainblock5", "mirror_random5", 
+                       "mirror_trainblock6", "mirror_random6", 
+                       "mirror_trainblock7", "mirror_random7"],
+                      
+                      ["mirror_trainblock1", "mirror_random1", 
+                       "mirror_trainblock2", "mirror_random2", 
+                       "mirror_trainblock3", "mirror_random3", 
+                       "mirror_random4", "mirror_trainblock4", 
+                       "mirror_random5", "mirror_trainblock5", 
+                       "mirror_random6", "mirror_trainblock6", 
+                       "mirror_random7", "mirror_trainblock7"]]    
+
+        '1 = random, 0 = seq'
+        types = [[1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                 [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0],
+                  [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                  [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0]]
+        
+        seqs = [1, 1, 2, 2] # 2 = mirror sequence (has different reward contingency)
+
+    sequence = seqs[group]
     blocktype = types[group][blockidx]
 
     mat = scipy.io.loadmat(matfile_dir + "%s.mat"%blockorder[group][blockidx])
-    
+
     seq = mat['sequence'][0]
     seq_no_jokers = mat['sequence_without_jokers'][0]
-    
+
+    # jokertypes = (seq>10)*seq
+
     "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
-    seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]    
-    
+    # seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]
+    # seq_withneutral = seq.copy()
+
     "----- Determine congruent/ incongruent jokers"
-    if blocktype == 0:
-        "sequential"
-        jokers = [-1 if seq_noneutral[tidx]<10 else seq_no_jokers[tidx] for tidx in range(len(seq))]
-        if sequence == 1:
-            jokertypes = [j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 for j in jokers]
+    if 'published' in matfile_dir:
+        if blocktype == 0:
+            "Sequential"
+            "Sequential element where jokers are"
+            jokers_noneut_seqelem = [-1 if seq[tidx] not in [12, 13, 24, 34] else seq_no_jokers[tidx] for tidx in range(len(seq))]
             
-        elif sequence == 2:
-            jokertypes = [j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 for j in jokers]
+            if sequence == 1:
+                "(published) : -1/0/1/2/3/4 : no joker/random choice/congruent/incongruent/NLP/NHP"
+                num_nlp = (np.array(seq) == 23).sum()
+                num_nhp = (np.array(seq) == 14).sum()
+                "groups 0 and 3"
+                "-1 > -1, 1 > 1, 2 > 2, 3 > 2, 4 > 1"
+                jokertypes = np.array([j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 if j == 4 else 0 for j in jokers_noneut_seqelem])
+                jokertypes += ((np.array(seq) == 14) * 5 + (np.array(seq) == 23) * 4)
+                
+                assert num_nlp == ((np.array(jokertypes) == 3).sum())
+                assert num_nhp == ((np.array(jokertypes) == 4).sum())
+                
+            elif sequence == 2:
+                num_nlp = (np.array(seq) == 14).sum()
+                num_nhp = (np.array(seq) == 23).sum()
+                "groups 1 and 2"
+                "-1 > -1, 1 > 2, 2 > 1, 3 > 1, 4 > 2"
+                jokertypes = np.array([j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 if j == 4 else 0 for j in jokers_noneut_seqelem])
+                jokertypes += ((np.array(seq) == 14) * 4 + (np.array(seq) == 23) * 5)
+                
+                assert num_nlp == ((np.array(jokertypes) == 3).sum())
+                assert num_nhp == ((np.array(jokertypes) == 4).sum())
+                
+            else:
+                raise Exception("Fehla!!")
+
+        elif blocktype == 1:
+            "Random"
+            # jokertypes = [-1 if seq_noneutral[tidx]<10 else 0 for tidx in range(len(seq_noneutral))]
+
+            if group == 0 or group == 3:
+                jokertypes = (np.array(seq) == 14) * 4 +\
+                            (np.array(seq) == 23) * 3 -\
+                            (np.array(seq) < 10)
+
+            elif group == 1 or group == 2:
+                jokertypes = (np.array(seq) == 14) * 3 +\
+                            (np.array(seq) == 23) * 4 -\
+                            (np.array(seq) < 10)
+                
+            else:
+                raise Exception("Group must be 0,1,2, or 3.")
             
-        else:
-            raise Exception("Fehla!!")
-                    
-    elif blocktype == 1:
-        "random"
-        jokertypes = [-1 if seq_noneutral[tidx]<10 else 0 for tidx in range(len(seq_noneutral))]
+        jokertypes = jokertypes.tolist()
+        # jokertypes = torch.where(torch.logical_or(seq_withneutral == 14, seq_withneutral == 23), )
+          
+    elif 'clipre' in matfile_dir:
+        if blocktype == 0:
+            "sequential"
+            "Sequential element where jokers are"
+            jokers_seqelem = [-1 if seq[tidx]<10 else seq_no_jokers[tidx] for tidx in range(len(seq))]
+            
+            if sequence == 1:
+                "Groups 1 & 2: High Reward top left & bottom right"
+                "-1 > -1, 1 > 1, 2 > 2, 3 > 2, else 1"
+                jokertypes = [j if j == -1 else 1 if j == 1 else 2 if j == 2 else 2 if j == 3 else 1 for j in jokers_seqelem]
+                
+            elif sequence == 2:
+                "Groups 1 & 2: High Reward top right & bottom left"
+                "Groups 3 & 4"
+                jokertypes = [j if j == -1 else 2 if j == 1 else 1 if j == 2 else 1 if j == 3 else 2 for j in jokers_seqelem]
+                
+            else:
+                raise Exception("Fehla!!")
+                     
+        elif blocktype == 1:
+            "random"
+            # jokertypes = [-1 if seq[tidx]<10 else 0 for tidx in range(len(seq))]
+            
+            jokertypes = ((np.array(seq) > 10) -1).tolist()
+    
+    assert (np.array(seq) > 10).sum() == (np.array(jokertypes)>=0).sum()
+    assert (np.array(jokertypes) > 4).sum() == 0
     
     return torch.squeeze(torch.tensor(seq)).tolist(), \
         torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
@@ -588,15 +883,26 @@ def comp_groupdata(groupdata):
 
     '''
     
-    newgroupdata = {'choices' : [],
-                    'choices_GD' : [],
-                    'outcomes' : [],
-                    'trialsequence' : [],
-                    'blocktype' : [],
-                    'jokertypes' : [],
-                    'blockidx' : [],
-                    'RT': []}
+    if 'outcomes' in groupdata[0].keys():
+        newgroupdata = {'choices' : [],
+                        'choices_GD' : [],
+                        'outcomes' : [],
+                        'trialsequence' : [],
+                        'blocktype' : [],
+                        'jokertypes' : [],
+                        'blockidx' : [],
+                        'RT': []}
 
+
+    else:
+        "Because of old published data"
+        newgroupdata = {'choices' : [],
+                        'choices_GD' : [],
+                        'trialsequence' : [],
+                        'blocktype' : [],
+                        'jokertypes' : [],
+                        'blockidx' : [],
+                        'RT': []}
         
     num_trials = len(groupdata[0]["trialsequence"])
     for trial in range(num_trials):
@@ -612,7 +918,8 @@ def comp_groupdata(groupdata):
         for dt in groupdata:
             choices.append(dt['choices'][trial][0])
             choices_GD.append(dt['choices_GD'][trial][0])
-            outcomes.append(dt['outcomes'][trial][0])
+            if 'outcomes' in groupdata[0].keys():
+                outcomes.append(dt['outcomes'][trial][0])
             trialsequence.append(dt['trialsequence'][trial][0])
             blocktype.append(dt['blocktype'][trial][0])
             jokertypes.append(dt['jokertypes'][trial][0])
@@ -622,7 +929,8 @@ def comp_groupdata(groupdata):
         
         newgroupdata["choices"].append(choices)
         newgroupdata["choices_GD"].append(choices_GD)
-        newgroupdata["outcomes"].append(outcomes)
+        if 'outcomes' in groupdata[0].keys():
+            newgroupdata["outcomes"].append(outcomes)
         newgroupdata["trialsequence"].append(trialsequence)
         newgroupdata["blocktype"].append(blocktype)
         newgroupdata["jokertypes"].append(jokertypes)
@@ -794,7 +1102,7 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr_day1'] = params_uniform[0:1, :]*0.04 # shape (1, num_agents)
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.01 # shape (1, num_agents)
             param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
             param_dict['theta_rep_day1'] = params_uniform[2:3, :]*2
             
@@ -1282,13 +1590,22 @@ def init_agent(model, group, num_agents=1, params = None):
             print("Setting random parameters.")
             params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
             
-            param_dict['lr0'] = params_uniform[0:1, :]
-            param_dict['lrk'] = params_uniform[1:2, :]*0.1
+            param_dict['lr0'] = params_uniform[0:1, :]*0.5
+            param_dict['lrk'] = torch.ones(params_uniform[1:2, :].shape)*0.1
             param_dict['theta_Q_day1'] = params_uniform[2:3, :]*6
             param_dict['theta_rep_day1'] = params_uniform[3:4, :]*6
             
             param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
             param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr0'] = params['lr0'][None,...]
+            param_dict['lrk'] = params['lrk'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
             
         newagent = models.Vbm_B_lrdec(param_dict,
                               
@@ -1470,7 +1787,10 @@ def plot_grouplevel(df1,
             outcomes
             trialsequence
             blocktype
-            jokertypes
+            jokertypes:
+                DTT Types
+                (clipre) -1/0/1/2 : no joker/random/congruent/incongruent
+                (published) : -1/0/1/2/3/4 : no joker/random choice/congruent/incongruent/NLP/NHP
             blockidx
             group
             ag_idx
@@ -1521,7 +1841,7 @@ def plot_grouplevel(df1,
                                          blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                          else row['blockidx'], axis=1)
         
-    groupdata_df_1 = groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
+    # groupdata_df_1 = groupdata_df_1.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
     
     if df2 is not None:
         if day == 1:
@@ -1547,8 +1867,8 @@ def plot_grouplevel(df1,
         groupdata_df_2['block_num'] = groupdata_df_2.apply(lambda row: \
                                              blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                              else row['blockidx'], axis=1)
-            
-        groupdata_df_2 = groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
+        
+        # groupdata_df_2 = groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
         
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     if plot_single:
@@ -1591,7 +1911,8 @@ def plot_grouplevel(df1,
             else:
                 agent_df_2 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 1]]
             
-            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
+            # agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
             agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             
             plot_dual_behav(agent_df_1, agent_df_2)
@@ -1602,7 +1923,7 @@ def plot_grouplevel(df1,
                                                'block_num',
                                                'jokertypes',
                                                'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
-    grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+    grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
     
     if df2 is not None:
         groupdata_df_2 = groupdata_df_2.drop(['model'], axis = 1)
@@ -1610,18 +1931,38 @@ def plot_grouplevel(df1,
                                                    'block_num',
                                                    'jokertypes',
                                                    'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+        # grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
         grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+        
+        
+        # grouped_df_2['blocknum'] = grouped_df_2['block_num'].map(lambda x: 1 if x == 0 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 2 if x == 3 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 3 if x == 4 or x == 5 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 4 if x == 6 or x == 7 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 5 if x == 8 or x == 9 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 6 if x == 10 or x == 11 else x)
+        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 7 if x == 12 or x == 13 else x)
     
+    grouped_df_1['blocknum'] = grouped_df_1['block_num'].map(lambda x: 1 if x == 0 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 2 if x == 3 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 3 if x == 4 or x == 5 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 4 if x == 6 or x == 7 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 5 if x == 8 or x == 9 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 6 if x == 10 or x == 11 else x)
+    grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 7 if x == 12 or x == 13 else x)
     if df2 is not None:
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-        sns.lineplot(x = 'block_num', 
+        sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
                     hue = 'jokertypes', 
                     data = grouped_df_1,
                     ax = ax1)
-        ax1.set_xticks(np.arange(15), minor = True)
+        ax1.set_xticks(np.arange(1, 8), minor = True)
+        ax1.set_xlabel('Block no.')
+        ax1.set_ylabel('HRCF (%)')
         ax1.grid(which='minor', alpha=0.5)
         ax1.set_title(f'Model {model_1}')
+        ax1.axvline(3.5, color='k', linewidth=0.5)
         ax1.get_legend().remove()
         
         sns.lineplot(x = 'block_num', 
@@ -1629,22 +1970,33 @@ def plot_grouplevel(df1,
                     hue ='jokertypes', 
                     data = grouped_df_2,
                     ax = ax2)
-        ax2.set_xticks(np.arange(15), minor = True)
+
+        ax2.set_xticks(np.arange(14), minor = True)
         ax2.grid(which='minor', alpha=0.5)
         ax2.set_title(f'Model {model_2}')
         ax2.get_legend().remove()
+        ax2.set_xlabel('Block no.')
+        ax2.set_ylabel('HRCF (%)')
+        ax2.axvline(3.5, color='k', linewidth=0.5)
+        plt.savefig('/home/sascha/Downloads/exp_vs_sim.tiff', dpi=600)
         plt.show()      
 
     else:
         "----- Remove error trials (where choices_GD == -2"
+
+        
         fig, ax = plt.subplots()
-        sns.lineplot(x = "block_num",
+        sns.lineplot(x = "blocknum",
                     y = "choices_GD",
                     hue = "jokertypes",
                     data = grouped_df_1,
                     palette = custom_palette,
                     ax = ax)
+        ax.set_ylim([0.61, 0.95])
+        ax.set_xlabel('Block no.')
+        ax.set_ylabel('HRCF (%)')
         plt.title(f'Group Behaviour for model {model_1}')
+        plt.savefig('/home/sascha/Downloads/res_new.png', dpi=600)
         plt.show()
         
 def plot_dual_behav(agent_df_1, agent_df_2):
@@ -1934,7 +2286,6 @@ def get_data_from_file():
     AIC = res[2][2]
     post_sample_df, expdata_df, _, params_df, agent_elbo_tuple = res
     
-    # dfgh
     # if len(res) == 4:
     #     post_sample_df, expdata_df, res_2, params_df = res
     #     if isinstance(res_2, tuple):
@@ -2023,135 +2374,348 @@ def get_data_from_file():
     #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
         
 def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names):
-    _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
-    # expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
-    
-    expdata_df_wseq = expdata_df_wseq.drop(['ag_idx'], axis=1)
-    complete_df_temp = pd.merge(inf_mean_df, 
-                           sociopsy_df[sociopsy_df['ID'].isin(inf_mean_df['ID'])], 
-                           on = 'ID')
+    '''
 
-    print("Computing errorrates.")
-    error_df = anal.compute_errors(expdata_df_wseq)
-    
-    complete_df = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], complete_df_temp, on='ID')
-    assert np.all(complete_df['group_x'] == complete_df['group_y'])
-    assert np.all(complete_df['handedness_x'] == complete_df['handedness_y'])
-    
-    complete_df = complete_df.drop(['group_x'], axis = 1)
-    complete_df.rename(columns={'group_y': 'group'}, inplace = True)
-    complete_df = complete_df.drop(['handedness_x'], axis = 1)
-    complete_df.rename(columns={'handedness_y': 'handedness'}, inplace = True)
+    Parameters
+    ----------
+    inf_mean_df : DataFrame
+        columns:
+            model
+            ag_idx
+            group
+            ID
+            lr_day1
+            theta_Q_day1
+            theta_rep_day1
+            lr_day2
+            theta_Q_day2
+            theta_rep_day2
         
-    RT_df = expdata_df_wseq.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
-    RT_df = RT_df[RT_df['choices'] != -1]
-    RT_df = RT_df[RT_df['choices'] != -2]
-    RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-    RT_df_temp_day1 = pd.DataFrame(RT_df[RT_df['blockidx']<=5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-    RT_df_temp_day1 = RT_df_temp_day1.rename(columns={'RT':'RT_day1'})
-    RT_df_temp_day2 = pd.DataFrame(RT_df[RT_df['blockidx']>5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-    RT_df_temp_day2 = RT_df_temp_day2.rename(columns={'RT':'RT_day2'})
-    
-    RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
-    RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
-    complete_df = pd.merge(RT_df, complete_df, on='ID')
-
-    newdf2 = pd.DataFrame(expdata_df_wseq.loc[:, ['ID',
-                            'q_notice_a_sequence']].groupby(['ID'], as_index = False).mean())
-
-    complete_df = pd.merge(complete_df, newdf2, on='ID')    
-
-    diffs_df = anal.daydiff(inf_mean_df)
-    try:
-        complete_df = pd.merge(complete_df, diffs_df, on='ID')
-    except:
-        pass
+    sociopsy_df : DataFrame
+        columns:
+            ID
+            age
+            gender
+            handedness
         
-    if 'ag_idx_x' in complete_df.columns:
+    expdata_df : DataFrame
+        columns:
+            choices
+            choices_GD
+            outcomes
+            trialsequence
+            blocktype
+            jokertypes
+            blockidx
+            group
+            ID
+            ag_idx
+            model
+        
+    post_sample_df : DataFrame
+        columns:
+            lr_day1
+            theta_Q_day1
+            theta_rep_day1
+            lr_day2
+            theta_Q_day2
+            theta_rep_day2
+            ag_idx
+            group
+            model
+            ID
+            (handedness)
+        
+    param_names : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    complete_df : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    if 'ID' in inf_mean_df.columns:
+        '''
+            For behavioral data
+        '''
+        
+        '''
+            Errors
+        '''
+        print("\nComputing errorrates.")
+        error_df = anal.compute_errors(expdata_df)
+        "error_df.columns: 'group', 'ID', 'ER_dtt', 'ER_dtt_day1', 'ER_dtt_day2', 'ER_stt','ER_total', 'ER_total_day1', 'ER_total_day2'"
+
+        '''
+            Differences between days
+        '''
+        diffs_df = anal.daydiff(inf_mean_df)
+
+        '''
+            Points
+        '''
+        points_df = compute_points(expdata_df)
+        
+        '''
+            Within-subject correlations
+        '''
+        corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
+
+        '''
+            HPCF
+        '''    
+        print("\nComputing HPCF.")
+        hpcf_df = expdata_df.loc[:, ['ID', 'choices_GD', 'blockidx', 'blocktype', 'jokertypes', 'trialsequence']]
+        hpcf_df = hpcf_df[hpcf_df['choices_GD'] != -1]
+        hpcf_df = hpcf_df[hpcf_df['choices_GD'] != -2]
+        hpcf_df = hpcf_df[hpcf_df['trialsequence'] > 10]
+        
+        hpcf_rand_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
+                                              (hpcf_df['blocktype'] == 0)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_rand_day1.rename(columns = {'choices_GD': 'hpcf_rand_day1'}, inplace = True)
+            
+        hpcf_rand_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
+                                 (hpcf_df['blocktype'] == 0)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_rand_day2.rename(columns = {'choices_GD': 'hpcf_rand_day2'}, inplace = True)
+            
+        hpcf_seq_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
+                                (hpcf_df['blocktype'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_seq_day1.rename(columns = {'choices_GD': 'hpcf_seq_day1'}, inplace = True)
+            
+        hpcf_seq_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
+                                (hpcf_df['blocktype'] == 1)]  .loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean()    )
+        hpcf_seq_day2.rename(columns = {'choices_GD': 'hpcf_seq_day2'}, inplace = True)
+
+        '-1/0/1/2 : no joker/random/congruent/incongruent'
+        hpcf_cong_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
+                                              (hpcf_df['blocktype'] == 0) & \
+                                              (hpcf_df['jokertypes'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_cong_day1.rename(columns={'choices_GD':'hpcf_cong_day1'}, inplace = True)
+            
+        hpcf_incong_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
+                                              (hpcf_df['blocktype'] == 0) & \
+                                              (hpcf_df['jokertypes'] == 2)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_incong_day1.rename(columns={'choices_GD':'hpcf_incong_day1'}, inplace = True)
+            
+        hpcf_cong_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
+                                              (hpcf_df['blocktype'] == 0) & \
+                                              (hpcf_df['jokertypes'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_cong_day2.rename(columns={'choices_GD':'hpcf_cong_day2'}, inplace = True)
+            
+        hpcf_incong_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
+                                              (hpcf_df['blocktype'] == 0) & \
+                                              (hpcf_df['jokertypes'] == 2)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf_incong_day2.rename(columns={'choices_GD':'hpcf_incong_day2'}, inplace = True)
+
+        hpcf_df = pd.merge(hpcf_rand_day1, hpcf_rand_day2, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, hpcf_seq_day1, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, hpcf_seq_day2, on = 'ID')
+        
+        hpcf_df = pd.merge(hpcf_df, hpcf_cong_day1, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, hpcf_incong_day1, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, hpcf_cong_day2, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, hpcf_incong_day2, on = 'ID')
+
+        '''
+            Sociopsychological Data
+        '''
+        print("\nRetrieving sociopsychological data.")
+        complete_df_temp = pd.merge(inf_mean_df.drop(['handedness'], axis=1), 
+                               sociopsy_df[sociopsy_df['ID'].isin(inf_mean_df['ID'])], 
+                               on = 'ID')
+        
+        '''
+            RT
+        '''
+        RT_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
+        RT_df = RT_df[RT_df['choices'] != -1]
+        RT_df = RT_df[RT_df['choices'] != -2]
+        RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_temp_day1 = pd.DataFrame(RT_df[RT_df['blockidx']<=5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_temp_day1 = RT_df_temp_day1.rename(columns={'RT':'RT_day1'})
+        RT_df_temp_day2 = pd.DataFrame(RT_df[RT_df['blockidx']>5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_temp_day2 = RT_df_temp_day2.rename(columns={'RT':'RT_day2'})
+        
+        RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
+        RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
+        
+        RT_cond_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'blocktype', 'trialsequence']]
+        RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
+        RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
+        
+        RT_df_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_rand_day1.rename(columns={'RT':'RT_rand_day1'}, inplace = True)
+        
+        RT_df_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_rand_day2.rename(columns={'RT':'RT_rand_day2'}, inplace = True)
+        
+        RT_df_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_seq_day1.rename(columns={'RT':'RT_seq_day1'}, inplace = True)
+        
+        RT_df_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_df_seq_day2.rename(columns={'RT':'RT_seq_day2'}, inplace = True)
+        
+        RT_stt_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_stt_seq_day1.rename(columns={'RT':'RT_stt_seq_day1'}, inplace = True)
+        
+        RT_stt_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_stt_rand_day1.rename(columns={'RT':'RT_stt_rand_day1'}, inplace = True)
+
+        RT_stt_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_stt_seq_day2.rename(columns={'RT':'RT_stt_seq_day2'}, inplace = True)
+        
+        RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+        RT_stt_rand_day2.rename(columns={'RT':'RT_stt_rand_day2'}, inplace = True)
+        
+        RT_df = pd.merge(RT_df, RT_df_rand_day1, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_df_rand_day2, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_df_seq_day1, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_df_seq_day2, on = 'ID')
+        
+        RT_df = pd.merge(RT_df, RT_stt_seq_day1, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_stt_rand_day1, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_stt_seq_day2, on = 'ID')
+        RT_df = pd.merge(RT_df, RT_stt_rand_day2, on = 'ID')
+        
+        '''
+            Q: Did you notice a sequence?
+        '''
+        _, expdata_df_wseq = pickle.load(open("behav_data/preproc_data_all.p", "rb" ))
+        '''expdata_df_wseq.columns: choices, choices_GD, outcomes, trialsequence, blocktype,
+        jokertypes, blockidx, RT, group, handedness, age, gender,
+        q_sometimes_easier, q_notice_a_sequence, ID, ag_idx, model'''
+        # expdata_df_wseq['gender'] = expdata_df_wseq['gender'].map(lambda x: 0 if x=='female' else (1 if x == 'male' else 2))
+
+        expdata_df_wseq = expdata_df_wseq.drop(['ag_idx'], axis=1)
+        notice_seq_df = pd.DataFrame(expdata_df_wseq.loc[:, ['ID',
+                                'q_notice_a_sequence']].groupby(['ID'], as_index = False).mean())
+
+    
+        '''
+            Merge them dataframes
+        '''
+        print("\nMerging Dataframes.")
+        df1 = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], complete_df_temp, on='ID')
+        df2 = pd.merge(df1, RT_df, on = 'ID')
+        df3 = pd.merge(df2, notice_seq_df, on='ID')   
+        df4 = pd.merge(df3, diffs_df, on='ID')
+        df5 = pd.merge(df4, points_df, on='ID')
+        df6 = pd.merge(df5, hpcf_df, on='ID')
+        complete_df = pd.merge(df6, corr_df, on='ID')
+        
+        '''
+            Rearrange dat dataframe
+        '''
         assert np.all(complete_df['ag_idx_x'] == complete_df['ag_idx_y'])
         complete_df = complete_df.drop(['ag_idx_x'], axis = 1)
         complete_df.rename(columns={'ag_idx_y': 'ag_idx'}, inplace = True)
+        
+        assert np.all(complete_df['group_x'] == complete_df['group_y'])
+        complete_df = complete_df.drop(['group_x'], axis = 1)
+        complete_df.rename(columns={'group_y': 'group'}, inplace = True)
+        
+        firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
+        complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
+        complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
+        
+    else:
+        '''
+            For simulated datasets
+        '''
+        
+        '''
+            Errors
+        '''
+        print("Computing errorrates.")
+        error_df = anal.compute_errors(expdata_df, identifier = 'ag_idx')
+        
+        '''
+            Differences between days
+        '''
+        diffs_df = anal.daydiff(inf_mean_df)
+        
+        '''
+            Points
+        '''
+        points_df = compute_points(expdata_df, identifier = 'ag_idx')
+        
+        '''
+            Within-subject correlations
+        '''
+        # corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
+        df1 = pd.merge(error_df[error_df['ag_idx'].isin(inf_mean_df['ag_idx'])], inf_mean_df, on='ag_idx')
+        df2 = pd.merge(df1, diffs_df, on='ag_idx')
+        complete_df = pd.merge(df2, points_df, on='ag_idx')
+    
+    assert len(complete_df) == len(inf_mean_df)
+    complete_df = complete_df.sort_values(by=['ag_idx'])
+    return complete_df
 
-    '''
-        Next: Points gained by participants.
-    '''
+def compute_points(expdata_df, identifier = 'ID'):
     expdata_df = expdata_df[expdata_df['outcomes'] != -1]
     expdata_df = expdata_df[expdata_df['outcomes'] != -2]
     
     "Total"
-    points_total = expdata_df.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_total = expdata_df.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
     points_total.rename(columns={'outcomes': 'points_total'}, inplace = True)
     
     "Day 1"
     expdata_df_day1 = expdata_df[expdata_df['blockidx'] <= 5 ]
-    points_day1 = expdata_df_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_day1 = expdata_df_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
     points_day1.rename(columns={'outcomes': 'points_day1'}, inplace = True)
     
     "Day 2"
     expdata_df_day2 = expdata_df[expdata_df['blockidx'] > 5 ]
-    points_day2 = expdata_df_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index=False).sum()
+    points_day2 = expdata_df_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
     points_day2.rename(columns={'outcomes': 'points_day2'}, inplace = True)
     
     "STT Day 1"
     expdata_df_stt_day1 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] <= 5)]
-    points_stt_df_day1 = expdata_df_stt_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    points_stt_df_day1 = expdata_df_stt_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     points_stt_df_day1.rename(columns = {'outcomes' : 'points_stt_day1'}, inplace = True)
     
     "STT Day 2"
     expdata_df_stt_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5)]
-    points_stt_df_day2 = expdata_df_stt_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    points_stt_df_day2 = expdata_df_stt_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     points_stt_df_day2.rename(columns = {'outcomes' : 'points_stt_day2'}, inplace = True)
-
+    
     
     "DTT Jokertypes Day 1"
     "-1/0/1/2 : no joker/random/congruent/incongruent"
     expdata_df_dtt_day1 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] <= 5)]
-    points_dtt_df_jokertypes_day1 = expdata_df_dtt_day1.loc[:, ['ID', 'outcomes', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).sum()
-    points_dtt_df_jokertypes_day1_pivoted = points_dtt_df_jokertypes_day1.pivot(index='ID', columns='jokertypes', values = 'outcomes').reset_index()
+    points_dtt_df_jokertypes_day1 = expdata_df_dtt_day1.loc[:, [identifier, 'outcomes', 'jokertypes']].groupby([identifier, 'jokertypes'], as_index = False).sum()
+    points_dtt_df_jokertypes_day1_pivoted = points_dtt_df_jokertypes_day1.pivot(index=identifier, columns='jokertypes', values = 'outcomes').reset_index()
     points_dtt_df_jokertypes_day1_pivoted.rename(columns={0: 'points_randomdtt_day1',
                                                1: 'points_congruent_day1',
                                                2: 'points_incongruent_day1'}, inplace=True)
     
     "DTT Day 1"
-    expdata_df_dtt_day1 = expdata_df_dtt_day1.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    expdata_df_dtt_day1 = expdata_df_dtt_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     expdata_df_dtt_day1.rename(columns = {'outcomes' : 'points_dtt_day1'}, inplace = True)
     
     "DTT Jokertypes Day 2"
     expdata_df_dtt_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5)]
-    points_dtt_df_jokertypes_day2 = expdata_df_dtt_day2.loc[:, ['ID', 'outcomes', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).sum()
-    points_dtt_df_jokertypes_day2_pivoted = points_dtt_df_jokertypes_day2.pivot(index='ID', columns='jokertypes', values = 'outcomes').reset_index()
+    points_dtt_df_jokertypes_day2 = expdata_df_dtt_day2.loc[:, [identifier, 'outcomes', 'jokertypes']].groupby([identifier, 'jokertypes'], as_index = False).sum()
+    points_dtt_df_jokertypes_day2_pivoted = points_dtt_df_jokertypes_day2.pivot(index=identifier, columns='jokertypes', values = 'outcomes').reset_index()
     points_dtt_df_jokertypes_day2_pivoted.rename(columns={0: 'points_randomdtt_day2',
                                                1: 'points_congruent_day2',
                                                2: 'points_incongruent_day2'}, inplace=True)
     
     "DTT Day 2"
-    expdata_df_dtt_day2 = expdata_df_dtt_day2.loc[:, ['ID', 'outcomes']].groupby(['ID'], as_index = False).sum()
+    expdata_df_dtt_day2 = expdata_df_dtt_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     expdata_df_dtt_day2.rename(columns = {'outcomes' : 'points_dtt_day2'}, inplace = True)
     
-    complete_df = pd.merge(complete_df, points_total, on = 'ID')
-    complete_df = pd.merge(complete_df, points_day1, on = 'ID')
-    complete_df = pd.merge(complete_df, points_day2, on = 'ID')
-    complete_df = pd.merge(complete_df, points_stt_df_day1, on = 'ID')
-    complete_df = pd.merge(complete_df, points_stt_df_day2, on = 'ID')
+    points_df = pd.merge(points_total, points_day1, on = identifier)
+    points_df = pd.merge(points_df, points_day2, on = identifier)
+    points_df = pd.merge(points_df, points_stt_df_day1, on = identifier)
+    points_df = pd.merge(points_df, points_stt_df_day2, on = identifier)
     
-    complete_df = pd.merge(complete_df, points_dtt_df_jokertypes_day1_pivoted, on = 'ID')
-    complete_df = pd.merge(complete_df, points_dtt_df_jokertypes_day2_pivoted, on = 'ID')
+    points_df = pd.merge(points_df, points_dtt_df_jokertypes_day1_pivoted, on = identifier)
+    points_df = pd.merge(points_df, points_dtt_df_jokertypes_day2_pivoted, on = identifier)
     
-    complete_df = pd.merge(complete_df, expdata_df_dtt_day1, on = 'ID')
-    complete_df = pd.merge(complete_df, expdata_df_dtt_day2, on = 'ID')
+    points_df = pd.merge(points_df, expdata_df_dtt_day1, on = identifier)
+    points_df = pd.merge(points_df, expdata_df_dtt_day2, on = identifier)
     
-    corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
-    
-    complete_df = pd.merge(complete_df, corr_df)
-    
-    # assert np.all(complete_df['gender_x'] == complete_df['gender_y'])
-    # complete_df = complete_df.drop(['gender_x'], axis = 1)
-    # complete_df.rename(columns={'gender_y': 'gender'}, inplace = True)
-    
-    firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
-    complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
-    complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
-    
-    assert len(complete_df) == len(inf_mean_df)
-    complete_df = complete_df.sort_values(by=['ag_idx'])
-    return complete_df
+    return points_df

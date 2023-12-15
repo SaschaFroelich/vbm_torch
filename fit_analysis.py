@@ -29,6 +29,8 @@ import itertools
 out = utils.get_data_from_file()
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
 
+expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
+
 # if len(out) == 7:
 #     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
     
@@ -42,7 +44,7 @@ param_names = params_df.iloc[:, 0:-3].columns
 if 'ID' in expdata_df.columns:
     "For compatibility with param_recov data"
     ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
-    "Ad IDs"
+    "Add IDs"
     post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
     
 assert len(param_names) == num_params
@@ -124,9 +126,13 @@ import matplotlib.cm as cm
 
 anal.violin(inf_mean_df.loc[:, [*param_names]], model)
 
+complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+
 if 'ID' in inf_mean_df.columns:
-    complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
     anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points_total']], model = 'sociopsy')
+    
+else:
+    anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points_total']], model = 'errors')
 #%%
 '''
 Check for how many participants parameters are 0:
@@ -151,6 +157,34 @@ anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
 
 #%%
 '''
+    Points Analysis
+'''
+
+"Predictors x"
+x = np.stack((np.array(complete_df['theta_Q_day1']), 
+              np.array(complete_df['theta_rep_day1'])), axis=1)
+
+
+"Data y"
+y = np.array(complete_df['points_day1']).reshape(-1,1)
+linmodel = LinearRegression()
+linmodel.fit(x, y)
+print(f"slope: {linmodel.coef_}\n")
+
+"Predictors x"
+x = np.stack((np.array(complete_df['theta_Q_day2']), 
+              np.array(complete_df['theta_rep_day2'])), axis=1)
+
+
+"Data y"
+y = np.array(complete_df['points_day2']).reshape(-1,1)
+linmodel = LinearRegression()
+linmodel.fit(x, y)
+print(f"slope: {linmodel.coef_}\n")
+
+
+#%%
+'''
 Differences day 1 & day 2
 '''
 
@@ -165,7 +199,7 @@ diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])
 
 anal.violin(inf_mean_df, model)
 
-diffs_df = anal.daydiff(post_sample_df, BF = 3.2)
+diffs_df = anal.daydiff(post_sample_df, BF = 1)
 
 anal.daydiff(post_sample_df[post_sample_df['group']==0], BF = 3.2)
 anal.daydiff(post_sample_df[post_sample_df['group']==1], BF = 3.2)
@@ -203,7 +237,7 @@ anal.perform_PCA(corr_df.drop(['ID'], axis=1), 1, correctfor = 'age')
 new_pca_df = pd.merge(corr_df, complete_df.loc[:, ['ID', *pca_parameters]], on='ID')
 
 new_pca_df = new_pca_df.rename(columns={'age_x':'age'})
-anal.perform_PCA(new_pca_df.drop(['ID', 'age_y'], axis=1), 10, correctfor = 'age')
+anal.perform_PCA(new_pca_df.drop(['ID', 'age_y'], axis=1), 9, correctfor = 'age')
 #%%
 '''
     Theta Q_day1
@@ -549,7 +583,7 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1
 '''
 Plot Experimental Data
 '''
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx']==35], plot_single = False)
+utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'] == 35], plot_single = False)
 
 #%%
 '''
@@ -560,7 +594,7 @@ groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(
                                                                         group = list(inf_mean_df['group']),
                                                                         params = inf_mean_df)
 
-utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
+utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
 # utils.plot_grouplevel(expdata_df, plot_single = True)
 
 
@@ -678,18 +712,19 @@ for param_x, param_y in itertools.product(['age'],['ER_dtt', 'ER_stt', 'ER_total
         print(f"slope: {linmodel.coef_}\n")
 
 """ Errors """
-for param_x, param_y in itertools.product(['ER_total', 'ER_stt', 'ER_dtt'],
-                                          [*param_names, 'RT']):
+for param_x, param_y in itertools.product(['ER_total_day1', 'ER_stt_day1', 'ER_dtt_day1',
+                                           'ER_total_day2', 'ER_stt_day2', 'ER_dtt_day2'],
+                                          [*param_names]):
     
     r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
-    print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
     
-    if p < 0.05:
+    if p < 0.1:
+        print(f'\n{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
         x = np.array(complete_df[param_x]).reshape(-1,1)
         y = np.array(complete_df[param_y]).reshape(-1,1)
         linmodel = LinearRegression()
         linmodel.fit(x, y)
-        print(f"slope: {linmodel.coef_}\n")
+        print(f"slope: {linmodel.coef_}")
 
 """ Points """
 for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_Q_day2', 'theta_rep_day1', 'theta_rep_day2'], 
@@ -736,3 +771,137 @@ print(f"for gender vs age: p={p_value}")
 import pingouin as pg
 pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day1', covar='age')
 pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='age')
+
+#%%
+'''
+    Plot RT as boxplots
+'''
+
+RT_df = complete_df.loc[:, ['ID', 
+                            'RT_stt_seq_day1', 
+                            'RT_stt_rand_day1', 
+                            'RT_stt_seq_day2', 
+                            'RT_stt_rand_day2']]
+
+RT_df['RT Diff Day 1'] = (np.squeeze(RT_df.loc[:, ['RT_stt_rand_day1']]) - np.squeeze(RT_df.loc[:, ['RT_stt_seq_day1']])).astype(float)
+RT_df['RT Diff Day 2'] = (np.squeeze(RT_df.loc[:, ['RT_stt_rand_day2']]) - np.squeeze(RT_df.loc[:, ['RT_stt_seq_day2']])).astype(float)
+
+# RT_df = RT_df.rename(columns={'RT_seq_day1':'Fix (Day 1)', 'RT_seq_day2':'Fix (Day 2)',
+#                               'RT_rand_day1':'Rand (Day 1)', 'RT_rand_day2':'Rand (Day 2)'})
+
+RT_df_melted = RT_df.melt(id_vars = ['ID'], value_vars=  ['RT Diff Day 1', 
+                                                          'RT Diff Day 2'])
+
+RT_df_melted['Day'] = RT_df_melted['variable'].map(lambda x: 'Day 1' if '1' in x else 'Day 2')
+
+
+
+r,p = scipy.stats.ttest_1samp(RT_df['RT Diff Day 1'], 0)
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_1samp(RT_df['RT Diff Day 2'], 0)
+print(r)
+print(p)
+
+fig, ax = plt.subplots()
+sns.boxplot(data=RT_df_melted, x='variable', y='value')
+ax.set_ylabel(r'$\Delta$RT (rand-fix) (ms)', fontsize=20)
+# ax.set_xlabel('Condition')
+plt.savefig('/home/sascha/Downloads/diffs_rt.tiff', dpi = 600)
+plt.show()
+#%%
+'''
+    Plot HPCF as boxplots
+'''
+hpcf_df = complete_df.loc[:, ['ID', 
+                              'hpcf_cong_day1', 
+                              'hpcf_incong_day1',
+                              'hpcf_rand_day1',
+                              'hpcf_cong_day2', 
+                              'hpcf_incong_day2',
+                              'hpcf_rand_day2']]
+
+hpcf_df = hpcf_df.rename(columns={'hpcf_cong_day1' : 'Cong (Day 1)',
+                               'hpcf_incong_day1' : 'Incong (Day 1)',
+                               'hpcf_rand_day1' : 'Random (Day 1)',
+                               'hpcf_cong_day2' : 'Cong (Day 2)',
+                               'hpcf_incong_day2' : 'Incong (Day 2)',
+                               'hpcf_rand_day2' : 'Random (Day 2)'})
+
+hpcf_df_melted = hpcf_df.melt(id_vars = ['ID'], value_vars=  ['Cong (Day 1)',
+                                                              'Incong (Day 1)',
+                                                              'Random (Day 1)',
+                                                              'Cong (Day 2)',
+                                                              'Incong (Day 2)',
+                                                              'Random (Day 2)'])
+
+hpcf_df_melted['value'] = hpcf_df_melted['value'].apply(lambda x: x*100)
+hpcf_df_melted['Trialtype'] = hpcf_df_melted['variable'].apply(lambda x: 'Inc' if 'Incong' in x else 'Cong' if 'Cong' in x else 'Rand')
+hpcf_df_melted['Day'] = hpcf_df_melted['variable'].apply(lambda x: 'Day 1' if 'Day 1' in x else 'Day 2')
+hpcf_df_melted.rename(columns={'value':'HRCF'}, inplace = True)
+
+fig, ax = plt.subplots()
+sns.boxplot(data=hpcf_df_melted, x='variable', y='HRCF', hue = 'Trialtype')
+ax.set_ylabel('HRCF (%)', fontsize=20)
+ax.set_xlabel('Condition')
+plt.savefig('/home/sascha/Downloads/diffs_hpcf.tiff', dpi = 600)
+plt.show()
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Cong (Day 1)'], hpcf_df['Incong (Day 1)'])
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Cong (Day 1)'], hpcf_df['Random (Day 1)'])
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Incong (Day 1)'], hpcf_df['Random (Day 1)'])
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Cong (Day 2)'], hpcf_df['Incong (Day 2)'])
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Cong (Day 2)'], hpcf_df['Random (Day 2)'])
+print(r)
+print(p)
+
+r,p = scipy.stats.ttest_rel(hpcf_df['Incong (Day 2)'], hpcf_df['Random (Day 2)'])
+print(r)
+print(p)
+
+#%%
+'''
+    Scatter HRCF vs. RT(diff) jeweils day 1 und day 2 gemittelt
+'''
+
+hpcf = complete_df.loc[:, ['ID', 'hpcf_cong_day1', 'hpcf_incong_day1', 'hpcf_cong_day2', 'hpcf_incong_day2']]
+hpcf['HPCF Diff Day 1'] = (np.array(hpcf['hpcf_cong_day1']) - np.array(hpcf['hpcf_incong_day1'])).astype(float)
+hpcf['HPCF Diff Day 2'] = (np.array(hpcf['hpcf_cong_day2']) - np.array(hpcf['hpcf_incong_day2'])).astype(float)
+
+df = pd.merge(hpcf, RT_df, on = 'ID')
+
+r,p = scipy.stats.pearsonr(df['HPCF Diff Day 1'], df['RT Diff Day 1'])
+
+fig, ax = plt.subplots(2,1, figsize=(10,15))
+sns.regplot(data = df, x='RT Diff Day 1', y = 'HPCF Diff Day 1', color='r', ax = ax[0])
+# ax[0].tick_params(axis = 'x', fontsize= 100)
+# ax[0].set_xticks(fontsize= 25)
+ax[0].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[0].set_xlabel(r'$\Delta$RT (rand-fix) (ms)', fontsize= 25)
+# ax[0].set_title('Day 1', fontsize=25)
+ax[0].text(-14, 0.3, 'r = %.2f\np = %.3f'%(r,p), fontsize=25)
+ax[0].tick_params(axis='both', labelsize=20)
+
+r,p = scipy.stats.pearsonr(df['HPCF Diff Day 2'], df['RT Diff Day 2'])
+
+sns.regplot(data = df, x='RT Diff Day 1', y = 'HPCF Diff Day 1', color='r', ax = ax[1])
+ax[1].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[1].set_xlabel(r'$\Delta$RT (rand-fix) (ms)', fontsize= 25)
+# ax[1].set_title('Day 2', fontsize = 25)
+ax[1].text(-14, 0.3, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
+ax[1].tick_params(axis='both', labelsize=20)
+plt.savefig('/home/sascha/Downloads/corrs.tiff', dpi = 600)
+plt.show()

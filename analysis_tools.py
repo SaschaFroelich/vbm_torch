@@ -272,12 +272,6 @@ def within_subject_corr(df, param_names):
     
     df = df.loc[:, ['ID', 'ag_idx', *param_names]]
     
-    # if 'ID' in df.columns:
-    #     df = df.drop(['model', 'group', 'ID'], axis = 1)
-        
-    # else:
-    #     df = df.drop(['model', 'group'], axis = 1)
-        
     corr_dict = {}
     corr_dict['ID'] = []
     for param1_idx in range(num_params):
@@ -533,14 +527,16 @@ def kmeans(data,
     
     return kmeans, cluster_groups, c_distances
 
-def compute_errors(df):
+def compute_errors(df, identifier = 'ID'):
     '''
-    
 
     Parameters
     ----------
     df : DataFrame
         Contains trial-level agent behaviour.
+
+    identifier : str
+        Name of df column which uniquely identifies an agent.
 
     Returns
     -------
@@ -550,12 +546,8 @@ def compute_errors(df):
     '''
     
     df = df[df['choices'] != -1]
-    # df_dtt = df[df['trialsequence'] > 10]
-    # df_stt = df[df['trialsequence'] < 10]
     
     error_rates = pd.DataFrame()
-    
-    # pd.DataFrame(df_dtt.groupby(['ID', 'model', 'ag_idx', 'group'], as_index=False))
     
     group = []
     IDs = []
@@ -570,43 +562,45 @@ def compute_errors(df):
     ER_total = []
     ER_total_day1 = []
     ER_total_day2 = []
-    for ID in df['ID'].unique():
-        ER_dtt.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] > 10) & (df['ID'] == ID)]))
+    for ID in df[identifier].unique():
+        ER_dtt.append(len(df[(df['trialsequence'] > 10) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df[identifier] == ID)]))
 
-        ER_dtt_day1.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+        ER_dtt_day1.append(len(df[(df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] <= 5) & (df[identifier] == ID)]))
 
-        ER_dtt_day2.append(len(df[(df['trialsequence'] > 10) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+        ER_dtt_day2.append(len(df[(df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] > 10) & (df['blockidx'] > 5) & (df[identifier] == ID)]))
             
-        ER_stt.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] < 10) & (df['ID'] == ID)]))
+        ER_stt.append(len(df[(df['trialsequence'] < 10) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df[identifier] == ID)]))
 
-        ER_stt_day1.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+        ER_stt_day1.append(len(df[(df['trialsequence'] < 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] <= 5) & (df[identifier] == ID)]))
             
-        ER_stt_day2.append(len(df[(df['trialsequence'] < 10) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+        ER_stt_day2.append(len(df[(df['trialsequence'] < 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                 len(df[(df['trialsequence'] < 10) & (df['blockidx'] > 5) & (df[identifier] == ID)]))
             
-        ER_total.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['choices'] == -2)]) /\
-                        len(df[(df['trialsequence'] > -1) & (df['ID'] == ID)]))
+        ER_total.append(len(df[(df['trialsequence'] > -1) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df[identifier] == ID)]))
 
-        ER_total_day1.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
-                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] <= 5) & (df['ID'] == ID)]))
+        ER_total_day1.append(len(df[(df['trialsequence'] > -1) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] <= 5) & (df[identifier] == ID)]))
             
-        ER_total_day2.append(len(df[(df['trialsequence'] > -1) & (df['ID'] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
-                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] > 5) & (df['ID'] == ID)]))
+        ER_total_day2.append(len(df[(df['trialsequence'] > -1) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['choices'] == -2)]) /\
+                        len(df[(df['trialsequence'] > -1) & (df['blockidx'] > 5) & (df[identifier] == ID)]))
             
         IDs.append(ID)
-        group.append(df[df['ID'] == ID]['group'].unique()[0])
-    
+        group.append(df[df[identifier] == ID]['group'].unique()[0])
+        
     er_df = pd.DataFrame({'group': group,
-                          'ID': IDs,
+                          identifier: IDs,
                           'ER_dtt': ER_dtt,
                           'ER_dtt_day1': ER_dtt_day1,
                           'ER_dtt_day2': ER_dtt_day2,
                           'ER_stt': ER_stt,
+                          'ER_stt_day1': ER_stt_day1,
+                          'ER_stt_day2': ER_stt_day2,
                           'ER_total': ER_total,
                           'ER_total_day1': ER_total_day1,
                           'ER_total_day2': ER_total_day2})
@@ -777,6 +771,8 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                                  color='black', 
                                  legend=False)
                     
+                    
+        plt.savefig('/home/sascha/Downloads/daydiff.tiff', dpi=600)
         plt.show()
         
 
