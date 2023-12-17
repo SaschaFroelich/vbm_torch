@@ -1160,6 +1160,43 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
+        
+    elif model == 'Interaction':
+        num_params = models.Interaction.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr_day1'] = params_uniform[0:1, :]*0.5
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
+            param_dict['interaction_param_day1'] = (params_uniform[3:4, :]-0.5)*6
+            
+            param_dict['lr_day2'] = params_uniform[4:5, :]*0.5
+            param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
+            param_dict['interaction_param_day2'] = (params_uniform[7:8, :]-0.5)*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr_day1'] = params['lr_day1'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['interaction_param_day1'] = params['interaction_param_day1'][None,...]
+            
+            param_dict['lr_day2'] = params['lr_day2'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['interaction_param_day2'] = params['interaction_param_day2'][None,...]
+        
+        newagent = models.Interaction(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+        
     elif model == 'Seqboost':
         num_params = models.Seqboost.num_params #number of latent model parameters
         param_dict = {}
@@ -1327,7 +1364,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               Q_init=Q_init[None, ...])
         
     elif model=='Bhand':
-        num_params = models.handedness.num_params #number of latent model parameters
+        num_params = models.Handedness.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -1360,7 +1397,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
 
-        newagent = models.handedness(param_dict,
+        newagent = models.Handedness(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1911,7 +1948,8 @@ def plot_grouplevel(df1,
             else:
                 agent_df_2 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 1]]
             
-            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
+            # agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             # agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
             agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             
@@ -1934,14 +1972,14 @@ def plot_grouplevel(df1,
         # grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
         grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
         
-        
-        # grouped_df_2['blocknum'] = grouped_df_2['block_num'].map(lambda x: 1 if x == 0 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 2 if x == 3 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 3 if x == 4 or x == 5 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 4 if x == 6 or x == 7 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 5 if x == 8 or x == 9 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 6 if x == 10 or x == 11 else x)
-        # grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 7 if x == 12 or x == 13 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['block_num'].map(lambda x: 1 if x == 0 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 2 if x == 3 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 3 if x == 4 or x == 5 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 4 if x == 6 or x == 7 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 5 if x == 8 or x == 9 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 6 if x == 10 or x == 11 else x)
+        grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 7 if x == 12 or x == 13 else x)
+        grouped_df_2 = grouped_df_2[grouped_df_2['jokertypes'] != 'no joker']
     
     grouped_df_1['blocknum'] = grouped_df_1['block_num'].map(lambda x: 1 if x == 0 else x)
     grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 2 if x == 3 else x)
@@ -1950,6 +1988,8 @@ def plot_grouplevel(df1,
     grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 5 if x == 8 or x == 9 else x)
     grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 6 if x == 10 or x == 11 else x)
     grouped_df_1['blocknum'] = grouped_df_1['blocknum'].map(lambda x: 7 if x == 12 or x == 13 else x)
+    
+    grouped_df_1 = grouped_df_1[grouped_df_1['jokertypes'] != 'no joker']
     if df2 is not None:
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
         sns.lineplot(x = 'blocknum', 
@@ -1965,13 +2005,13 @@ def plot_grouplevel(df1,
         ax1.axvline(3.5, color='k', linewidth=0.5)
         ax1.get_legend().remove()
         
-        sns.lineplot(x = 'block_num', 
+        sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
                     hue ='jokertypes', 
                     data = grouped_df_2,
                     ax = ax2)
 
-        ax2.set_xticks(np.arange(14), minor = True)
+        ax2.set_xticks(np.arange(1, 8), minor = True)
         ax2.grid(which='minor', alpha=0.5)
         ax2.set_title(f'Model {model_2}')
         ax2.get_legend().remove()
@@ -2651,6 +2691,12 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     
     assert len(complete_df) == len(inf_mean_df)
     complete_df = complete_df.sort_values(by=['ag_idx'])
+    
+    
+    for col in complete_df.columns:
+        if type(complete_df[col][0]) != str:
+            complete_df[col] = complete_df[col].astype('float')
+    
     return complete_df
 
 def compute_points(expdata_df, identifier = 'ID'):

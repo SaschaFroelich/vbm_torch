@@ -6,16 +6,18 @@ Created on Mon Dec  4 13:04:04 2023
 @author: sascha
 """
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pickle
 import pandas as pd
 import numpy as np
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-
 # expdata_df = expdata_df[expdata_df['choices'] != -1]
 # expdata_df = expdata_df[expdata_df['jokertypes'] != -1]
 
 num_agents = 60
+#%%
 '''
     Prob. of choosing GD if the last x (last dim) jokers were of the same jokertype.
     jokertypes: -1/0/1/2 : no joker/random/congruent/incongruent
@@ -54,8 +56,6 @@ props = num_choices_gd[:, [1,2], 0:4] / counts[:, [1,2], 0:4]
 print(props.mean(axis=0))
 print(props.std(axis=0))
 
-import matplotlib.pyplot as plt
-import numpy as np
 
 "Jokertypes 1"
 # Sample data
@@ -91,44 +91,82 @@ plt.title('Incongruent DTT')
 # Show the plot
 plt.show()
 
+#%%
 '''
-    Prob. of choosing GD suboptimal response in the last joker.
+    Prob of choosing GD choice if chose GD choice in prev joker
 '''
 print("---> Influence of previous joker response.")
 '''
     0th column: suboptimal choice
     1st column: optimal choice
 '''
-num_choices_gd_seq = np.zeros((num_agents, 2)) 
+"Sequential condition"
+num_choices_gd_seq = np.zeros((num_agents, 2)) # num of gd choices where choice in prev joker was not GD (0th column) or GD (1st column)
+occurrences_seq = np.zeros((num_agents, 2))
+
+"Random Condition"
 num_choices_gd_rand = np.zeros((num_agents, 2)) 
+occurrences_rand = np.zeros((num_agents, 2))
+
 for ID_idx in range(len(expdata_df['ID'].unique())):
     prev_choice = -1
+    prevprev_choice = -1
     
     ag_df = expdata_df[expdata_df['ID'] == expdata_df['ID'].unique()[ID_idx]]
     
     for row_idx in range(len(ag_df)):
         current_jokertype = ag_df.loc[row_idx, 'jokertypes']
-        if current_jokertype != -1 and current_jokertype == 0:
+        
+        if current_jokertype == 0:
+            "Random Condition"
             if prev_choice == 0 or prev_choice == 1:
                 num_choices_gd_rand[ID_idx, prev_choice] += ag_df.loc[row_idx, 'choices_GD']
+                occurrences_rand[ID_idx, prev_choice] += 1
                 
-        elif current_jokertype != -1 and current_jokertype != 0:
+        elif current_jokertype > 0:
+            "Sequential Condition"
             if prev_choice == 0 or prev_choice == 1:
                 num_choices_gd_seq[ID_idx, prev_choice] += ag_df.loc[row_idx, 'choices_GD']
-                
+                occurrences_seq[ID_idx, prev_choice] += 1
+        
+        prevprev_choice = prev_choice
         prev_choice = ag_df.loc[row_idx, 'choices_GD']
+        
+categories = ['previously not GD', 'previously GD']
+values = (num_choices_gd_rand/ occurrences_rand).mean(axis=0)
+errors = (num_choices_gd_rand/ occurrences_rand).std(axis=0)
 
-print("For seq condition %.4f +- %.4f"%((num_choices_gd_seq[:,1]/num_choices_gd_seq[:,0]).mean(),
-                                        (num_choices_gd_seq[:,1]/num_choices_gd_seq[:,0]).std()))
+# Create a bar plot with error bars
+plt.bar(categories, values, yerr=errors, capsize=5, color='skyblue', alpha=0.7)
 
-print("For random condition %.4f +- %.4f"%((num_choices_gd_rand[:,1]/num_choices_gd_seq[:,0]).mean(),
-                                           (num_choices_gd_rand[:,1]/num_choices_gd_rand[:,0]).std()))
+# Add labels and title
+plt.xlabel('previous action')
+plt.ylabel('% GD choice')
+plt.title('Random Condition')
+
+# Show the plot
+plt.show()
+
+categories = ['previously not GD', 'previously GD']
+values = (num_choices_gd_seq/ occurrences_seq).mean(axis=0)
+errors = (num_choices_gd_seq/ occurrences_seq).std(axis=0)
+
+# Create a bar plot with error bars
+plt.bar(categories, values, yerr=errors, capsize=5, color='skyblue', alpha=0.7)
+
+# Add labels and title
+plt.xlabel('previous action')
+plt.ylabel('% GD choice')
+plt.title('sequential Condition')
+
+# Show the plot
+plt.show()
 
 import scipy.stats
-t,p = scipy.stats.ttest_rel(num_choices_gd_seq[:,0], num_choices_gd_seq[:,1])
+t,p = scipy.stats.ttest_rel((num_choices_gd_seq/ occurrences_seq)[:,0], (num_choices_gd_seq/ occurrences_seq)[:,1])
 print(t)
 print(p)
 
-t,p = scipy.stats.ttest_rel(num_choices_gd_rand[:,0], num_choices_gd_rand[:,1])
+t,p = scipy.stats.ttest_rel((num_choices_gd_rand/ occurrences_rand)[:,0], (num_choices_gd_rand/ occurrences_rand)[:,1])
 print(t)
 print(p)
