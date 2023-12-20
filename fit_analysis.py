@@ -33,10 +33,10 @@ expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p",
 
 # if len(out) == 7:
 #     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
-    
+
 # elif len(out) == 6:
 #     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
-    
+
 # else:
 #     raise Exception("Output length invalid.")
 
@@ -59,7 +59,7 @@ if 'ID' in post_sample_df:
                                                        'group', 
                                                        'ID', 
                                                        'handedness'], as_index = False).mean())
-    
+
 else:
     inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                        'ag_idx', 
@@ -117,7 +117,7 @@ for param_idx in range(num_params):
 plt.show()
 
 '''
-Violin Plot
+    Violin Plot
 '''
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
@@ -133,9 +133,90 @@ if 'ID' in inf_mean_df.columns:
     
 else:
     anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points_total']], model = 'errors')
+
+'''
+    Kdpelots
+'''
+fig, ax = plt.subplots(len(param_names), 1, figsize=(10,35))
+if model == 'Conflict':
+    xlims = [[0, 0.08],
+             [0, 9],
+             [0, 3.0],
+             [-2.5, 3],
+             [0, 0.08],
+            [0, 9],
+            [0, 3.0],
+            [-2.5, 3]]
+    
+for param_idx in range(len(param_names)):
+    sns.kdeplot(post_sample_df[param_names[param_idx]], ax = ax[param_idx])
+    ax[param_idx].set_xlabel(param_names[param_idx])
+    ax[param_idx].set_xlim(xlims[param_idx])
+
+plt.show()
+
 #%%
 '''
-Check for how many participants parameters are 0:
+    Sort by counterbalancing group
+'''
+# complete_df_grp0 = complete_df[complete_df['group'] == 0]
+# complete_df_grp0 = complete_df[complete_df['group'] == 1]
+# complete_df_grp0 = complete_df[complete_df['group'] == 2]
+# complete_df_grp0 = complete_df[complete_df['group'] == 3]
+
+for group in range(4):
+    anal.violin(inf_mean_df[inf_mean_df['group'] == group].loc[:, [*param_names]], model)
+
+num_comparisons = 0
+num_diffs = 0
+for group1 in range(4):
+    for group2 in range(group1+1, 4):
+        for param in [*param_names]:
+            t,p = scipy.stats.ttest_ind(inf_mean_df[inf_mean_df['group'] == group1][param], inf_mean_df[inf_mean_df['group'] == group2][param])
+            num_comparisons += 1
+            if p < 0.1: 
+                if p < 0.05:
+                    num_diffs += 1 
+                print(f"\n param {param} for groups {group1} and {group2}")
+                print(t)
+                print(p)
+
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.anova import anova_lm                
+df = complete_df.loc[:, ['group', *param_names]].copy()
+
+# Fit the 2-way ANOVA model
+for param in [*param_names]:
+    
+    if 'day1' in param:
+    
+        anova_df = pd.DataFrame()
+        day = [1]*len(df)
+        day.extend([2]*len(df))
+        anova_df['day'] = day
+        
+        group = list(df['group'])
+        group.extend(list(df['group']))
+        anova_df['group'] = group
+        
+        anova_df['group'] = anova_df['group'].map(lambda x: 0 if (x == 0. or x == 2.) else 1)
+        # anova_df['group'] = anova_df['group'].map(lambda x: 1 if group == 2 or group == 3 else x)
+        
+        param_val = list(df[param[0:-5] + '_day1'])
+        param_val.extend(list(df[param[0:-5] + '_day2']))
+        anova_df[param[0:-5]] = param_val
+        
+        print(f"\n for param {param[0:-5]}")
+        model = ols(f'{param[0:-5]} ~ group * day', data=anova_df).fit()
+    
+        # Perform ANOVA and print the results
+        anova_table = anova_lm(model, typ=2)
+        print(anova_table)
+
+#%%
+'''
+    Check for how many participants parameters are 0:
 '''
 threshold = 0
 BF = 3.2
@@ -164,7 +245,6 @@ anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
 x = np.stack((np.array(complete_df['theta_Q_day1']), 
               np.array(complete_df['theta_rep_day1'])), axis=1)
 
-
 "Data y"
 y = np.array(complete_df['points_day1']).reshape(-1,1)
 linmodel = LinearRegression()
@@ -185,7 +265,7 @@ print(f"slope: {linmodel.coef_}\n")
 
 #%%
 '''
-Differences day 1 & day 2
+    Differences day 1 & day 2
 '''
 
 inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
@@ -224,7 +304,7 @@ pca_parameters = ['ag_idx', 'age',
                   'ER_total_day1', 'ER_total_day2',
                   'RT_day1', 'RT_day2']
 
-anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 4, correctfor='age')
+pcomps = anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 4, correctfor='age')
 
 "----- On within-subject correlations"
 corr_df = anal.within_subject_corr(post_sample_df, ['theta_Q_day1', 'theta_Q_day2', 
@@ -238,6 +318,49 @@ new_pca_df = pd.merge(corr_df, complete_df.loc[:, ['ID', *pca_parameters]], on='
 
 new_pca_df = new_pca_df.rename(columns={'age_x':'age'})
 anal.perform_PCA(new_pca_df.drop(['ID', 'age_y'], axis=1), 9, correctfor = 'age')
+
+#%%
+'''
+    PCA for points
+'''
+
+"Day 1"
+print("Day 1")
+
+"----- On absolute values"
+pca_parameters = ['ag_idx',
+                  'theta_Q_day1',
+                  'theta_rep_day1',
+                  'conflict_param_day1']
+
+pcomps = anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 3)
+
+complete_df['pcomps'] = pcomps[:, 0]
+complete_df_temp = complete_df.sort_values(by='pcomps', inplace = False)
+
+t,p = scipy.stats.ttest_ind(complete_df_temp['points_day1'][0:30], complete_df_temp['points_day1'][30:])
+print(t)
+print(p)
+
+"Day 2"
+print("\nDay 2")
+
+"----- On absolute values"
+pca_parameters = ['ag_idx',
+                  'age',
+                  'theta_Q_day2',
+                  'theta_rep_day2',
+                  'conflict_param_day2']
+
+pcomps = anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 3)
+
+complete_df['pcomps'] = pcomps[:, 0]
+complete_df_temp = complete_df.sort_values(by='pcomps', inplace = False)
+
+t,p = scipy.stats.ttest_ind(complete_df_temp['points_day2'][0:20], complete_df_temp['points_day2'][40:])
+print(t)
+print(p)
+
 #%%
 '''
     Theta Q_day1
@@ -334,7 +457,7 @@ anal.perform_PCA(complete_df.loc[:, ['ag_idx', 'theta_Q_day1', 'theta_rep_day1',
                             'theta_rep_day2-theta_rep_day1']], num_components=1)
 
 #%%
-"Cluster Analysis is based on absolute values"
+"Cluster Analysis based on absolute values"
 
 normalized_mean_df = pd.DataFrame()
 for param in [*param_names, 'age', 'RT', 'ER_dtt', 'ER_stt']:
@@ -397,7 +520,7 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_bothda
 
 #%%
 '''
-Correlations of Daydiffs with age
+    Correlations of Daydiffs with age
 '''
 import scipy
 
@@ -411,14 +534,14 @@ for param_idx in range(num_params):
 
 #%%
 '''
-Correlations between subjects
+    Correlations between subjects
 '''
 import analysis_tools as anal
 anal.param_corr(inf_mean_df)
 
 #%%
 '''
-Correlations within subjects
+    Correlations within subjects
 '''
 corr_df = anal.within_subject_corr(post_sample_df, param_names)
 
@@ -456,7 +579,7 @@ kmeans, cluster_groups_bothdays, _ = anal.kmeans(corr_df,
 
 #%%
 '''
-Correlation analysis day 1
+    Correlation analysis day 1
 '''
 droplist_for_day1 = [param for param in post_sample_df.columns if 'day2'  in param]
 post_sample_df_day1 = post_sample_df.drop(droplist_for_day1, axis = 1)
@@ -487,7 +610,7 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[0
 
 #%%
 '''
-kmeans with errors Day 1
+    kmeans with errors Day 1
 '''
 corr_dict_day1_errors = corr_dict_day1.copy()
 corr_dict_day1_errors['errors_stt_day1'] = errorrates_day1[0, :]
@@ -500,7 +623,7 @@ labels, cluster_groups_day1_errors = anal.kmeans(corr_dict_day1_errors, inf_mean
 anal.compare_lists(cluster_groups_day1_errors[0], cluster_groups_day1[0])
 #%%
 '''
-Correlation analysis day 2
+    Correlation analysis day 2
 '''
 droplist_for_day2 = [param for param in post_sample_df.columns if 'day1'  in param]
 post_sample_df_day2 = post_sample_df.drop(droplist_for_day2, axis = 1)
@@ -523,7 +646,7 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day2[0
                       day = 2)
 
 '''
-kmeans with errors Day 2
+    kmeans with errors Day 2
 '''
 post_sample_df_day2 = post_sample_df.drop(['lr_day2', 'theta_Q_day2', 'theta_rep_day2'], axis = 1)
 corr_dict_day2 = anal.within_subject_corr(post_sample_df_day2)
@@ -538,7 +661,7 @@ labels, cluster_groups = anal.kmeans(corr_dict_day2_errors, inf_mean_df, n_clust
 
 #%%
 '''
-Perform correlation analysis_tools only between days
+    Perform correlation analysis_tools only between days
 '''
 corr_dict = anal.within_subject_corr(post_sample_df)
 corr_dict_day_between = corr_dict.copy()
@@ -627,7 +750,7 @@ plt.show()
 
 #%%
 '''
-Clustering in Parameter Space Both days
+    Clustering in Parameter Space Both days
 '''
 df = inf_mean_df.drop(['model', 'ag_idx', 'group', 'labels', 'lr_day1', 'lr_day2'], axis = 1)
 normalized_df = (df-df.mean())/df.std()
@@ -665,7 +788,7 @@ utils.plot_grouplevel(expdf[expdf['labels'] == 0], expdf[expdf['labels'] == 1], 
 
 #%%
 '''
-Clustering in Parameter Space Day 1
+    Clustering in Parameter Space Day 1
 '''
 df = inf_mean_df.drop(['model', 'ag_idx', 'group', 'lr_day2', 'theta_Q_day2', 'theta_rep_day2', 'labels'], axis = 1)
 normalized_df = (df-df.mean())/df.std()
@@ -695,10 +818,10 @@ utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
 
 #%%
 '''
-Correlation with sociopsy data
+    Correlation Analyses
 '''
 
-""" age """
+""" age vs ER, RT, model parameters """
 for param_x, param_y in itertools.product(['age'],['ER_dtt', 'ER_stt', 'ER_total',
                                                    'RT', *param_names]):
     r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
@@ -711,7 +834,7 @@ for param_x, param_y in itertools.product(['age'],['ER_dtt', 'ER_stt', 'ER_total
         linmodel.fit(x, y)
         print(f"slope: {linmodel.coef_}\n")
 
-""" Errors """
+""" Errors vs model parameters """
 for param_x, param_y in itertools.product(['ER_total_day1', 'ER_stt_day1', 'ER_dtt_day1',
                                            'ER_total_day2', 'ER_stt_day2', 'ER_dtt_day2'],
                                           [*param_names]):
@@ -726,28 +849,66 @@ for param_x, param_y in itertools.product(['ER_total_day1', 'ER_stt_day1', 'ER_d
         linmodel.fit(x, y)
         print(f"slope: {linmodel.coef_}")
 
-""" Points """
-for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_Q_day2', 'theta_rep_day1', 'theta_rep_day2'], 
-                                          ['points_day1', 'points_day2',
-                                           'points_stt_day1', 'points_stt_day2',
-                                           'points_dtt_day1', 'points_dtt_day2',
-                                           'points_randomdtt_day1', 'points_congruent_day1', 'points_incongruent_day1',
-                                           'points_randomdtt_day2', 'points_congruent_day2', 'points_incongruent_day2']):
-    
+""" Points vs model parameters """
+"Day 1"
+for param_x, param_y in itertools.product(['theta_Q_day1', 'theta_rep_day1', 'conflict_param_day1'], 
+                                          ['points_day1',
+                                           'points_stt_day1',
+                                           'points_dtt_day1',
+                                           'points_randomdtt_day1', 
+                                           'points_congruent_day1', 
+                                           'points_incongruent_day1']):
+
     print(f"\n~~~~~ {param_x} ~~~~~")
     r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
     print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
     
-    if p < 0.05:
+    if p < 0.1:
         x = np.array(complete_df[param_x]).reshape(-1,1)
         y = np.array(complete_df[param_y]).reshape(-1,1)
         linmodel = LinearRegression()
         linmodel.fit(x, y)
         print(f"slope: {linmodel.coef_}\n")
 
+        
+"Day 2"
+for param_x, param_y in itertools.product(['theta_Q_day2', 'theta_rep_day2', 'conflict_param_day2'], 
+                                          ['points_day2',
+                                           'points_stt_day2',
+                                           'points_dtt_day2',
+                                           'points_randomdtt_day2', 'points_congruent_day2', 'points_incongruent_day2']):
+    
+    print(f"\n~~~~~ {param_x} ~~~~~")
+    r,p = scipy.stats.pearsonr(complete_df[param_x], complete_df[param_y])
+    print(f'{param_x} vs {param_y}: r=%.4f, p=%.4f'%(r,p))
+    
+    if p < 0.1:
+        x = np.array(complete_df[param_x]).reshape(-1,1)
+        y = np.array(complete_df[param_y]).reshape(-1,1)
+        linmodel = LinearRegression()
+        linmodel.fit(x, y)
+        print(f"slope: {linmodel.coef_}\n")
+        
+        
+""" Other """
+r,p = scipy.stats.pearsonr(complete_df['RT_stt_seq_day1'], complete_df['points_stt_day1'])
+print("\n")
+print(r)
+print(p)
+
+r,p = scipy.stats.pearsonr(complete_df['RT_stt_seq_day1'], complete_df['points_stt_seq_day1'])
+print("\n")
+print(r)
+print(p)
+
+r,p = scipy.stats.pearsonr(complete_df['RT_stt_rand_day1'], complete_df['points_stt_rand_day1'])
+print("\n")
+print(r)
+print(p)
+
 #%%
 '''
-Test sequence knowledge vs inferred parameters and sociopsy Data
+    Test sequence knowledge vs inferred parameters and sociopsy Data
 '''
 
 from scipy.stats import ttest_ind
@@ -769,8 +930,10 @@ print(f"for gender vs age: p={p_value}")
 
 #%%
 import pingouin as pg
-pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day1', covar='age')
-pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='age')
+# complete_df['points_day1'] = complete_df['points_day1'].astype('float')
+# complete_df['RT_day1'] = complete_df['RT_day1'].astype('float')
+pg.partial_corr(data=complete_df, x='points_day1', y='conflict_param_day1', covar='age')
+pg.partial_corr(data=complete_df, x='points_day2', y='conflict_param_day2', covar='age')
 
 #%%
 '''
@@ -778,6 +941,7 @@ pg.partial_corr(data=complete_df, x='ER_dtt', y='theta_Q_day2', covar='age')
 '''
 
 RT_df = complete_df.loc[:, ['ID', 
+                            'group',
                             'RT_stt_seq_day1', 
                             'RT_stt_rand_day1', 
                             'RT_stt_seq_day2', 
@@ -794,8 +958,6 @@ RT_df_melted = RT_df.melt(id_vars = ['ID'], value_vars=  ['RT Diff Day 1',
 
 RT_df_melted['Day'] = RT_df_melted['variable'].map(lambda x: 'Day 1' if '1' in x else 'Day 2')
 
-
-
 r,p = scipy.stats.ttest_1samp(RT_df['RT Diff Day 1'], 0)
 print(r)
 print(p)
@@ -810,6 +972,7 @@ ax.set_ylabel(r'$\Delta$RT (rand-fix) (ms)', fontsize=20)
 # ax.set_xlabel('Condition')
 plt.savefig('/home/sascha/Downloads/diffs_rt.tiff', dpi = 600)
 plt.show()
+
 #%%
 '''
     Plot HPCF as boxplots
@@ -845,7 +1008,7 @@ fig, ax = plt.subplots()
 sns.boxplot(data=hpcf_df_melted, x='variable', y='HRCF', hue = 'Trialtype')
 ax.set_ylabel('HRCF (%)', fontsize=20)
 ax.set_xlabel('Condition')
-plt.savefig('/home/sascha/Downloads/diffs_hpcf.tiff', dpi = 600)
+# plt.savefig('/home/sascha/Downloads/diffs_hpcf.tiff', dpi = 600)
 plt.show()
 
 r,p = scipy.stats.ttest_rel(hpcf_df['Cong (Day 1)'], hpcf_df['Incong (Day 1)'])
@@ -874,7 +1037,7 @@ print(p)
 
 #%%
 '''
-    Scatter HRCF vs. RT(diff) jeweils day 1 und day 2 gemittelt
+    Scatter HRCF vs. ΔRT (R-S) jeweils day 1 und day 2 gemittelt
 '''
 
 hpcf = complete_df.loc[:, ['ID', 'hpcf_cong_day1', 'hpcf_incong_day1', 'hpcf_cong_day2', 'hpcf_incong_day2']]
@@ -897,11 +1060,250 @@ ax[0].tick_params(axis='both', labelsize=20)
 
 r,p = scipy.stats.pearsonr(df['HPCF Diff Day 2'], df['RT Diff Day 2'])
 
-sns.regplot(data = df, x='RT Diff Day 1', y = 'HPCF Diff Day 1', color='r', ax = ax[1])
+sns.regplot(data = df, x='RT Diff Day 2', y = 'HPCF Diff Day 2', color='r', ax = ax[1])
 ax[1].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
 ax[1].set_xlabel(r'$\Delta$RT (rand-fix) (ms)', fontsize= 25)
 # ax[1].set_title('Day 2', fontsize = 25)
-ax[1].text(-14, 0.3, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
+ax[1].text(-8, 0.3, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
 ax[1].tick_params(axis='both', labelsize=20)
 plt.savefig('/home/sascha/Downloads/corrs.tiff', dpi = 600)
 plt.show()
+
+'''
+    Scatter θR vs. ΔRT (R-S) jeweils day 1 und day 2 gemittelt
+'''
+
+df = pd.merge(complete_df.loc[:, ['ID', 'theta_rep_day1', 'theta_rep_day2']], RT_df, on = 'ID')
+
+r,p = scipy.stats.pearsonr(df['theta_rep_day1'], df['RT Diff Day 1'])
+
+fig, ax = plt.subplots(2,1, figsize=(10,15))
+sns.regplot(data = df, x='RT Diff Day 1', y = 'theta_rep_day1', color='r', ax = ax[0])
+# ax[0].tick_params(axis = 'x', fontsize= 100)
+# ax[0].set_xticks(fontsize= 25)
+ax[0].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[0].set_xlabel(r'$\Delta$RT (rand-fix) (ms)', fontsize= 25)
+# ax[0].set_title('Day 1', fontsize=25)
+ax[0].text(-14, 1.25, 'r = %.2f\np = %.3f'%(r,p), fontsize=25)
+ax[0].tick_params(axis='both', labelsize=20)
+
+r,p = scipy.stats.pearsonr(df['theta_rep_day2'], df['RT Diff Day 2'])
+
+sns.regplot(data = df, x='RT Diff Day 2', y = 'theta_rep_day2', color='r', ax = ax[1])
+ax[1].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[1].set_xlabel(r'$\Delta$RT (rand-fix) (ms)', fontsize= 25)
+# ax[1].set_title('Day 2', fontsize = 25)
+ax[1].text(-7, 1.4, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
+ax[1].tick_params(axis='both', labelsize=20)
+# plt.savefig('/home/sascha/Downloads/corrs.tiff', dpi = 600)
+plt.show()
+
+#%%
+'''
+    Scatter HRCF vs. ΔER (R-S) jeweils day 1 und day 2 gemittelt
+'''
+
+ER_df = complete_df.loc[:, ['ID', 
+                            'group',
+                            'ER_stt_seq_day1', 
+                            'ER_stt_rand_day1', 
+                            'ER_stt_seq_day2', 
+                            'ER_stt_rand_day2']]
+
+ER_df['ER Diff Day 1'] = (np.squeeze(ER_df.loc[:, ['ER_stt_rand_day1']]) - np.squeeze(ER_df.loc[:, ['ER_stt_seq_day1']])).astype(float)
+ER_df['ER Diff Day 2'] = (np.squeeze(ER_df.loc[:, ['ER_stt_rand_day2']]) - np.squeeze(ER_df.loc[:, ['ER_stt_seq_day2']])).astype(float)
+
+df = pd.merge(hpcf, ER_df)
+
+r,p = scipy.stats.pearsonr(df['HPCF Diff Day 1'], df['ER Diff Day 1'])
+
+fig, ax = plt.subplots(2,1, figsize=(10,15))
+sns.regplot(data = df, x='ER Diff Day 1', y = 'HPCF Diff Day 1', color='r', ax = ax[0])
+# ax[0].tick_params(axis = 'x', fontsize= 100)
+# ax[0].set_xticks(fontsize= 25)
+ax[0].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[0].set_xlabel(r'$\Delta$ER (rand-fix) (ms)', fontsize= 25)
+# ax[0].set_title('Day 1', fontsize=25)
+ax[0].text(-0.02, 0.3, 'r = %.2f\np = %.3f'%(r,p), fontsize=25)
+# ax[0].tick_params(axis='both', labelsize=20)
+
+r,p = scipy.stats.pearsonr(df['HPCF Diff Day 2'], df['ER Diff Day 2'])
+
+sns.regplot(data = df, x='ER Diff Day 2', y = 'HPCF Diff Day 2', color='r', ax = ax[1])
+ax[1].set_ylabel(r'$\Delta$HRCF (cong-inc)', fontsize= 25)
+ax[1].set_xlabel(r'$\Delta$ER (rand-fix) (ms)', fontsize= 25)
+# ax[1].set_title('Day 2', fontsize = 25)
+ax[1].text(-0.02, 0.3, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
+# ax[1].tick_params(axis='both', labelsize=20)
+# plt.savefig('/home/sascha/Downloads/corrs.tiff', dpi = 600)
+plt.show()
+
+'''
+    Scatter θR vs. ΔER (R-S) jeweils day 1 und day 2 gemittelt
+'''
+
+df = pd.merge(complete_df.loc[:, ['ID', 'theta_rep_day1', 'theta_rep_day2']], ER_df, on = 'ID')
+
+r,p = scipy.stats.pearsonr(df['theta_rep_day1'], df['ER Diff Day 1'])
+
+fig, ax = plt.subplots(2,1, figsize=(10,15))
+sns.regplot(data = df, x='ER Diff Day 1', y = 'theta_rep_day1', color='r', ax = ax[0])
+# ax[0].tick_params(axis = 'x', fontsize= 100)
+# ax[0].set_xticks(fontsize= 25)
+ax[0].set_ylabel(r'$\theta_R$', fontsize= 25)
+ax[0].set_xlabel(r'$\Delta$ER (rand-fix) (ms)', fontsize= 25)
+# ax[0].set_title('Day 1', fontsize=25)
+ax[0].text(-0.02, 1.25, 'r = %.2f\np = %.3f'%(r,p), fontsize=25)
+ax[0].tick_params(axis='both', labelsize=20)
+
+r,p = scipy.stats.pearsonr(df['theta_rep_day2'], df['ER Diff Day 2'])
+
+sns.regplot(data = df, x='ER Diff Day 2', y = 'theta_rep_day2', color='r', ax = ax[1])
+ax[1].set_ylabel(r'$\theta_R$', fontsize= 25)
+ax[1].set_xlabel(r'$\Delta$ER (rand-fix) (ms)', fontsize= 25)
+# ax[1].set_title('Day 2', fontsize = 25)
+ax[1].text(-0.01, 1.4, 'r = %.2f\np = %.5f'%(r,p), fontsize=25)
+ax[1].tick_params(axis='both', labelsize=20)
+# plt.savefig('/home/sascha/Downloads/corrs.tiff', dpi = 600)
+plt.show()
+
+#%%
+'''
+    Parameter distributions of highest points
+'''
+
+params_day1 = ['lr_day1', 'theta_Q_day1', 'theta_rep_day1', 'conflict_param_day1', 'ER_stt_day1', 'ER_dtt_day1',  'RT_day1']
+params_day2 = ['lr_day2', 'theta_Q_day2', 'theta_rep_day2', 'conflict_param_day2', 'ER_stt_day2', 'ER_dtt_day2',  'RT_day2']
+
+for par in params_day1:
+    r,p = scipy.stats.pearsonr(complete_df[par], complete_df['points_day1'])
+    
+    print(f"Correlation for points_day1 with {par}: r=%.4f, p=%.4f"%(r, p))
+
+
+print('\n')
+for par in params_day2:
+    r,p = scipy.stats.pearsonr(complete_df[par], complete_df['points_day2'])
+    
+    print(f"Correlation for points_day2 with {par}: r=%.4f, p=%.4f"%(r, p))
+    
+#%%
+params_day1 = ['theta_rep_day1', 'conflict_param_day1']
+params_day2 = ['theta_rep_day2', 'conflict_param_day2']
+
+import statsmodels.api as sm
+x = np.array(complete_df.loc[:, [*params_day1]], dtype='float')
+y = np.array(complete_df['points_day1'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+x = np.array(complete_df.loc[:, [*params_day2]], dtype='float')
+y = np.array(complete_df['points_day1'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+#%%
+'''
+    Points: Day 1
+'''
+complete_df = complete_df.sort_values(by = 'points_day1')
+rep_conf = complete_df.loc[:, 'theta_rep_day1'] + complete_df.loc[:, 'conflict_param_day1']
+
+complete_df.iloc[0:20, :]
+
+for param in params_day1:
+    t, p = scipy.stats.ttest_ind(np.array(complete_df.iloc[0:20,:][param], dtype='float'), np.array(complete_df.iloc[-20:,:][param], dtype='float'))
+    print(f"Test for points_day1 with {param}: t=%.4f, p=%.4f"%(t, p))
+
+t, p = scipy.stats.ttest_ind(np.array(rep_conf[0:20], dtype='float'), np.array(rep_conf[-20:], dtype='float'))
+print("Test for points_day1 with rep+conf: t=%.4f, p=%.4f"%(t, p))
+
+#%%
+'''
+    Points: Day 2
+'''
+complete_df = complete_df.sort_values(by = 'points_day2')
+rep_conf = complete_df.loc[:, 'theta_rep_day2'] + complete_df.loc[:, 'conflict_param_day2']
+
+complete_df.iloc[0:20, :]
+
+for param in params_day2:
+    t, p = scipy.stats.ttest_ind(np.array(complete_df.iloc[0:20,:][param], dtype='float'), np.array(complete_df.iloc[-20:,:][param], dtype='float'))
+    print(f"Test for points_day1 with {param}: t=%.4f, p=%.4f"%(t, p))
+    
+t, p = scipy.stats.ttest_ind(np.array(rep_conf[0:20], dtype='float'), np.array(rep_conf[-20:], dtype='float'))
+print("Test for points_day1 with rep+conf: t=%.4f, p=%.4f"%(t, p))
+
+#%%
+'''
+    Check for 3 approaches:
+        1) (Almost) no habit learning
+                low ΔER, low ΔRT, low θR --> same points in DTT random and seq (ΔPoints (DTT_s - DTT_r) ~ 0)
+                
+        2) Habit learning --> use habit to free cognitive resources and increase performance
+                High ΔER, low to medium ΔRT --> more points in DTT Seq than DTT Rand (ΔPoints (DTT_s - DTT_r) > 0)
+                
+        3) Habit learning --> habitual responding independent from points
+                High ΔER, high ΔRT --> less points in DTT Seq than DTT Rand (ΔPoints (DTT_s - DTT_r) < 0)
+                
+        (NB: Use ΔER and ΔRT of last 2 blocks on day 1 and last 4 blocks on day 2)
+'''
+import statsmodels.api as sm
+df = pd.merge(ER_df.loc[:, ['ID', 'group', 'ER Diff Day 1', 'ER Diff Day 2']], RT_df.loc[:, ['ID', 'RT Diff Day 1', 'RT Diff Day 2']], on = 'ID')
+complete_df['ΔPoints Day 1'] = np.array(complete_df.loc[:, ['points_dtt_seq_day1']]) - np.array(complete_df.loc[:, ['points_dtt_rand_day1']])
+complete_df['ΔPoints Day 2'] = np.array(complete_df.loc[:, ['points_dtt_seq_day2']]) - np.array(complete_df.loc[:, ['points_dtt_rand_day2']])
+df = pd.merge(df, complete_df.loc[:, ['ID', 'ΔPoints Day 1', 'ΔPoints Day 2']], on = 'ID')
+
+x = np.array(df.loc[:, ['ER Diff Day 1', 'RT Diff Day 1']], dtype='float')
+y = np.array(df['ΔPoints Day 1'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+x = np.array(df.loc[:, ['ER Diff Day 2', 'RT Diff Day 2']], dtype='float')
+y = np.array(df['ΔPoints Day 2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+
+
+
+# sns.scatterplot(data = df, x = 'RT Diff Day 2', y = 'ΔPoints Day 2')
+# sns.scatterplot(data = df, x = 'ER Diff Day 2', y = 'ΔPoints Day 2')
+
+#%%
+
+points_df = complete_df.loc[:, ['ID', 
+                                'theta_rep_day1', 
+                                'theta_rep_day2', 
+                                'conflict_param_day1', 
+                                'conflict_param_day2', 
+                                'points_stt_day1', 
+                                'points_dtt_day1', 
+                                'points_stt_day2', 
+                                'points_dtt_day2',
+                                'hpcf_incong_day1',
+                                'hpcf_incong_day2']]
+
+points_df['day1_comb'] = points_df['theta_rep_day1']+points_df['conflict_param_day1']
+points_df['ER_dtt_day1'] = complete_df['ER_dtt_day1']
+points_df['day2_comb'] = points_df['theta_rep_day2']+points_df['conflict_param_day2']
+points_df['ER_dtt_day2'] = complete_df['ER_dtt_day2']
+
+fig, ax = plt.subplots(2,1, figsize=(10,15))
+sns.regplot(data = points_df, x = 'day1_comb', y='hpcf_incong_day1', ax = ax[0])
+ax[0].set_xlabel('theta_rep + theta_conf')
+r,p = scipy.stats.pearsonr(complete_df['conflict_param_day1'],complete_df['hpcf_incong_day1'])
+print(r)
+print(p)
+
+sns.regplot(data = points_df, x = 'day2_comb', y='hpcf_incong_day2', ax = ax[1])
+ax[1].set_xlabel('theta_rep + theta_conf')
+r,p = scipy.stats.pearsonr(complete_df['conflict_param_day2'], complete_df['ER_stt_day2'])
+print(r)
+print(p)
+plt.show()
+

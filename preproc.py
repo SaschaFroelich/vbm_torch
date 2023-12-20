@@ -14,8 +14,7 @@ exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch
 
 pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data.p", "wb" ) )
 
-# exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/', getall = True)
+#%% Published data
+exp_behav_dict, expdata_df = utils.get_old_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/published/Data/', getall = True, oldpub = True)
 
-# pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_all.p", "wb" ) )
-
-
+pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_old_published_all.p", "wb" ) )

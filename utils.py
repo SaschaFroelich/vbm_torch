@@ -1839,7 +1839,6 @@ def plot_grouplevel(df1,
     None.
 
     '''
-    
     if 'ID' in df1.columns:
         groupdata_df_1 = df1.drop(['ID'], axis = 1)
         
@@ -1913,11 +1912,11 @@ def plot_grouplevel(df1,
             agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == ag_idx]
             agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             
-            if groupdata_df_2 is not None:
+            if df2 is not None:
                 agent_df_2 = groupdata_df_2[groupdata_df_2['ag_idx'] == ag_idx]
                 agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
             
-            if groupdata_df_2 is not None:
+            if df2 is not None:
                 
                 # pass
                 # exp_grouped_df = create_grouped(exp_data[exp_data['ag_idx']==ag_idx], ag_idx)
@@ -2024,11 +2023,11 @@ def plot_grouplevel(df1,
     else:
         "----- Remove error trials (where choices_GD == -2"
 
-        
+        grouped_df_1.rename(columns={'jokertypes':'DTT Types'}, inplace = True)
         fig, ax = plt.subplots()
         sns.lineplot(x = "blocknum",
                     y = "choices_GD",
-                    hue = "jokertypes",
+                    hue = "DTT Types",
                     data = grouped_df_1,
                     palette = custom_palette,
                     ax = ax)
@@ -2396,14 +2395,7 @@ def get_data_from_file():
     num_params = len(params_df_temp.columns)
     del params_df_temp
     
-    sociopsy_df = pd.read_csv('/home/sascha/Desktop/vbm_torch/behav_data/sociopsy_data.csv')
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded\xa0(0)', 'handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded\xa0(1)', 'handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous\xa0(2)', 'handedness'] = 2
-    
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'female\xa0(0)', 'handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'male\xa0(1)', 'handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'other\xa0(2)', 'handedness'] = 2
+    sociopsy_df = get_sociopsy_df()
     
     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
     
@@ -2507,56 +2499,7 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
             HPCF
         '''    
         print("\nComputing HPCF.")
-        hpcf_df = expdata_df.loc[:, ['ID', 'choices_GD', 'blockidx', 'blocktype', 'jokertypes', 'trialsequence']]
-        hpcf_df = hpcf_df[hpcf_df['choices_GD'] != -1]
-        hpcf_df = hpcf_df[hpcf_df['choices_GD'] != -2]
-        hpcf_df = hpcf_df[hpcf_df['trialsequence'] > 10]
-        
-        hpcf_rand_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
-                                              (hpcf_df['blocktype'] == 0)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_rand_day1.rename(columns = {'choices_GD': 'hpcf_rand_day1'}, inplace = True)
-            
-        hpcf_rand_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
-                                 (hpcf_df['blocktype'] == 0)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_rand_day2.rename(columns = {'choices_GD': 'hpcf_rand_day2'}, inplace = True)
-            
-        hpcf_seq_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
-                                (hpcf_df['blocktype'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_seq_day1.rename(columns = {'choices_GD': 'hpcf_seq_day1'}, inplace = True)
-            
-        hpcf_seq_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
-                                (hpcf_df['blocktype'] == 1)]  .loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean()    )
-        hpcf_seq_day2.rename(columns = {'choices_GD': 'hpcf_seq_day2'}, inplace = True)
-
-        '-1/0/1/2 : no joker/random/congruent/incongruent'
-        hpcf_cong_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
-                                              (hpcf_df['blocktype'] == 0) & \
-                                              (hpcf_df['jokertypes'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_cong_day1.rename(columns={'choices_GD':'hpcf_cong_day1'}, inplace = True)
-            
-        hpcf_incong_day1 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] <= 5) & \
-                                              (hpcf_df['blocktype'] == 0) & \
-                                              (hpcf_df['jokertypes'] == 2)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_incong_day1.rename(columns={'choices_GD':'hpcf_incong_day1'}, inplace = True)
-            
-        hpcf_cong_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
-                                              (hpcf_df['blocktype'] == 0) & \
-                                              (hpcf_df['jokertypes'] == 1)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_cong_day2.rename(columns={'choices_GD':'hpcf_cong_day2'}, inplace = True)
-            
-        hpcf_incong_day2 = pd.DataFrame(hpcf_df[(hpcf_df['blockidx'] > 5) & \
-                                              (hpcf_df['blocktype'] == 0) & \
-                                              (hpcf_df['jokertypes'] == 2)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-        hpcf_incong_day2.rename(columns={'choices_GD':'hpcf_incong_day2'}, inplace = True)
-
-        hpcf_df = pd.merge(hpcf_rand_day1, hpcf_rand_day2, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, hpcf_seq_day1, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, hpcf_seq_day2, on = 'ID')
-        
-        hpcf_df = pd.merge(hpcf_df, hpcf_cong_day1, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, hpcf_incong_day1, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, hpcf_cong_day2, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, hpcf_incong_day2, on = 'ID')
+        hpcf_df = compute_hpcf(expdata_df)
 
         '''
             Sociopsychological Data
@@ -2569,55 +2512,8 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
         '''
             RT
         '''
-        RT_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
-        RT_df = RT_df[RT_df['choices'] != -1]
-        RT_df = RT_df[RT_df['choices'] != -2]
-        RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_temp_day1 = pd.DataFrame(RT_df[RT_df['blockidx']<=5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_temp_day1 = RT_df_temp_day1.rename(columns={'RT':'RT_day1'})
-        RT_df_temp_day2 = pd.DataFrame(RT_df[RT_df['blockidx']>5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_temp_day2 = RT_df_temp_day2.rename(columns={'RT':'RT_day2'})
         
-        RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
-        RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
-        
-        RT_cond_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'blocktype', 'trialsequence']]
-        RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
-        RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
-        
-        RT_df_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_rand_day1.rename(columns={'RT':'RT_rand_day1'}, inplace = True)
-        
-        RT_df_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_rand_day2.rename(columns={'RT':'RT_rand_day2'}, inplace = True)
-        
-        RT_df_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_seq_day1.rename(columns={'RT':'RT_seq_day1'}, inplace = True)
-        
-        RT_df_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_df_seq_day2.rename(columns={'RT':'RT_seq_day2'}, inplace = True)
-        
-        RT_stt_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_stt_seq_day1.rename(columns={'RT':'RT_stt_seq_day1'}, inplace = True)
-        
-        RT_stt_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_stt_rand_day1.rename(columns={'RT':'RT_stt_rand_day1'}, inplace = True)
-
-        RT_stt_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_stt_seq_day2.rename(columns={'RT':'RT_stt_seq_day2'}, inplace = True)
-        
-        RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-        RT_stt_rand_day2.rename(columns={'RT':'RT_stt_rand_day2'}, inplace = True)
-        
-        RT_df = pd.merge(RT_df, RT_df_rand_day1, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_df_rand_day2, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_df_seq_day1, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_df_seq_day2, on = 'ID')
-        
-        RT_df = pd.merge(RT_df, RT_stt_seq_day1, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_stt_rand_day1, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_stt_seq_day2, on = 'ID')
-        RT_df = pd.merge(RT_df, RT_stt_rand_day2, on = 'ID')
+        RT_df = compute_RT(expdata_df)
         
         '''
             Q: Did you notice a sequence?
@@ -2707,27 +2603,27 @@ def compute_points(expdata_df, identifier = 'ID'):
     points_total = expdata_df.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
     points_total.rename(columns={'outcomes': 'points_total'}, inplace = True)
     
-    "Day 1"
+    "----- Day 1"
     expdata_df_day1 = expdata_df[expdata_df['blockidx'] <= 5 ]
     points_day1 = expdata_df_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
     points_day1.rename(columns={'outcomes': 'points_day1'}, inplace = True)
     
-    "Day 2"
-    expdata_df_day2 = expdata_df[expdata_df['blockidx'] > 5 ]
-    points_day2 = expdata_df_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
-    points_day2.rename(columns={'outcomes': 'points_day2'}, inplace = True)
-    
-    "STT Day 1"
+    "--- Day 1: STT"
     expdata_df_stt_day1 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] <= 5)]
     points_stt_df_day1 = expdata_df_stt_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     points_stt_df_day1.rename(columns = {'outcomes' : 'points_stt_day1'}, inplace = True)
     
-    "STT Day 2"
-    expdata_df_stt_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5)]
-    points_stt_df_day2 = expdata_df_stt_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    points_stt_df_day2.rename(columns = {'outcomes' : 'points_stt_day2'}, inplace = True)
+    "STT sequential Day 1"
+    expdata_df_stt_seq_day1 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] <= 5) & (expdata_df['blocktype'] == 0)]
+    points_stt_seq_df_day1 = expdata_df_stt_seq_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_stt_seq_df_day1.rename(columns = {'outcomes' : 'points_stt_seq_day1'}, inplace = True)
     
+    "STT Random Day 1"
+    expdata_df_stt_rand_day1 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] <= 5) & (expdata_df['blocktype'] == 1)]
+    points_stt_rand_df_day1 = expdata_df_stt_rand_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_stt_rand_df_day1.rename(columns = {'outcomes' : 'points_stt_rand_day1'}, inplace = True)
     
+    "--- Day 1: DTT"
     "DTT Jokertypes Day 1"
     "-1/0/1/2 : no joker/random/congruent/incongruent"
     expdata_df_dtt_day1 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] <= 5)]
@@ -2737,9 +2633,39 @@ def compute_points(expdata_df, identifier = 'ID'):
                                                1: 'points_congruent_day1',
                                                2: 'points_incongruent_day1'}, inplace=True)
     
-    "DTT Day 1"
-    expdata_df_dtt_day1 = expdata_df_dtt_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    expdata_df_dtt_day1.rename(columns = {'outcomes' : 'points_dtt_day1'}, inplace = True)
+    "DTT Seq"
+    expdata_df_dtt_seq_day1 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] <= 5) & (expdata_df['blocktype'] == 0)]
+    points_dtt_seq_day1 = expdata_df_dtt_seq_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+    points_dtt_seq_day1.rename(columns = {'outcomes' : 'points_dtt_seq_day1'}, inplace = True)
+    
+    "DTT Rand"
+    expdata_df_dtt_rand_day1 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] <= 5) & (expdata_df['blocktype'] == 1)]
+    points_dtt_rand_day1 = expdata_df_dtt_rand_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+    points_dtt_rand_day1.rename(columns = {'outcomes' : 'points_dtt_rand_day1'}, inplace = True)
+    
+    "--- Day 1: DTT"
+    points_df_dtt_day1 = expdata_df_dtt_day1.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_df_dtt_day1.rename(columns = {'outcomes' : 'points_dtt_day1'}, inplace = True)
+    
+    "----- Day 2"
+    expdata_df_day2 = expdata_df[expdata_df['blockidx'] > 5 ]
+    points_day2 = expdata_df_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+    points_day2.rename(columns={'outcomes': 'points_day2'}, inplace = True)
+    
+    "STT Day 2"
+    expdata_df_stt_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5)]
+    points_stt_df_day2 = expdata_df_stt_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_stt_df_day2.rename(columns = {'outcomes' : 'points_stt_day2'}, inplace = True)
+    
+    "DTT Seq"
+    expdata_df_dtt_seq_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5) & (expdata_df['blocktype'] == 0)]
+    points_dtt_seq_day2 = expdata_df_dtt_seq_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+    points_dtt_seq_day2.rename(columns = {'outcomes' : 'points_dtt_seq_day2'}, inplace = True)
+    
+    "DTT Rand"
+    expdata_df_dtt_rand_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5) & (expdata_df['blocktype'] == 1)]
+    points_dtt_rand_day2 = expdata_df_dtt_rand_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+    points_dtt_rand_day2.rename(columns = {'outcomes' : 'points_dtt_rand_day2'}, inplace = True)
     
     "DTT Jokertypes Day 2"
     expdata_df_dtt_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5)]
@@ -2754,14 +2680,157 @@ def compute_points(expdata_df, identifier = 'ID'):
     expdata_df_dtt_day2.rename(columns = {'outcomes' : 'points_dtt_day2'}, inplace = True)
     
     points_df = pd.merge(points_total, points_day1, on = identifier)
-    points_df = pd.merge(points_df, points_day2, on = identifier)
     points_df = pd.merge(points_df, points_stt_df_day1, on = identifier)
+    points_df = pd.merge(points_df, points_stt_seq_df_day1, on = identifier)
+    points_df = pd.merge(points_df, points_stt_rand_df_day1, on = identifier)
+    points_df = pd.merge(points_df, points_dtt_df_jokertypes_day1_pivoted, on = identifier)
+    points_df = pd.merge(points_df, points_df_dtt_day1, on = identifier)
+    points_df = pd.merge(points_df, points_dtt_seq_day1, on = identifier)
+    points_df = pd.merge(points_df, points_dtt_rand_day1, on = identifier)
+    
+    points_df = pd.merge(points_df, points_day2, on = identifier)
     points_df = pd.merge(points_df, points_stt_df_day2, on = identifier)
     
-    points_df = pd.merge(points_df, points_dtt_df_jokertypes_day1_pivoted, on = identifier)
     points_df = pd.merge(points_df, points_dtt_df_jokertypes_day2_pivoted, on = identifier)
     
-    points_df = pd.merge(points_df, expdata_df_dtt_day1, on = identifier)
     points_df = pd.merge(points_df, expdata_df_dtt_day2, on = identifier)
     
+    points_df = pd.merge(points_df, points_dtt_seq_day2, on = identifier)
+    points_df = pd.merge(points_df, points_dtt_rand_day2, on = identifier)
+    
     return points_df
+
+def compute_hpcf(expdata_df):
+    '''
+    jokertypes : list
+        DTT Types
+        -1/0/1/2 : no joker/random/congruent/incongruent
+    '''
+    
+    df = expdata_df[expdata_df['choices_GD'] != -1]
+    df = expdata_df[expdata_df['choices_GD'] != -2]
+    df = expdata_df[expdata_df['trialsequence'] > 10]
+    
+    hpcf_df = pd.DataFrame(data = {'ID': expdata_df['ID'].unique()})
+    
+    hpcf_day1 = pd.DataFrame(df[df['blockidx'] <= 5].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    hpcf_day1.rename(columns={'choices_GD' : 'hpcf_day1'}, inplace = True)
+
+    hpcf_day2 = pd.DataFrame(df[df['blockidx'] > 5].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    hpcf_day2.rename(columns={'choices_GD' : 'hpcf_day2'}, inplace = True)
+    
+    "Random"
+    df_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+    
+    df_rand_day1 = pd.DataFrame(df[(df['jokertypes'] == 0) & (df['blockidx'] <= 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_rand_day1.rename(columns = {'choices_GD': 'hpcf_rand_day1'}, inplace = True)
+    
+    df_rand_day2 = pd.DataFrame(df[(df['jokertypes'] == 0) & (df['blockidx'] > 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_rand_day2.rename(columns = {'choices_GD': 'hpcf_rand_day2'}, inplace = True)
+    
+    "Congruent"
+    df_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_cong.rename(columns = {'choices_GD': 'hpcf_cong'}, inplace = True)
+    
+    df_cong_day1 = pd.DataFrame(df[(df['jokertypes'] == 1) & (df['blockidx'] <= 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_cong_day1.rename(columns = {'choices_GD': 'hpcf_cong_day1'}, inplace = True)
+    
+    df_cong_day2 = pd.DataFrame(df[(df['jokertypes'] == 1) & (df['blockidx'] > 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_cong_day2.rename(columns = {'choices_GD': 'hpcf_cong_day2'}, inplace = True)
+    
+    "Incongruent"
+    df_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
+    
+    df_inc_day1 = pd.DataFrame(df[(df['jokertypes'] == 2) & (df['blockidx'] <= 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_inc_day1.rename(columns = {'choices_GD': 'hpcf_incong_day1'}, inplace = True)
+    
+    df_inc_day2 = pd.DataFrame(df[(df['jokertypes'] == 2) & (df['blockidx'] > 5)].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_inc_day2.rename(columns = {'choices_GD': 'hpcf_incong_day2'}, inplace = True)
+    
+    
+    hpcf_df = pd.merge(hpcf_df, hpcf_day1, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, hpcf_day2, on = 'ID')
+    
+    hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_rand_day1, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_rand_day2, on = 'ID')
+    
+    hpcf_df = pd.merge(hpcf_df, df_cong, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_cong_day1, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_cong_day2, on = 'ID')
+    
+    hpcf_df = pd.merge(hpcf_df, df_inc, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_inc_day1, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_inc_day2, on = 'ID')
+    
+    return hpcf_df
+
+def compute_RT(expdata_df):
+    RT_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
+    RT_df = RT_df[RT_df['choices'] != -1]
+    RT_df = RT_df[RT_df['choices'] != -2]
+    RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day1 = pd.DataFrame(RT_df[RT_df['blockidx']<=5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day1 = RT_df_temp_day1.rename(columns={'RT':'RT_day1'})
+    RT_df_temp_day2 = pd.DataFrame(RT_df[RT_df['blockidx']>5].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_temp_day2 = RT_df_temp_day2.rename(columns={'RT':'RT_day2'})
+    
+    RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
+    RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
+    
+    RT_cond_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'blocktype', 'trialsequence']]
+    RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
+    RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
+    
+    RT_df_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_rand_day1.rename(columns={'RT':'RT_rand_day1'}, inplace = True)
+    
+    RT_df_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_rand_day2.rename(columns={'RT':'RT_rand_day2'}, inplace = True)
+    
+    RT_df_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_seq_day1.rename(columns={'RT':'RT_seq_day1'}, inplace = True)
+    
+    RT_df_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_seq_day2.rename(columns={'RT':'RT_seq_day2'}, inplace = True)
+    
+    RT_stt_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_seq_day1.rename(columns={'RT':'RT_stt_seq_day1'}, inplace = True)
+    
+    RT_stt_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_rand_day1.rename(columns={'RT':'RT_stt_rand_day1'}, inplace = True)
+
+    RT_stt_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_seq_day2.rename(columns={'RT':'RT_stt_seq_day2'}, inplace = True)
+    
+    RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_rand_day2.rename(columns={'RT':'RT_stt_rand_day2'}, inplace = True)
+    
+    RT_df = pd.merge(RT_df, RT_df_rand_day1, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_df_rand_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_df_seq_day1, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_df_seq_day2, on = 'ID')
+    
+    RT_df = pd.merge(RT_df, RT_stt_seq_day1, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_rand_day1, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_seq_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_rand_day2, on = 'ID')
+    
+    RT_df['RT Diff STT Day 1'] = RT_df['RT_stt_rand_day1'] - RT_df['RT_stt_seq_day1']
+    RT_df['RT Diff STT Day 2'] = RT_df['RT_stt_rand_day2'] - RT_df['RT_stt_seq_day2']
+    
+    return RT_df
+
+def get_sociopsy_df():
+    sociopsy_df = pd.read_csv('/home/sascha/Desktop/vbm_torch/behav_data/sociopsy_data.csv')
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded\xa0(0)', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded\xa0(1)', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous\xa0(2)', 'handedness'] = 2
+    
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'female\xa0(0)', 'handedness'] = 0
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'male\xa0(1)', 'handedness'] = 1
+    sociopsy_df.loc[sociopsy_df['handedness'] == 'other\xa0(2)', 'handedness'] = 2
+    
+    return sociopsy_df
