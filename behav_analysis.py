@@ -99,1279 +99,6 @@ print(t)
 print(p)
 
 #%%
-import utils
-import analysis_tools as anal
-import seaborn as sns
-import scipy
-from scipy import stats
-
-published = 0
-if published == 1:
-    expdata_df = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
-    
-else:
-    _, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-
-hpcf_df = utils.compute_hpcf(expdata_df)
-error_df = anal.compute_errors(expdata_df)
-RT_df = utils.compute_RT(expdata_df)
-# points_df = utils.compute_points(expdata_df)
-
-complete_df = pd.merge(hpcf_df, error_df, on = 'ID')
-complete_df = pd.merge(complete_df, RT_df, on = 'ID')
-# complete_df = pd.merge(complete_df, points_df, on = 'ID')
-complete_df = pd.merge(complete_df, expdata_df.loc[:, ['group', 'ID', 'q_notice_a_sequence']].groupby(['ID'], as_index = False).mean(), on = 'ID')
-
-for col in complete_df.columns:
-    if col != 'ID':
-        complete_df[col] = complete_df[col].astype(float)
-
-complete_df['RIspread_day1'] = complete_df['hpcf_rand_day1'] - complete_df['hpcf_incong_day1']
-complete_df['RIspread_day2'] = complete_df['hpcf_rand_day2'] - complete_df['hpcf_incong_day2']
-
-complete_df['CRspread_day1'] = complete_df['hpcf_cong_day1'] - complete_df['hpcf_rand_day1']
-complete_df['CRspread_day2'] = complete_df['hpcf_cong_day2'] - complete_df['hpcf_rand_day2']
-
-complete_df['CIspread_day1'] = complete_df['hpcf_cong_day1'] - complete_df['hpcf_incong_day1']
-complete_df['CIspread_day2'] = complete_df['hpcf_cong_day2'] - complete_df['hpcf_incong_day2']
-
-complete_df['spread_day1'] = complete_df['hpcf_cong_day1'] - complete_df['hpcf_incong_day1']
-complete_df['spread_day2'] = complete_df['hpcf_cong_day2'] - complete_df['hpcf_incong_day2']
-
-complete_df['seqtrait'] = complete_df['RT Diff STT Day 2']/ complete_df['RT Diff STT Day 2'].max() +\
-    complete_df['ER Diff STT Day 2']/ complete_df['ER Diff STT Day 2'].max() 
-
-if published:
-    complete_df = complete_df[complete_df['RT Diff STT Day 2'] < 60]
-    complete_df = complete_df[complete_df['ER Diff STT Day 2'] < 0.08]
-    
-else:
-    sociopsy_df = utils.get_sociopsy_df()
-    complete_df = pd.merge(complete_df, sociopsy_df, on='ID')
-    
-
-complete_df.rename(columns={'jokertypes': 'DTT Types'}, inplace = True)
-
-
-#%%
-'''
-    Dysco-Vortrag 2024/01/03
-'''
-
-if 'spread_day1' in complete_df.columns:
-    '''
-        Fig 1
-        x : ΔRT
-        y : ΔER
-        hue = CI-Spread
-    '''
-    fig, ax = plt.subplots()
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['ER Diff STT Day 2'])
-    # sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax)
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax, hue = 'CIspread_day2')
-    ax.text(22, 0.035, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.axhline(0, color = 'k', linewidth = 0.5)
-    ax.axvline(0, color = 'k', linewidth = 0.5)
-    plt.show()
-    
-    '''
-        Fig 2
-        Subplot 1
-        x : ΔRT
-        y : RI-Spread
-        
-        Subplot 2
-        x : ΔER
-        y : RI-Spread
-        
-        Without Outlier Detection
-    '''
-    fig, ax = plt.subplots(1,2, figsize=(15,5))
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-    sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax[0])
-    ax[0].text(22,-0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[0].axhline(0, color = 'k', linewidth = 0.5)
-    ax[0].axvline(0, color = 'k', linewidth = 0.5)
-    ax[0].set_ylabel('RI-Spread (pp)')
-    ax[0].set_xlabel(r'$\Delta$RT (ms)')
-    
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-    sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'RIspread_day2', ax = ax[1])
-    ax[1].text(0.023, -0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[1].axhline(0, color = 'k', linewidth = 0.5)
-    ax[1].axvline(0, color = 'k', linewidth = 0.5)
-    ax[1].set_xlabel(r'$\Delta$ER (pp)')
-    ax[1].set_ylabel('RI-Spread (pp)')
-    plt.show()
-    
-    no_outlier_df = complete_df.copy()
-    no_outlier_df['hpcf_rand_day2 zscore'] = stats.zscore(no_outlier_df['hpcf_rand_day2'])
-    no_outlier_df = no_outlier_df[abs(no_outlier_df['hpcf_rand_day2 zscore']) < 3]
-    
-    '''
-        Fig 3
-        Subplot 1
-        x : ΔRT
-        y : HRCF Random DTT Day 2
-        
-        Subplot 2
-        x : ΔER
-        y : HRCF Random DTT Day 2
-        
-        With Outlier Detection
-    '''
-    fig, ax = plt.subplots(1,2, figsize=(15,5))
-    slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['RT Diff STT Day 2'], no_outlier_df['hpcf_rand_day2'])
-    sns.regplot(data = no_outlier_df, x = 'RT Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[0])
-    ax[0].text(21,0.97, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    # ax[0].axhline(0, color = 'k', linewidth=0.5)
-    ax[0].set_xlabel(r'$\Delta$RT')
-    ax[0].set_ylabel(r'HRCF (Random DTT)')
-    ax[0].axvline(0, color = 'k', linewidth=0.5)
-    
-    slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['ER Diff STT Day 2'], no_outlier_df['hpcf_rand_day2'])
-    sns.regplot(data = no_outlier_df, x = 'ER Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[1])
-    ax[1].text(0.021,0.97, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    # ax[1].axhline(0, color = 'k', linewidth=0.5)
-    ax[1].axvline(0, color = 'k', linewidth=0.5)
-    ax[1].set_xlabel(r'$\Delta$ER')
-    ax[1].set_ylabel(r'HRCF (Random DTT)')
-    plt.show()
-    
-    '''
-        Exploiters
-    '''
-    exploiters_df = complete_df[(complete_df['RIspread_day2'] < complete_df['RIspread_day2'].mean()) &\
-                                (complete_df['ER Diff STT Day 2'] > 0) & (complete_df['CRspread_day2'] > 0) ]
-        
-    no_exploiters_df = complete_df[~complete_df['ID'].isin(exploiters_df['ID'])]
-    
-    exploiters_df['RT Diff STT Day 2'].mean()
-    exploiters_df['ER Diff STT Day 2'].mean()
-    
-    '''
-        x : ΔRT
-        y : ΔER
-        hue : RI-Spread
-    '''
-    fig, ax = plt.subplots()
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axvline(0, color='k', linewidth = 0.5)
-    # sns.move_legend(ax, "lower right")
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.set_xlim([-10, 40])
-    ax.set_ylim([-0.01, 0.04])
-    ax.legend(title='RI Spread')
-    # plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
-    plt.show()
-    
-    '''
-        x : ΔRT
-        y : ΔER
-        hue : RI-Spread
-    '''
-    fig, ax = plt.subplots()
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axvline(0, color='k', linewidth = 0.5)
-    sns.move_legend(ax, "lower right")
-    ax.set_xlabel(r'$\Delta$RT (ms)')
-    ax.set_ylabel(r'$\Delta$ER (pp)')
-    ax.set_xlim([-10, 40])
-    ax.set_ylim([-0.01, 0.04])
-    ax.legend(title='RI Spread (pp)')
-    # plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
-    plt.show()
-    
-    '''
-        x : ΔRT
-        y : ΔER
-        hue : RI-Spread
-        red: exploiters
-    '''
-    fig, ax = plt.subplots()
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-    sns.scatterplot(data = exploiters_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', color ='red')
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axvline(0, color='k', linewidth = 0.5)
-    sns.move_legend(ax, "lower right")
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.legend(title='RI Spread')
-    ax.set_xlim([-10, 40])
-    ax.set_ylim([-0.01, 0.04])
-    plt.show()
-    
-    '''
-        x : HPCF Random DTT Day 2
-        y : CR-Spread
-        only exploiters
-    '''
-    fig, ax = plt.subplots()
-    sns.scatterplot(data = exploiters_df, x = 'hpcf_rand_day2', y = 'CRspread_day2', ax = ax, color = 'red')
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axhline(exploiters_df['CRspread_day2'].mean(), color='r', linewidth = 0.5)
-    ax.axhline(no_exploiters_df['CRspread_day2'].mean(), color='b', linewidth = 0.5)
-    ax.axvline(exploiters_df['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
-    ax.axvline(no_exploiters_df['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
-    ax.set_ylabel('CR-Spread')
-    ax.set_xlabel('HRCF Random DTT')
-    # ax.axvline(0)
-    plt.title('Exploiters')
-    plt.show()
-    
-    scipy.stats.ttest_ind(exploiters_df['CRspread_day2'], no_exploiters_df['CRspread_day2'])
-    scipy.stats.ttest_ind(exploiters_df['hpcf_rand_day2'], no_exploiters_df['hpcf_rand_day2'])
-    scipy.stats.ttest_ind(exploiters_df['RIspread_day2'], no_exploiters_df['RIspread_day2'])
-    
-    compare_df = pd.DataFrame()
-    hpcf_day2 = []
-    hpcf_day2.extend(np.array(exploiters_df['hpcf_day2'], dtype = float))
-    hpcf_day2.extend(np.array(no_exploiters_df['hpcf_day2'], dtype = float))
-    
-    agenttype = []
-    agenttype.extend(['exploiter']*len(exploiters_df))
-    agenttype.extend(['no exploiter']*len(no_exploiters_df))
-    
-    compare_df['hpcf_day2'] = hpcf_day2
-    compare_df['agenttype'] = agenttype
-    
-    '''
-        violinplot
-        HPCF Day 2
-        x : exploiters, non-exploiters
-    '''
-    fig, ax = plt.subplots()
-    # slope, intercept, r, p, std_err = stats.linregress(exploiters_df['RT Diff STT Day 2'], exploiters_df['RIspread_day2'])
-    sns.violinplot(data = compare_df, x = 'agenttype', y = 'hpcf_day2', ax = ax)
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    # ax.axhline(0, color='k', linewidth = 0.5)
-    # ax.set_ylabel('CR-Spread')
-    # ax.set_xlabel('HRCF Random DTT')
-    # ax.axvline(0)
-    # plt.title('Exploiters')
-    ax.set_ylabel('HRCF (%)')
-    ax.set_xlabel('Participant')
-    plt.show()
-    
-    scipy.stats.ttest_ind(exploiters_df['hpcf_day2'], no_exploiters_df['hpcf_day2'])
-
-elif 'conflict_param_day2' in complete_df.columns:
-    
-    '''
-        Now with modelfit parameters
-        
-        Exploiters:
-            - High θ_R + θ_Conf
-            - ΔER > 0
-    '''
-    '''
-        x : ΔRT
-        y : ΔER
-        hue = θ_R
-    '''
-    fig, ax = plt.subplots()
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['ER Diff STT Day 2'])
-    # sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax)
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax, hue = 'theta_rep_day2')
-    ax.text(22, 0.035, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.axhline(0, color = 'k', linewidth = 0.5)
-    ax.axvline(0, color = 'k', linewidth = 0.5)
-    plt.show()
-    
-    '''
-        Subplot 1
-        x : ΔRT
-        y : θ_R
-        
-        Subplot 2
-        x : ΔER
-        y : θ_R
-        
-        Without Outlier Detection
-    '''
-    fig, ax = plt.subplots(1,2, figsize=(15,5))
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['theta_rep_day2'])
-    sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'theta_rep_day2', ax = ax[0])
-    ax[0].text(22,-0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[0].axhline(0, color = 'k', linewidth = 0.5)
-    ax[0].axvline(0, color = 'k', linewidth = 0.5)
-    ax[0].set_ylabel(r'$\Theta_R$')
-    ax[0].set_xlabel(r'$\Delta$RT (ms)')
-    
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['theta_rep_day2'])
-    sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'theta_rep_day2', ax = ax[1])
-    ax[1].text(0.023, -0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[1].axhline(0, color = 'k', linewidth = 0.5)
-    ax[1].axvline(0, color = 'k', linewidth = 0.5)
-    ax[1].set_xlabel(r'$\Delta$ER (pp)')
-    ax[1].set_ylabel(r'$\Theta_R$')
-    plt.show()
-    
-    '''
-        Subplot 1
-        x : ΔRT
-        y : θ_R + θ_Conf
-        
-        Subplot 2
-        x : ΔER
-        y : θ_R + θ_Conf
-        
-        Without Outlier Detection
-    '''
-    complete_df['theta_comb_day2'] = complete_df['theta_rep_day2'] + complete_df['conflict_param_day2']
-    
-    fig, ax = plt.subplots(1,2, figsize=(15,5))
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['theta_comb_day2'])
-    sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'theta_comb_day2', ax = ax[0])
-    ax[0].text(22,-0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[0].axhline(0, color = 'k', linewidth = 0.5)
-    ax[0].axvline(0, color = 'k', linewidth = 0.5)
-    ax[0].set_xlabel(r'$\Delta$RT (ms)')
-    ax[0].set_ylabel(r'$\Theta_Comb$')
-    
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['theta_comb_day2'])
-    sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'theta_comb_day2', ax = ax[1])
-    ax[1].text(0.023, -0.03, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax[1].axhline(0, color = 'k', linewidth = 0.5)
-    ax[1].axvline(0, color = 'k', linewidth = 0.5)
-    ax[1].set_xlabel(r'$\Delta$ER (pp)')
-    ax[1].set_ylabel(r'$\Theta_Comb$')
-    plt.show()
-    
-    '''
-        Subplot 1
-        x : ΔRT
-        y : θ_Q
-        
-        Subplot 2
-        x : ΔER
-        y : θ_Q
-        
-        With Outlier Detection
-    '''
-    no_outlier_df = complete_df.copy()
-    # no_outlier_df['hpcf_rand_day2 zscore'] = stats.zscore(no_outlier_df['hpcf_rand_day2'])
-    # no_outlier_df = no_outlier_df[abs(no_outlier_df['hpcf_rand_day2 zscore']) < 3]
-    
-    fig, ax = plt.subplots(1,2, figsize=(15,5))
-    slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['RT Diff STT Day 2'], no_outlier_df['theta_Q_day2'])
-    sns.regplot(data = no_outlier_df, x = 'RT Diff STT Day 2', y = 'theta_Q_day2', ax = ax[0])
-    ax[0].text(21,0.97, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    # ax[0].axhline(0, color = 'k', linewidth=0.5)
-    ax[0].set_xlabel(r'$\Delta$RT')
-    ax[0].set_ylabel(r'$\Theta_Q$')
-    ax[0].axvline(0, color = 'k', linewidth=0.5)
-    
-    slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['ER Diff STT Day 2'], no_outlier_df['theta_Q_day2'])
-    sns.regplot(data = no_outlier_df, x = 'ER Diff STT Day 2', y = 'theta_Q_day2', ax = ax[1])
-    ax[1].text(0.021,0.97, 'r=%.4f, p = %.4f'%(r,p))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    # ax[1].axhline(0, color = 'k', linewidth=0.5)
-    ax[1].axvline(0, color = 'k', linewidth=0.5)
-    ax[1].set_xlabel(r'$\Delta$ER')
-    ax[1].set_ylabel(r'$\Theta_Q$')
-    plt.show()
-    
-    '''
-        Exploiters
-    '''
-    exploiters_df_modeled = complete_df[(complete_df['theta_comb_day2'] > complete_df['theta_comb_day2'].mean()) &\
-                                (complete_df['ER Diff STT Day 2'] > 0)]
-        
-    no_exploiters_df_modeled = complete_df[~complete_df['ID'].isin(exploiters_df_modeled['ID'])]
-    
-    exploiters_df_modeled['RT Diff STT Day 2'].mean()
-    exploiters_df_modeled['ER Diff STT Day 2'].mean()
-    
-    '''
-        x : ΔRT
-        y : ΔER
-        hue : θ_Comb
-    '''
-    fig, ax = plt.subplots()
-    slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='theta_comb_day2', ax = ax)
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axvline(0, color='k', linewidth = 0.5)
-    # sns.move_legend(ax, "lower right")
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.set_xlim([-10, 40])
-    ax.set_ylim([-0.01, 0.04])
-    ax.legend(title=r'$\Theta_Comb$')
-    # plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
-    plt.show()
-    
-    '''
-        x : ΔRT
-        y : ΔER
-        hue : θ_Comb
-        red: exploiters
-    '''
-    fig, ax = plt.subplots()
-    sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='theta_comb_day2', ax = ax)
-    sns.scatterplot(data = exploiters_df_modeled, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', color ='red')
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axvline(0, color='k', linewidth = 0.5)
-    sns.move_legend(ax, "lower right")
-    ax.set_xlabel(r'$\Delta$RT')
-    ax.set_ylabel(r'$\Delta$ER')
-    ax.legend(title=r'$\Theta_{Comb}$')
-    ax.set_xlim([-10, 40])
-    ax.set_ylim([-0.01, 0.04])
-    plt.show()
-    
-    '''
-        x : HPCF Random DTT Day 2
-        y : θ_Q
-        only exploiters
-    '''
-    fig, ax = plt.subplots()
-    sns.scatterplot(data = exploiters_df_modeled, x = 'hpcf_rand_day2', y = 'theta_comb_day2', ax = ax, color = 'red')
-    # ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-    # ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-    # ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-    ax.axhline(0, color='k', linewidth = 0.5)
-    ax.axhline(exploiters_df_modeled['theta_comb_day2'].mean(), color='r', linewidth = 0.5)
-    ax.axhline(no_exploiters_df_modeled['theta_comb_day2'].mean(), color='b', linewidth = 0.5)
-    ax.axvline(exploiters_df_modeled['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
-    ax.axvline(no_exploiters_df_modeled['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
-    ax.set_ylabel(r'$\Theta_{Comb}$')
-    ax.set_xlabel('HRCF Random DTT')
-    # ax.axvline(0)
-    plt.title('Exploiters')
-    plt.show()
-
-    scipy.stats.ttest_ind(exploiters_df_modeled['theta_comb_day2'], no_exploiters_df_modeled['theta_comb_day2'])
-    scipy.stats.ttest_ind(exploiters_df_modeled['hpcf_rand_day2'], no_exploiters_df_modeled['hpcf_rand_day2'])
-    scipy.stats.ttest_ind(exploiters_df_modeled['theta_rep_day2'], no_exploiters_df_modeled['theta_rep_day2'])
-    scipy.stats.ttest_ind(exploiters_df_modeled['conflict_param_day2'], no_exploiters_df_modeled['conflict_param_day2'])
-    scipy.stats.ttest_ind(exploiters_df_modeled['theta_Q_day2'], no_exploiters_df_modeled['theta_Q_day2'])
-    
-    compare_df = pd.DataFrame()
-    hpcf_day2 = []
-    hpcf_day2.extend(np.array(exploiters_df_modeled['hpcf_day2'], dtype = float))
-    hpcf_day2.extend(np.array(no_exploiters_df_modeled['hpcf_day2'], dtype = float))
-    
-    agenttype = []
-    agenttype.extend(['exploiter']*len(exploiters_df_modeled))
-    agenttype.extend(['no exploiter']*len(no_exploiters_df_modeled))
-    
-    compare_df['hpcf_day2'] = hpcf_day2
-    compare_df['agenttype'] = agenttype
-
-#%%
-'''
-    ΔER & ΔRT are measures of how strongly the sequences are learned.
-'''
-
-'''
-    ΔER & ΔRT are correlated.
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['ER Diff STT Day 2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax)
-ax.text(22, 0.035, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.set_xlabel(r'$\Delta$RT')
-ax.set_ylabel(r'$\Delta$ER')
-ax.axhline(0, color = 'k', linewidth = 0.5)
-ax.axvline(0, color = 'k', linewidth = 0.5)
-plt.show()
-
-'''
-    ΔRT is more strongly correlated with RIspread than ΔER is.
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax[0])
-ax[0].text(22,-0.03, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0, color = 'k', linewidth = 0.5)
-ax[0].axvline(0, color = 'k', linewidth = 0.5)
-ax[0].set_ylabel('RI-Spread (pp)')
-ax[0].set_xlabel(r'$\Delta$RT (ms)')
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'RIspread_day2', ax = ax[1])
-ax[1].text(0.023, -0.03, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0, color = 'k', linewidth = 0.5)
-ax[1].axvline(0, color = 'k', linewidth = 0.5)
-ax[1].set_xlabel(r'$\Delta$ER (pp)')
-ax[1].set_ylabel('RI-Spread (pp)')
-plt.show()
-
-'''
-    ΔRT & ΔEr with CI Spread like in paper
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['CIspread_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'CIspread_day2', ax = ax[0])
-ax[0].text(21,-0.07, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0, color='k', linewidth=0.5)
-ax[0].axvline(0, color='k', linewidth=0.5)
-ax[0].set_xlabel(r'$\Delta$RT (ms)')
-ax[0].set_ylabel(r'$\Delta$HRCF (Cong-Inc) (pp)')
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['CIspread_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'CIspread_day2', ax = ax[1])
-ax[1].text(0.022,-0.07, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0, color='k', linewidth=0.5)
-ax[1].axvline(0, color='k', linewidth=0.5)
-ax[1].set_xlabel(r'$\Delta$ER (pp)')
-ax[1].set_ylabel(r'$\Delta$HRCF (Cong-Inc) (pp)')
-plt.show()
-
-
-'''
-    The correlations with CRspread are not that strong, since there is a 
-    ceiling effect for congruent DTT.
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['CRspread_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'CRspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['CRspread_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'CRspread_day2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-'''
-    Generally, ΔRT and ΔER do not strongly differentiate 
-    between goal-directed and non-goal-directed participants...
-    
-    ΔER differentiates stronger.
-    
-    For N = 100 dataset, the differentiation is the case
-    
-    ToDo: Outlier detection.
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[0])
-ax[0].text(0,0.6, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax[0].axhline(0)
-# ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[1])
-ax[1].text(0,0.6, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax[1].axhline(0)
-# ax[1].axvline(0)
-plt.show()
-
-no_outlier_df = complete_df.copy()
-no_outlier_df['hpcf_rand_day2 zscore'] = stats.zscore(no_outlier_df['hpcf_rand_day2'])
-no_outlier_df = no_outlier_df[abs(no_outlier_df['hpcf_rand_day2 zscore']) < 3]
-
-"With Outlier Detection"
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['RT Diff STT Day 2'], no_outlier_df['hpcf_rand_day2'])
-sns.regplot(data = no_outlier_df, x = 'RT Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[0])
-ax[0].text(21,0.97, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax[0].axhline(0, color = 'k', linewidth=0.5)
-ax[0].set_xlabel(r'$\Delta$RT')
-ax[0].set_ylabel(r'HRCF (Random DTT)')
-ax[0].axvline(0, color = 'k', linewidth=0.5)
-
-slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['ER Diff STT Day 2'], no_outlier_df['hpcf_rand_day2'])
-sns.regplot(data = no_outlier_df, x = 'ER Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax[1])
-ax[1].text(0.021,0.97, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax[1].axhline(0, color = 'k', linewidth=0.5)
-ax[1].axvline(0, color = 'k', linewidth=0.5)
-ax[1].set_xlabel(r'$\Delta$ER')
-ax[1].set_ylabel(r'HRCF (Random DTT)')
-plt.show()
-
-'''
-    ... and a higher goal-directedness in random trials does not present
-    a different RI-Spread.
-    
-    Problem: Influence of hpcf_rand_day2 on CR-Spread not easy to evaluate
-    bc of ceiling effect.
-    
-    N=100: Higher Goal-Directedness -> smaller spread
-    
-    -> SEQUENCE LEARNERS GENERALLY DO NOT HAVE LOWER GOAL-DIRECTEDNESS (per se)
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['hpcf_rand_day2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'hpcf_rand_day2', y = 'RIspread_day2', ax = ax)
-ax.text(0.6,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax[0].axhline(0)
-# ax[0].axvline(0)
-# ax[0].legend(title='RI Spread')
-plt.show()
-
-'''
-    High ΔRT and high ΔER lead to large spreads
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0, color='k', linewidth = 0.5)
-ax[0].axvline(0, color='k', linewidth = 0.5)
-sns.move_legend(ax[0], "lower right")
-ax[0].set_xlabel(r'$\Delta$RT')
-ax[0].set_ylabel(r'$\Delta$ER')
-ax[0].legend(title='RI Spread')
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='CRspread_day2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0, color='k', linewidth = 0.5)
-ax[1].axvline(0, color='k', linewidth = 0.5)
-ax[1].set_xlabel(r'$\Delta$RT')
-ax[1].set_ylabel(r'$\Delta$ER')
-ax[1].legend(title='CR Spread')
-sns.move_legend(ax[1], "lower right")
-# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/DeltasvsSpreads.svg')
-plt.show()
-
-'''
-    RI-Spread and CR-Spread are correlated, but not as much as you'd think,
-    which makes sense, since there is a ceiling effect for the CR-spread.
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'CRspread_day2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(complete_df['RIspread_day2'].mean())
-ax.axvline(complete_df['CRspread_day2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-plt.show()
-
-
-'''
-    -> Strong sequence-learning is not associated with strongly reduced 
-    traits of goal-directedness in general. But sequence learning 
-'''
-
-'''
-    ΔRT & ΔER are both indicators of how strongly the sequence is learned.
-'''
-
-'''
-    Age is not associated with ΔRT and ΔER
-    This suggests age is also not associated with spread.
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['RT Diff STT Day 2'])
-sns.regplot(data = complete_df, x = 'age', y = 'RT Diff STT Day 2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['ER Diff STT Day 2'])
-sns.regplot(data = complete_df, x = 'age', y = 'ER Diff STT Day 2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-'''
-    Age is not associated with spread.
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['CRspread_day2'])
-sns.regplot(data = complete_df, x = 'age', y = 'CRspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'age', y = 'RIspread_day2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-'''
-    Age is slightly associated with goal-directedness
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'age', y = 'hpcf_rand_day2', ax = ax)
-ax.text(25,0.55, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax.axhline(complete_df['RIspread_day2'].mean())
-# ax.axvline(complete_df['CRspread_day2'].mean())
-plt.show()
-
-#%%
-'''
-    Exploiters
-'''
-
-# complete_df['score'] = complete_df['RT Diff STT Day 2'] /  complete_df['RT Diff STT Day 2'].std() + \
-#                         complete_df['ER Diff STT Day 2'] /  complete_df['ER Diff STT Day 2'].std() + \
-#                         complete_df['conflict_param_day2'] - complete_df['theta_rep_day2']
-
-complete_df['score'] = complete_df['RT Diff STT Day 2'] / complete_df['RT Diff STT Day 2'].std() + \
-                        complete_df['ER Diff STT Day 2'] / complete_df['ER Diff STT Day 2'].std() + \
-                        - complete_df['RIspread_day2']
-
-# exploiters_df = complete_df[(complete_df['CRspread_day2'] > complete_df['CRspread_day2'].mean()) &\
-#                              (complete_df['RIspread_day2'] < complete_df['RIspread_day2'].mean())]
-
-exploiters_df = complete_df[(complete_df['RIspread_day2'] < complete_df['RIspread_day2'].mean()) &\
-                            (complete_df['ER Diff STT Day 2'] > 0)]
-    
-no_exploiters_df = complete_df[~complete_df['ID'].isin(exploiters_df['ID'])]
-
-exploiters_df['RT Diff STT Day 2'].mean()
-exploiters_df['ER Diff STT Day 2'].mean()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-# sns.move_legend(ax, "lower right")
-ax.set_xlabel(r'$\Delta$RT')
-ax.set_ylabel(r'$\Delta$ER')
-ax.set_xlim([-10, 40])
-ax.set_ylim([-0.01, 0.04])
-ax.legend(title='RI Spread')
-# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='CIspread_day2', ax = ax)
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-sns.move_legend(ax, "lower right")
-ax.set_xlabel(r'$\Delta$RT (ms)')
-ax.set_ylabel(r'$\Delta$ER (pp)')
-ax.set_xlim([-10, 40])
-ax.set_ylim([-0.01, 0.04])
-ax.legend(title='CI Spread (pp)')
-# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
-plt.show()
-
-fig, ax = plt.subplots()
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-sns.scatterplot(data = exploiters_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', color ='red')
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-sns.move_legend(ax, "lower right")
-ax.set_xlabel(r'$\Delta$RT')
-ax.set_ylabel(r'$\Delta$ER')
-ax.legend(title='RI Spread')
-ax.set_xlim([-10, 40])
-ax.set_ylim([-0.01, 0.04])
-plt.show()
-
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(exploiters_df['RT Diff STT Day 2'], exploiters_df['RIspread_day2'])
-sns.scatterplot(data = exploiters_df, x = 'hpcf_rand_day2', y = 'CRspread_day2', ax = ax, color = 'red')
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axhline(exploiters_df['CRspread_day2'].mean(), color='r', linewidth = 0.5)
-ax.axhline(no_exploiters_df['CRspread_day2'].mean(), color='b', linewidth = 0.5)
-ax.axvline(exploiters_df['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
-ax.axvline(no_exploiters_df['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
-ax.set_ylabel('CR-Spread')
-ax.set_xlabel('HRCF Random DTT')
-# ax.axvline(0)
-plt.title('Exploiters')
-plt.show()
-
-scipy.stats.ttest_ind(exploiters_df['CRspread_day2'], no_exploiters_df['CRspread_day2'])
-scipy.stats.ttest_ind(exploiters_df['hpcf_rand_day2'], no_exploiters_df['hpcf_rand_day2'])
-
-
-#%%
-'''
-    Habitualizers
-'''
-
-habitualizers_df = complete_df[(complete_df['RIspread_day2'] >= complete_df['RIspread_day2'].mean())]
-no_habitualizers = complete_df[~complete_df['ID'].isin(habitualizers_df['ID'])]
-
-
-fig, ax = plt.subplots(figsize=(10,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-# sns.move_legend(ax, "lower right")
-ax.set_xlabel(r'$\Delta$RT')
-ax.set_ylabel(r'$\Delta$ER')
-ax.set_xlim([-10, 40])
-ax.set_ylim([-0.01, 0.04])
-ax.legend(title='RI Spread')
-plt.show()
-
-
-fig, ax = plt.subplots(figsize=(10,5))
-sns.scatterplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', hue='RIspread_day2', ax = ax)
-sns.scatterplot(data = habitualizers_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', color ='red')
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axvline(0, color='k', linewidth = 0.5)
-sns.move_legend(ax, "lower right")
-ax.set_xlabel(r'$\Delta$RT')
-ax.set_ylabel(r'$\Delta$ER')
-ax.legend(title='RI Spread')
-ax.set_xlim([-10, 40])
-ax.set_ylim([-0.01, 0.04])
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(habitualizers_df['RT Diff STT Day 2'], habitualizers_df['RIspread_day2'])
-sns.scatterplot(data = habitualizers_df, x = 'hpcf_rand_day2', y = 'CRspread_day2', ax = ax, color ='red')
-# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0, color='k', linewidth = 0.5)
-ax.axhline(habitualizers_df['CRspread_day2'].mean(), color='r', linewidth = 0.5)
-ax.axhline(exploiters_df['CRspread_day2'].mean(), color='orange', linewidth = 0.5)
-ax.axhline(no_habitualizers['CRspread_day2'].mean(), color='b', linewidth = 0.5)
-ax.axvline(habitualizers_df['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
-ax.axvline(exploiters_df['hpcf_rand_day2'].mean(), color='orange', linewidth = 0.5)
-ax.axvline(no_habitualizers['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
-ax.set_ylabel('CR-Spread')
-ax.set_xlabel('HRCF Random DTT')
-# ax.axvline(0)
-plt.title('Habitualizers')
-# sns.move_legend(ax, "lower left")
-plt.show()
-
-scipy.stats.ttest_ind(habitualizers_df['CRspread_day2'], no_habitualizers['CRspread_day2'])
-scipy.stats.ttest_ind(habitualizers_df['CRspread_day2'], exploiters_df['CRspread_day2'])
-scipy.stats.ttest_ind(habitualizers_df['hpcf_rand_day2'], no_habitualizers['hpcf_rand_day2'])
-scipy.stats.ttest_ind(habitualizers_df['hpcf_rand_day2'], exploiters_df['hpcf_rand_day2'])
-
-
-#%%
-
-'''
-    CR-Spread and RI-Spread for seqtrait
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['CRspread_day2'])
-sns.regplot(data = complete_df, x = 'seqtrait', y = 'CRspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'seqtrait', y = 'RIspread_day2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['hpcf_rand_day2'])
-slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'seqtrait', y = 'hpcf_rand_day2', ax = ax)
-ax.text(0,0.75, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-plt.show()
-
-#%%
-# noseqlearners_df = complete_df[(complete_df['ER Diff STT Day 2'] <= 0) & (complete_df['RT Diff STT Day 2'] <= 0)]
-# print(f'number of no sequence learners are {len(noseqlearners_df)}')
-# utils.plot_grouplevel(expdata_df[expdata_df['ID'].isin(noseqlearners_df['ID'])], plot_single = True)
-# noseqlearners_df = complete_df[(complete_df['RIspread_day2'] <= 0) & (complete_df['CRspread_day2'] <= 0)]
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-'''
-    GLM RIspread ~ ΔER + ΔRT + ΔER * ΔRT
-'''
-"Correct ER for RT"
-from sklearn.linear_model import LinearRegression
-y = np.array(complete_df['ER Diff STT Day 2']).reshape(-1,1)
-x = np.array(complete_df['RT Diff STT Day 2']).reshape(-1,1)
-linmodel = LinearRegression()
-linmodel.fit(x, y)
-predictions = linmodel.predict(x)
-residuals = y - predictions
-
-complete_df['ER Diff STT Day 2 corrected'] = np.squeeze(residuals)
-# complete_df['interaction']   = 
-
-import statsmodels.api as sm
-x = np.array(complete_df.loc[:, ['RT Diff STT Day 2', 'ER Diff STT Day 2 corrected']], dtype='float')
-y = np.array(complete_df['RIspread_day2'], dtype = 'float')
-X = sm.add_constant(x)
-model = sm.OLS(y, X).fit()
-print(model.summary())
-
-# x = np.array(df.loc[:, ['ER Diff Day 2', 'RT Diff Day 2']], dtype='float')
-# y = np.array(df['ΔPoints Day 2'], dtype = 'float')
-# X = sm.add_constant(x)
-# model = sm.OLS(y, X).fit()
-# print(model.summary())
-
-#%%
-'''
-    Check High ΔRT → High ΔER but not High ΔER → High ΔRT
-'''
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 1', y = 'ER Diff STT Day 1', ax = ax)
-# ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
-ax.axhline(complete_df['ER Diff STT Day 1'].mean())
-ax.axvline(complete_df['RT Diff STT Day 1'].mean())
-# ax.axhline(0)
-# ax.axvline(0)
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['ER Diff STT Day 2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
-ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-# ax.axhline(0)
-# ax.axvline(0)
-plt.show()
-
-# test_df = complete_df.loc[:, ['RT Diff STT Day 2', 'ER Diff STT Day 2']]
-
-# test_df = (test_df-test_df.mean())/test_df.std()
-# test_df.sort_values(by='RT Diff STT Day 2', inplace = True, ascending = False)
-# test_df[0:30]['ER Diff STT Day 2'].mean()
-
-# test_df.sort_values(by='ER Diff STT Day 2', inplace = True, ascending = False)
-# test_df[0:30]['ER Diff STT Day 2'].mean()
-
-#%%
-
-
-'''
-    Check High ΔHRCF & High ΔER & High ΔRT → High R-Inc Spread
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['RIspread_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-"Day 2"
-# seqlearners_df = complete_df[(complete_df['CRspread_day2'] > complete_df['CRspread_day2'] .mean()) & \
-#                       (complete_df['ER Diff STT Day 2'] > complete_df['ER Diff STT Day 2'].mean())]
-
-'''
-    We define sequence learners as those whose ΔER > 0
-'''
-# seqlearners_df = complete_df[complete_df['ER Diff STT Day 2'] > complete_df['ER Diff STT Day 2'].mean()]
-# antiseqlearners_df = complete_df[~complete_df['ID'].isin(seqlearners_df['ID'])]
-
-seqlearners_df = complete_df[complete_df['ER Diff STT Day 2'] > 0]
-noseqlearners_df = complete_df[complete_df['ER Diff STT Day 2'] <= 0]
-
-# seqlearners_df = seqlearners_df[seqlearners_df['RT Diff STT Day 2'] < 60]
-
-len(seqlearners_df)
-'''
-    larger ΔRT is associated with larger RIspread in sequence learners
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT Diff STT Day 2'], seqlearners_df['RIspread_day2'])
-sns.regplot(data = seqlearners_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT Diff STT Day 2'], seqlearners_df['ER Diff STT Day 2'])
-sns.regplot(data = seqlearners_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-'''
-    nosequence learners
-'''
-fig, ax = plt.subplots(1,2, figsize=(15,5))
-slope, intercept, r, p, std_err = stats.linregress(noseqlearners_df['RT Diff STT Day 2'], noseqlearners_df['RIspread_day2'])
-sns.regplot(data = noseqlearners_df, x = 'RT Diff STT Day 2', y = 'RIspread_day2', ax = ax[0])
-ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[0].axhline(0)
-ax[0].axvline(0)
-
-slope, intercept, r, p, std_err = stats.linregress(noseqlearners_df['RT Diff STT Day 2'], noseqlearners_df['ER Diff STT Day 2'])
-sns.regplot(data = noseqlearners_df, x = 'RT Diff STT Day 2', y = 'ER Diff STT Day 2', ax = ax[1])
-ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax[1].axhline(0)
-ax[1].axvline(0)
-plt.show()
-
-'''
-    Are exploiters generally more AO than habitualizers?
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT Diff STT Day 2'], seqlearners_df['hpcf_rand_day2'])
-sns.regplot(data = seqlearners_df, x = 'RT Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-'''
-    Generally, sequence-learners have lower goal-directedness than non-sequence learners.
-    This works only for ΔER since sequence learners can have low ΔRT if they are exploiters.
-'''
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['ER Diff STT Day 2'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'ER Diff STT Day 2', y = 'hpcf_rand_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(complete_df['CRspread_day2'], complete_df['hpcf_rand_day2'])
-sns.regplot(data = complete_df, x = 'CRspread_day2', y = 'hpcf_rand_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-scipy.stats.ttest_ind(seqlearners_df['hpcf_rand_day2'], antiseqlearners_df['hpcf_rand_day2'])
-
-'''
-    Have sequence learners noticed the sequence more than non-sequence learners?
-    -> Yes
-'''
-(seqlearners_df['q_notice_a_sequence']==1).sum() / len(seqlearners_df['q_notice_a_sequence'])
-(antiseqlearners_df['q_notice_a_sequence']==1).sum() / len(antiseqlearners_df['q_notice_a_sequence'])
-
-'''
-    Have exploiters noticed the sequence more than habitualizers?
-    -> Not really
-'''
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LogisticRegression
-from sklearn.datasets import make_classification
-
-seqlearners_regdf = seqlearners_df[seqlearners_df['q_notice_a_sequence'] < 2]
-X = np.array(seqlearners_regdf['RT Diff STT Day 2']).reshape(14,-1)
-y = np.array(seqlearners_regdf['q_notice_a_sequence']).reshape(14)
-
-# Train logistic regression model
-model = LogisticRegression()
-model.fit(X, y)
-
-# Plotting the logistic regression curve
-X_test = np.linspace(min(X), max(X), 300)
-y_prob = model.predict_proba(X_test.reshape(-1, 1))[:, 1]
-
-plt.scatter(X, y, color='blue', marker='o', label='Data Points')
-plt.plot(X_test, y_prob, color='red', label='Logistic Regression Curve')
-plt.xlabel('RT Diff STT Day 2')
-plt.ylabel('Y-axis (Binary)')
-plt.title('Logistic Regression Visualization')
-plt.legend()
-plt.show()
-#%%
-'''
-    Check Low ΔHRCF & High ΔER → High R-Inc Spread
-'''
-
-"Day 2"
-test_df = complete_df[complete_df['spread_day2'] < complete_df['spread_day2'] .mean()]
-test_df = test_df[test_df['ER Diff STT Day 2'] > 0]
-
-fig, ax = plt.subplots()
-slope, intercept, r, p, std_err = stats.linregress(test_df['ER Diff STT Day 2'], test_df['RIspread_day2'])
-sns.scatterplot(data = test_df, x = 'ER Diff STT Day 2', y = 'RIspread_day2', ax = ax)
-ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
-# ax.axhline(complete_df['ER Diff STT Day 2'].mean())
-# ax.axvline(complete_df['RT Diff STT Day 2'].mean())
-ax.axhline(0)
-ax.axvline(0)
-plt.show()
-
-#%%
-'''
-    Exploit-Score
-'''
-
-complete_df['learnscore'] = complete_df['RT Diff STT Day 2'] / complete_df['RT Diff STT Day 2'].std() + \
-                        complete_df['ER Diff STT Day 2'] / complete_df['ER Diff STT Day 2'].std() + \
-                        + complete_df['theta_rep_day2']
-
-complete_df['exploitscore'] = complete_df['learnscore'] + complete_df['conflict_param_day2']
-
-#%%
 
 '''
     Prob. of choosing GD if the last x (last dim) jokers were of the same jokertype.
@@ -1445,3 +172,762 @@ plt.title('Incongruent DTT')
 
 # Show the plot
 plt.show()
+
+#%%
+'''
+    ΔER & ΔRT are measures of how strongly the sequences are learned.
+'''
+
+'''
+    ΔER & ΔRT are correlated.
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['ER_diff_stt_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', ax = ax)
+ax.text(22, 0.035, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.set_xlabel(r'$\Delta$RT')
+ax.set_ylabel(r'$\Delta$ER')
+ax.axhline(0, color = 'k', linewidth = 0.5)
+ax.axvline(0, color = 'k', linewidth = 0.5)
+plt.show()
+
+'''
+    ΔRT is more strongly correlated with RIspread than ΔER is.
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'RIspread_day2', ax = ax[0])
+ax[0].text(22,-0.03, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0, color = 'k', linewidth = 0.5)
+ax[0].axvline(0, color = 'k', linewidth = 0.5)
+ax[0].set_ylabel('RI-Spread (pp)')
+ax[0].set_xlabel(r'$\Delta$RT (ms)')
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'RIspread_day2', ax = ax[1])
+ax[1].text(0.023, -0.03, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0, color = 'k', linewidth = 0.5)
+ax[1].axvline(0, color = 'k', linewidth = 0.5)
+ax[1].set_xlabel(r'$\Delta$ER (pp)')
+ax[1].set_ylabel('RI-Spread (pp)')
+plt.show()
+
+'''
+    ΔRT & ΔEr with CI Spread like in paper
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['CIspread_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'CIspread_day2', ax = ax[0])
+ax[0].text(21,-0.07, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0, color='k', linewidth=0.5)
+ax[0].axvline(0, color='k', linewidth=0.5)
+ax[0].set_xlabel(r'$\Delta$RT (ms)')
+ax[0].set_ylabel(r'$\Delta$HRCF (Cong-Inc) (pp)')
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['CIspread_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'CIspread_day2', ax = ax[1])
+ax[1].text(0.022,-0.07, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0, color='k', linewidth=0.5)
+ax[1].axvline(0, color='k', linewidth=0.5)
+ax[1].set_xlabel(r'$\Delta$ER (pp)')
+ax[1].set_ylabel(r'$\Delta$HRCF (Cong-Inc) (pp)')
+plt.show()
+
+
+'''
+    The correlations with CRspread are not that strong, since there is a 
+    ceiling effect for congruent DTT.
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['CRspread_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'CRspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['CRspread_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'CRspread_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+'''
+    Generally, ΔRT and ΔER do not strongly differentiate 
+    between goal-directed and non-goal-directed participants...
+    
+    ΔER differentiates stronger.
+    
+    For N = 100 dataset, the differentiation is the case
+    
+    ToDo: Outlier detection.
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax[0])
+ax[0].text(0,0.6, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax[0].axhline(0)
+# ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax[1])
+ax[1].text(0,0.6, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax[1].axhline(0)
+# ax[1].axvline(0)
+plt.show()
+
+no_outlier_df = complete_df.copy()
+no_outlier_df['hpcf_rand_day2 zscore'] = stats.zscore(no_outlier_df['hpcf_rand_day2'])
+no_outlier_df = no_outlier_df[abs(no_outlier_df['hpcf_rand_day2 zscore']) < 3]
+
+"With Outlier Detection"
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['RT_diff_stt_day2'], no_outlier_df['hpcf_rand_day2'])
+sns.regplot(data = no_outlier_df, x = 'RT_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax[0])
+ax[0].text(21,0.97, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax[0].axhline(0, color = 'k', linewidth=0.5)
+ax[0].set_xlabel(r'$\Delta$RT')
+ax[0].set_ylabel(r'HRCF (Random DTT)')
+ax[0].axvline(0, color = 'k', linewidth=0.5)
+
+slope, intercept, r, p, std_err = stats.linregress(no_outlier_df['ER_diff_stt_day2'], no_outlier_df['hpcf_rand_day2'])
+sns.regplot(data = no_outlier_df, x = 'ER_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax[1])
+ax[1].text(0.021,0.97, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax[1].axhline(0, color = 'k', linewidth=0.5)
+ax[1].axvline(0, color = 'k', linewidth=0.5)
+ax[1].set_xlabel(r'$\Delta$ER')
+ax[1].set_ylabel(r'HRCF (Random DTT)')
+plt.show()
+
+'''
+    ... and a higher goal-directedness in random trials does not present
+    a different RI-Spread.
+    
+    Problem: Influence of hpcf_rand_day2 on CR-Spread not easy to evaluate
+    bc of ceiling effect.
+    
+    N=100: Higher Goal-Directedness -> smaller spread
+    
+    -> SEQUENCE LEARNERS GENERALLY DO NOT HAVE LOWER GOAL-DIRECTEDNESS (per se)
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['hpcf_rand_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'hpcf_rand_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0.6,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax[0].axhline(0)
+# ax[0].axvline(0)
+# ax[0].legend(title='RI Spread')
+plt.show()
+
+'''
+    High ΔRT and high ΔER lead to large spreads
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='RIspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0, color='k', linewidth = 0.5)
+ax[0].axvline(0, color='k', linewidth = 0.5)
+sns.move_legend(ax[0], "lower right")
+ax[0].set_xlabel(r'$\Delta$RT')
+ax[0].set_ylabel(r'$\Delta$ER')
+ax[0].legend(title='RI Spread')
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='CRspread_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0, color='k', linewidth = 0.5)
+ax[1].axvline(0, color='k', linewidth = 0.5)
+ax[1].set_xlabel(r'$\Delta$RT')
+ax[1].set_ylabel(r'$\Delta$ER')
+ax[1].legend(title='CR Spread')
+sns.move_legend(ax[1], "lower right")
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/DeltasvsSpreads.svg')
+plt.show()
+
+'''
+    RI-Spread and CR-Spread are correlated, but not as much as you'd think,
+    which makes sense, since there is a ceiling effect for the CR-spread.
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'CRspread_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(complete_df['RIspread_day2'].mean())
+ax.axvline(complete_df['CRspread_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+plt.show()
+
+
+'''
+    -> Strong sequence-learning is not associated with strongly reduced 
+    traits of goal-directedness in general. But sequence learning 
+'''
+
+'''
+    ΔRT & ΔER are both indicators of how strongly the sequence is learned.
+'''
+
+'''
+    Age is not associated with ΔRT and ΔER
+    This suggests age is also not associated with spread.
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['RT_diff_stt_day2'])
+sns.regplot(data = complete_df, x = 'age', y = 'RT_diff_stt_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['ER_diff_stt_day2'])
+sns.regplot(data = complete_df, x = 'age', y = 'ER_diff_stt_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+'''
+    Age is not associated with spread.
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['CRspread_day2'])
+sns.regplot(data = complete_df, x = 'age', y = 'CRspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'age', y = 'RIspread_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+'''
+    Age is slightly associated with goal-directedness
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['age'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'age', y = 'hpcf_rand_day2', ax = ax)
+ax.text(25,0.55, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax.axhline(complete_df['RIspread_day2'].mean())
+# ax.axvline(complete_df['CRspread_day2'].mean())
+plt.show()
+
+#%%
+'''
+    Exploiters
+'''
+
+# complete_df['score'] = complete_df['RT_diff_stt_day2'] /  complete_df['RT_diff_stt_day2'].std() + \
+#                         complete_df['ER_diff_stt_day2'] /  complete_df['ER_diff_stt_day2'].std() + \
+#                         complete_df['conflict_param_day2'] - complete_df['theta_rep_day2']
+
+complete_df['score'] = complete_df['RT_diff_stt_day2'] / complete_df['RT_diff_stt_day2'].std() + \
+                        complete_df['ER_diff_stt_day2'] / complete_df['ER_diff_stt_day2'].std() + \
+                        - complete_df['RIspread_day2']
+
+# exploiters_df = complete_df[(complete_df['CRspread_day2'] > complete_df['CRspread_day2'].mean()) &\
+#                              (complete_df['RIspread_day2'] < complete_df['RIspread_day2'].mean())]
+
+exploiters_df = complete_df[(complete_df['RIspread_day2'] < complete_df['RIspread_day2'].mean()) &\
+                            (complete_df['ER_diff_stt_day2'] > 0)]
+    
+no_exploiters_df = complete_df[~complete_df['ID'].isin(exploiters_df['ID'])]
+
+exploiters_df['RT_diff_stt_day2'].mean()
+exploiters_df['ER_diff_stt_day2'].mean()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='RIspread_day2', ax = ax)
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+# sns.move_legend(ax, "lower right")
+ax.set_xlabel(r'$\Delta$RT')
+ax.set_ylabel(r'$\Delta$ER')
+ax.set_xlim([-10, 40])
+ax.set_ylim([-0.01, 0.04])
+ax.legend(title='RI Spread')
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='CIspread_day2', ax = ax)
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+sns.move_legend(ax, "lower right")
+ax.set_xlabel(r'$\Delta$RT (ms)')
+ax.set_ylabel(r'$\Delta$ER (pp)')
+ax.set_xlim([-10, 40])
+ax.set_ylim([-0.01, 0.04])
+ax.legend(title='CI Spread (pp)')
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Dysco/2024_01_03/BehavioralAnalysis/N60/Deltas_CISpread_hues.svg')
+plt.show()
+
+fig, ax = plt.subplots()
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='RIspread_day2', ax = ax)
+sns.scatterplot(data = exploiters_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', color ='red')
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+sns.move_legend(ax, "lower right")
+ax.set_xlabel(r'$\Delta$RT')
+ax.set_ylabel(r'$\Delta$ER')
+ax.legend(title='RI Spread')
+ax.set_xlim([-10, 40])
+ax.set_ylim([-0.01, 0.04])
+plt.show()
+
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(exploiters_df['RT_diff_stt_day2'], exploiters_df['RIspread_day2'])
+sns.scatterplot(data = exploiters_df, x = 'hpcf_rand_day2', y = 'CRspread_day2', ax = ax, color = 'red')
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axhline(exploiters_df['CRspread_day2'].mean(), color='r', linewidth = 0.5)
+ax.axhline(no_exploiters_df['CRspread_day2'].mean(), color='b', linewidth = 0.5)
+ax.axvline(exploiters_df['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
+ax.axvline(no_exploiters_df['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
+ax.set_ylabel('CR-Spread')
+ax.set_xlabel('HRCF Random DTT')
+# ax.axvline(0)
+plt.title('Exploiters')
+plt.show()
+
+scipy.stats.ttest_ind(exploiters_df['CRspread_day2'], no_exploiters_df['CRspread_day2'])
+scipy.stats.ttest_ind(exploiters_df['hpcf_rand_day2'], no_exploiters_df['hpcf_rand_day2'])
+
+
+#%%
+'''
+    Habitualizers
+'''
+
+habitualizers_df = complete_df[(complete_df['RIspread_day2'] >= complete_df['RIspread_day2'].mean())]
+no_habitualizers = complete_df[~complete_df['ID'].isin(habitualizers_df['ID'])]
+
+
+fig, ax = plt.subplots(figsize=(10,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='RIspread_day2', ax = ax)
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+# sns.move_legend(ax, "lower right")
+ax.set_xlabel(r'$\Delta$RT')
+ax.set_ylabel(r'$\Delta$ER')
+ax.set_xlim([-10, 40])
+ax.set_ylim([-0.01, 0.04])
+ax.legend(title='RI Spread')
+plt.show()
+
+
+fig, ax = plt.subplots(figsize=(10,5))
+sns.scatterplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', hue='RIspread_day2', ax = ax)
+sns.scatterplot(data = habitualizers_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', color ='red')
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axvline(0, color='k', linewidth = 0.5)
+sns.move_legend(ax, "lower right")
+ax.set_xlabel(r'$\Delta$RT')
+ax.set_ylabel(r'$\Delta$ER')
+ax.legend(title='RI Spread')
+ax.set_xlim([-10, 40])
+ax.set_ylim([-0.01, 0.04])
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(habitualizers_df['RT_diff_stt_day2'], habitualizers_df['RIspread_day2'])
+sns.scatterplot(data = habitualizers_df, x = 'hpcf_rand_day2', y = 'CRspread_day2', ax = ax, color ='red')
+# ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0, color='k', linewidth = 0.5)
+ax.axhline(habitualizers_df['CRspread_day2'].mean(), color='r', linewidth = 0.5)
+ax.axhline(exploiters_df['CRspread_day2'].mean(), color='orange', linewidth = 0.5)
+ax.axhline(no_habitualizers['CRspread_day2'].mean(), color='b', linewidth = 0.5)
+ax.axvline(habitualizers_df['hpcf_rand_day2'].mean(), color='r', linewidth = 0.5)
+ax.axvline(exploiters_df['hpcf_rand_day2'].mean(), color='orange', linewidth = 0.5)
+ax.axvline(no_habitualizers['hpcf_rand_day2'].mean(), color='b', linewidth = 0.5)
+ax.set_ylabel('CR-Spread')
+ax.set_xlabel('HRCF Random DTT')
+# ax.axvline(0)
+plt.title('Habitualizers')
+# sns.move_legend(ax, "lower left")
+plt.show()
+
+scipy.stats.ttest_ind(habitualizers_df['CRspread_day2'], no_habitualizers['CRspread_day2'])
+scipy.stats.ttest_ind(habitualizers_df['CRspread_day2'], exploiters_df['CRspread_day2'])
+scipy.stats.ttest_ind(habitualizers_df['hpcf_rand_day2'], no_habitualizers['hpcf_rand_day2'])
+scipy.stats.ttest_ind(habitualizers_df['hpcf_rand_day2'], exploiters_df['hpcf_rand_day2'])
+
+
+#%%
+
+'''
+    CR-Spread and RI-Spread for seqtrait
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['CRspread_day2'])
+sns.regplot(data = complete_df, x = 'seqtrait', y = 'CRspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'seqtrait', y = 'RIspread_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['hpcf_rand_day2'])
+slope, intercept, r, p, std_err = stats.linregress(complete_df['seqtrait'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'seqtrait', y = 'hpcf_rand_day2', ax = ax)
+ax.text(0,0.75, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+plt.show()
+
+#%%
+# noseqlearners_df = complete_df[(complete_df['ER_diff_stt_day2'] <= 0) & (complete_df['RT_diff_stt_day2'] <= 0)]
+# print(f'number of no sequence learners are {len(noseqlearners_df)}')
+# utils.plot_grouplevel(expdata_df[expdata_df['ID'].isin(noseqlearners_df['ID'])], plot_single = True)
+# noseqlearners_df = complete_df[(complete_df['RIspread_day2'] <= 0) & (complete_df['CRspread_day2'] <= 0)]
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['RIspread_day2'])
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+'''
+    GLM RIspread ~ ΔER + ΔRT + ΔER * ΔRT
+'''
+"Correct ER for RT"
+from sklearn.linear_model import LinearRegression
+y = np.array(complete_df['ER_diff_stt_day2']).reshape(-1,1)
+x = np.array(complete_df['RT_diff_stt_day2']).reshape(-1,1)
+linmodel = LinearRegression()
+linmodel.fit(x, y)
+predictions = linmodel.predict(x)
+residuals = y - predictions
+
+complete_df['ER_diff_stt_day2 corrected'] = np.squeeze(residuals)
+# complete_df['interaction']   = 
+
+import statsmodels.api as sm
+x = np.array(complete_df.loc[:, ['RT_diff_stt_day2', 'ER_diff_stt_day2 corrected']], dtype='float')
+y = np.array(complete_df['RIspread_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+# x = np.array(df.loc[:, ['ER Diff Day 2', 'RT Diff Day 2']], dtype='float')
+# y = np.array(df['ΔPoints Day 2'], dtype = 'float')
+# X = sm.add_constant(x)
+# model = sm.OLS(y, X).fit()
+# print(model.summary())
+
+#%%
+'''
+    Check High ΔRT → High ΔER but not High ΔER → High ΔRT
+'''
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT Diff STT Day 1'], complete_df['ER Diff STT Day 1'])
+sns.regplot(data = complete_df, x = 'RT Diff STT Day 1', y = 'ER Diff STT Day 1', ax = ax)
+# ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
+ax.axhline(complete_df['ER Diff STT Day 1'].mean())
+ax.axvline(complete_df['RT Diff STT Day 1'].mean())
+# ax.axhline(0)
+# ax.axvline(0)
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['ER_diff_stt_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
+ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+# ax.axhline(0)
+# ax.axvline(0)
+plt.show()
+
+# test_df = complete_df.loc[:, ['RT_diff_stt_day2', 'ER_diff_stt_day2']]
+
+# test_df = (test_df-test_df.mean())/test_df.std()
+# test_df.sort_values(by='RT_diff_stt_day2', inplace = True, ascending = False)
+# test_df[0:30]['ER_diff_stt_day2'].mean()
+
+# test_df.sort_values(by='ER_diff_stt_day2', inplace = True, ascending = False)
+# test_df[0:30]['ER_diff_stt_day2'].mean()
+
+#%%
+
+
+'''
+    Check High ΔHRCF & High ΔER & High ΔRT → High R-Inc Spread
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['RIspread_day2'])
+slope, intercept, r, p, std_err = stats.linregress(complete_df['RT_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'RT_diff_stt_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['RIspread_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+"Day 2"
+# seqlearners_df = complete_df[(complete_df['CRspread_day2'] > complete_df['CRspread_day2'] .mean()) & \
+#                       (complete_df['ER_diff_stt_day2'] > complete_df['ER_diff_stt_day2'].mean())]
+
+'''
+    We define sequence learners as those whose ΔER > 0
+'''
+# seqlearners_df = complete_df[complete_df['ER_diff_stt_day2'] > complete_df['ER_diff_stt_day2'].mean()]
+# antiseqlearners_df = complete_df[~complete_df['ID'].isin(seqlearners_df['ID'])]
+
+seqlearners_df = complete_df[complete_df['ER_diff_stt_day2'] > 0]
+noseqlearners_df = complete_df[complete_df['ER_diff_stt_day2'] <= 0]
+
+# seqlearners_df = seqlearners_df[seqlearners_df['RT_diff_stt_day2'] < 60]
+
+len(seqlearners_df)
+'''
+    larger ΔRT is associated with larger RIspread in sequence learners
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT_diff_stt_day2'], seqlearners_df['RIspread_day2'])
+sns.regplot(data = seqlearners_df, x = 'RT_diff_stt_day2', y = 'RIspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT_diff_stt_day2'], seqlearners_df['ER_diff_stt_day2'])
+sns.regplot(data = seqlearners_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+'''
+    nosequence learners
+'''
+fig, ax = plt.subplots(1,2, figsize=(15,5))
+slope, intercept, r, p, std_err = stats.linregress(noseqlearners_df['RT_diff_stt_day2'], noseqlearners_df['RIspread_day2'])
+sns.regplot(data = noseqlearners_df, x = 'RT_diff_stt_day2', y = 'RIspread_day2', ax = ax[0])
+ax[0].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[0].axhline(0)
+ax[0].axvline(0)
+
+slope, intercept, r, p, std_err = stats.linregress(noseqlearners_df['RT_diff_stt_day2'], noseqlearners_df['ER_diff_stt_day2'])
+sns.regplot(data = noseqlearners_df, x = 'RT_diff_stt_day2', y = 'ER_diff_stt_day2', ax = ax[1])
+ax[1].text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax[1].axhline(0)
+ax[1].axvline(0)
+plt.show()
+
+'''
+    Are exploiters generally more AO than habitualizers?
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(seqlearners_df['RT_diff_stt_day2'], seqlearners_df['hpcf_rand_day2'])
+sns.regplot(data = seqlearners_df, x = 'RT_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+'''
+    Generally, sequence-learners have lower goal-directedness than non-sequence learners.
+    This works only for ΔER since sequence learners can have low ΔRT if they are exploiters.
+'''
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['ER_diff_stt_day2'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'ER_diff_stt_day2', y = 'hpcf_rand_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(complete_df['CRspread_day2'], complete_df['hpcf_rand_day2'])
+sns.regplot(data = complete_df, x = 'CRspread_day2', y = 'hpcf_rand_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f, slope=%.4f+-%.4f'%(r,p,slope,std_err))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+scipy.stats.ttest_ind(seqlearners_df['hpcf_rand_day2'], antiseqlearners_df['hpcf_rand_day2'])
+
+'''
+    Have sequence learners noticed the sequence more than non-sequence learners?
+    -> Yes
+'''
+(seqlearners_df['q_notice_a_sequence']==1).sum() / len(seqlearners_df['q_notice_a_sequence'])
+(antiseqlearners_df['q_notice_a_sequence']==1).sum() / len(antiseqlearners_df['q_notice_a_sequence'])
+
+'''
+    Have exploiters noticed the sequence more than habitualizers?
+    -> Not really
+'''
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import make_classification
+
+seqlearners_regdf = seqlearners_df[seqlearners_df['q_notice_a_sequence'] < 2]
+X = np.array(seqlearners_regdf['RT_diff_stt_day2']).reshape(14,-1)
+y = np.array(seqlearners_regdf['q_notice_a_sequence']).reshape(14)
+
+# Train logistic regression model
+model = LogisticRegression()
+model.fit(X, y)
+
+# Plotting the logistic regression curve
+X_test = np.linspace(min(X), max(X), 300)
+y_prob = model.predict_proba(X_test.reshape(-1, 1))[:, 1]
+
+plt.scatter(X, y, color='blue', marker='o', label='Data Points')
+plt.plot(X_test, y_prob, color='red', label='Logistic Regression Curve')
+plt.xlabel('RT_diff_stt_day2')
+plt.ylabel('Y-axis (Binary)')
+plt.title('Logistic Regression Visualization')
+plt.legend()
+plt.show()
+#%%
+'''
+    Check Low ΔHRCF & High ΔER → High R-Inc Spread
+'''
+
+"Day 2"
+test_df = complete_df[complete_df['spread_day2'] < complete_df['spread_day2'] .mean()]
+test_df = test_df[test_df['ER_diff_stt_day2'] > 0]
+
+fig, ax = plt.subplots()
+slope, intercept, r, p, std_err = stats.linregress(test_df['ER_diff_stt_day2'], test_df['RIspread_day2'])
+sns.scatterplot(data = test_df, x = 'ER_diff_stt_day2', y = 'RIspread_day2', ax = ax)
+ax.text(0,0, 'r=%.4f, p = %.4f'%(r,p))
+# ax.axhline(complete_df['ER_diff_stt_day2'].mean())
+# ax.axvline(complete_df['RT_diff_stt_day2'].mean())
+ax.axhline(0)
+ax.axvline(0)
+plt.show()
+
+#%%
+'''
+    Exploit-Score
+'''
+
+complete_df['learnscore'] = complete_df['RT_diff_stt_day2'] / complete_df['RT_diff_stt_day2'].std() + \
+                        complete_df['ER_diff_stt_day2'] / complete_df['ER_diff_stt_day2'].std() + \
+                        + complete_df['theta_rep_day2']
+
+complete_df['exploitscore'] = complete_df['learnscore'] + complete_df['conflict_param_day2']

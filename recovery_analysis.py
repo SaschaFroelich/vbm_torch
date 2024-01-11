@@ -45,7 +45,7 @@ Plot ELBO
 import matplotlib.pyplot as plt
 import seaborn as sns
 fig, ax = plt.subplots()
-plt.plot(loss[-500:])
+plt.plot(loss[-2000:])
 plt.title(f"ELBO for model {model}")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -98,7 +98,7 @@ for param_idx in range(num_params+1):
 
     if num_params > 3:
         ax_idxs = [plot_row_idx, plot_col_idx]
-        
+
     else:
         ax_idxs = [plot_col_idx]
 

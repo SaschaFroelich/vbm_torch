@@ -545,6 +545,7 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     trialsequence = [[trialsequence[i]] for i in range(num_trials)]
     trialsequence_wo_jokers = [[trialsequence_wo_jokers[i]] for i in range(num_trials)]
     choices = [[choices[i]] for i in range(num_trials)]
+    correct = [[correct[i]] for i in range(num_trials)]
     if 'rew_cell' in participant_day2.keys():
         outcomes = [[outcomes[i]] for i in range(num_trials)]
     blocktype = [[blocktype[i]] for i in range(num_trials)]
@@ -590,11 +591,13 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     assert torch.all(torch.tensor([resp in [-2, -1, 0] for resp in nlpresps]))
     assert torch.all(torch.tensor([resp in [-2, -1, 1] for resp in nhpresps]))
     
-    # dfgh
+    assert len(correct) == len(choices)
+    
     if 'rew_cell' in participant_day2.keys():
         data = {'trialsequence': trialsequence,
                 'trialsequence_no_jokers': trialsequence_wo_jokers,
                 'jokertypes' : jokertypes,
+                'correct' : correct,
                 'choices': choices,
                 'choices_GD' : choices_GD,
                 'outcomes': outcomes,
@@ -608,6 +611,7 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
                 'trialsequence_no_jokers': trialsequence_wo_jokers,
                 'jokertypes' : jokertypes,
                 'choices': choices,
+                'correct': correct,
                 'choices_GD' : choices_GD,
                 'blocktype': blocktype,
                 'blockidx': blockidx,
@@ -2299,24 +2303,29 @@ def create_grouped(df, ag_idx):
     
     return grouped_df
 
-def get_data_from_file():
+def get_data_from_file(file_dir = None):
     import pickle
     import tkinter as tk
     from tkinter import filedialog
     
-    def open_files():
-        global filenames
-        filenames = filedialog.askopenfilenames()
-        print(f'File paths: {filenames}')
-        root.destroy()
+    if file_dir is None:
+        def open_files():
+            global filenames
+            filenames = filedialog.askopenfilenames()
+            print(f'File paths: {filenames}')
+            root.destroy()
         
-    root = tk.Tk()
-    button = tk.Button(root, text="Open Files", command=open_files)
-    print(button)
-    button.pack()
-    root.mainloop()
-    # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
-    res = pickle.load(open( filenames[0], "rb" ))
+        root = tk.Tk()
+        button = tk.Button(root, text="Open Files", command=open_files)
+        print(button)
+        button.pack()
+        root.mainloop()
+        # post_sample_df, df, loss, param_names = pickle.load(open( filenames[0], "rb" ))
+        res = pickle.load(open( filenames[0], "rb" ))
+            
+    else:
+        res = pickle.load(open( file_dir, "rb" ))
+            
     # print("len res is %d"%len(res))
     assert len(res) == 5
     assert len(res[2]) == 3
@@ -2657,6 +2666,17 @@ def compute_points(expdata_df, identifier = 'ID'):
     points_stt_df_day2 = expdata_df_stt_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
     points_stt_df_day2.rename(columns = {'outcomes' : 'points_stt_day2'}, inplace = True)
     
+    "STT sequential Day 2"
+    expdata_df_stt_seq_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5) & (expdata_df['blocktype'] == 0)]
+    points_stt_seq_df_day2 = expdata_df_stt_seq_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_stt_seq_df_day2.rename(columns = {'outcomes' : 'points_stt_seq_day2'}, inplace = True)
+    
+    "STT Random Day 2"
+    expdata_df_stt_rand_day2 = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blockidx'] > 5) & (expdata_df['blocktype'] == 1)]
+    points_stt_rand_df_day2 = expdata_df_stt_rand_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+    points_stt_rand_df_day2.rename(columns = {'outcomes' : 'points_stt_rand_day2'}, inplace = True)
+    
+    
     "DTT Seq"
     expdata_df_dtt_seq_day2 = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blockidx'] > 5) & (expdata_df['blocktype'] == 0)]
     points_dtt_seq_day2 = expdata_df_dtt_seq_day2.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
@@ -2690,6 +2710,8 @@ def compute_points(expdata_df, identifier = 'ID'):
     
     points_df = pd.merge(points_df, points_day2, on = identifier)
     points_df = pd.merge(points_df, points_stt_df_day2, on = identifier)
+    points_df = pd.merge(points_df, points_stt_seq_df_day2, on = identifier)
+    points_df = pd.merge(points_df, points_stt_rand_df_day2, on = identifier)
     
     points_df = pd.merge(points_df, points_dtt_df_jokertypes_day2_pivoted, on = identifier)
     
@@ -2808,6 +2830,9 @@ def compute_RT(expdata_df):
     RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_rand_day2.rename(columns={'RT':'RT_stt_rand_day2'}, inplace = True)
     
+    RT_stt_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_day2.rename(columns={'RT':'RT_stt_day2'}, inplace = True)
+    
     RT_df = pd.merge(RT_df, RT_df_rand_day1, on = 'ID')
     RT_df = pd.merge(RT_df, RT_df_rand_day2, on = 'ID')
     RT_df = pd.merge(RT_df, RT_df_seq_day1, on = 'ID')
@@ -2817,9 +2842,10 @@ def compute_RT(expdata_df):
     RT_df = pd.merge(RT_df, RT_stt_rand_day1, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt_seq_day2, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt_rand_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_day2, on = 'ID')
     
     RT_df['RT Diff STT Day 1'] = RT_df['RT_stt_rand_day1'] - RT_df['RT_stt_seq_day1']
-    RT_df['RT Diff STT Day 2'] = RT_df['RT_stt_rand_day2'] - RT_df['RT_stt_seq_day2']
+    RT_df['RT_diff_stt_day2'] = RT_df['RT_stt_rand_day2'] - RT_df['RT_stt_seq_day2']
     
     return RT_df
 

@@ -1562,7 +1562,7 @@ class Handedness(Vbm_B):
         else:
             # assert choice_python_stt.ndim == 1
             return choice_python_stt.clone().detach()
-        
+
 class Conflict(Vbm_B):
     
     param_names = ['lr_day1',
@@ -1814,7 +1814,7 @@ class Interaction(Vbm_B):
         # seq_bool = (blocktype == 0).type(torch.int)
         
         # bonus = opt1_GD*conflict_value*conflict_param
-            
+
         probs = self.softmax(torch.stack((Vopt1 + interaction_param*DeltaQ*DeltaRep, 
                                           Vopt2), 2))
 

@@ -40,7 +40,7 @@ def sweep_probs(samples, index):
         c_point += c_sign * step_size
     return (samples[:, index] >= c_point).sum() / samples.shape[0]
 
-num_models = 3
+num_models = 5
 num_agents = 60
 elbos = np.zeros((num_agents, num_models))
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
@@ -71,7 +71,23 @@ with pm.Model() as BMS:
     
     BMSinferenceData = pm.sample(chains=4, draws=6000, tune=6000)
     
+az.summary(BMSinferenceData)
+
 #%%
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
-
 exceedance_probability(posteriorsModelProbs)
+
+#%%
+import matplotlib.pyplot as plt
+import seaborn as sns
+# extract samples of all chains
+posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
+plt.figure()
+sns.histplot(posteriorsModelProbs, stat='density', element='step', bins=30, alpha=.1) #, fill=False)
+sns.kdeplot(posteriorsModelProbs, linewidth=4)
+plt.ylabel(f'$p(r_i\mid{{data}})$', fontsize=16)
+plt.xlabel('Posterior probability of the model', fontsize=16)
+plt.xlim([0,1])
+plt.yticks([])
+# plt.legend(['1', '2', '3', '4', '5'], fontsize=14, title='Model', title_fontsize=14)
+plt.show()

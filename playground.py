@@ -20,266 +20,17 @@ import pandas as pd
 
 matfile_dir = './matlabcode/clipre/'
 
-#%% 
-"Model B"
-
-npar = 6
-# parameter = np.random.uniform(0,1, npar)
-theta_rep_day1 = 0.8
-theta_rep_day2 = 0.8
-theta_Q_day1 = 3.
-theta_Q_day2 = 3.
-lr_day1 = 0.005
-lr_day2 = 0.
-
-newagent = models.Vbm_B(theta_rep_day1 = torch.tensor([[theta_rep_day1]]),
-              theta_rep_day2 = torch.tensor([[theta_rep_day2]]),
-              lr_day1 = torch.tensor([[lr_day1]]),
-              lr_day2 = torch.tensor([[lr_day2]]),
-              theta_Q_day1 = torch.tensor([[theta_Q_day1]]),
-              theta_Q_day2 = torch.tensor([[theta_Q_day2]]),
-              k=torch.tensor(4.),
-              Q_init=torch.tensor([[[0.2, 0., 0., 0.2]]]))
-    
-newenv = env.Env(newagent, 
-                 rewprobs=[0.8, 0.2, 0.2, 0.8], 
-                 matfile_dir = './matlabcode/clipre/')
-
-newenv.run()
-data = {"Choices": newenv.choices, 
-        "Outcomes": newenv.outcomes,
-        "Trialsequence": newenv.data["trialsequence"], 
-        "Blocktype": newenv.data["blocktype"],
-        "Jokertypes": newenv.data["jokertypes"], 
-        "Blockidx": newenv.data["blockidx"],
-        # "Qdiff": [(newenv.agent.Q[i][...,0] + \
-        #            newenv.agent.Q[i][...,3])/2 - \
-        #           (newenv.agent.Q[i][...,1] + \
-        #            newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]
-        }
-    
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-#%%
-"Bayesian Prior Model"
-
-dectemp_day1 = 0
-lr_day1 = 0.1
-omega_day1 = 0.1
-
-dectemp_day2 = 0
-lr_day2 = 0.1
-omega_day2 = 0.1
-
-newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1, \
-                      omega_day2 = omega_day2, \
-                      lr_day1 = lr_day1, \
-                      lr_day2 = lr_day2, \
-                      dectemp_day1 = dectemp_day1, \
-                      dectemp_day2 = dectemp_day2, \
-                      k=4,\
-                      Q_init=[0.4, 0., 0., 0.4])
-    
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
-
-newenv.run()
-data = {"Choices": newenv.choices, 
-        "Outcomes": newenv.outcomes,
-        "Trialsequence": newenv.data["trialsequence"], 
-        "Blocktype": newenv.data["blocktype"],
-        "Jokertypes": newenv.data["jokertypes"], 
-        "Blockidx": newenv.data["blockidx"],
-        "Qdiff": [(newenv.agent.Q[i][...,0] + \
-                   newenv.agent.Q[i][...,3])/2 - \
-                  (newenv.agent.Q[i][...,1] + \
-                   newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-dectemp_day1 = 0
-lr_day1 = 0.1
-omega_day1 = 3
-
-dectemp_day2 = 0
-lr_day2 = 0.1
-omega_day2 = 3
-
-newagent = models.Vbm_A_Bayesian(omega_day1 = omega_day1,
-                      omega_day2 = omega_day2,
-                      lr_day1 = lr_day1,
-                      lr_day2 = lr_day2,
-                      dectemp_day1 = dectemp_day1,
-                      dectemp_day2 = dectemp_day2,
-                      k=4,
-                      Q_init=[0.4, 0., 0., 0.4])
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
-
-newenv.run()
-data = {"Choices": newenv.choices, 
-        "Outcomes": newenv.outcomes,
-        "Trialsequence": newenv.data["trialsequence"],
-        "Blocktype": newenv.data["blocktype"],
-        "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"], \
-        "Qdiff": [(newenv.agent.Q[i][...,0] + \
-                   newenv.agent.Q[i][...,3])/2 - \
-                  (newenv.agent.Q[i][...,1] + \
-                   newenv.agent.Q[i][...,2])/2 for i in range(len(newenv.choices))]}
-
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-
-#%%
-"Model C"
-
-lr0_day1 = 0.1
-lr_lambda_day1 = 0.01
-theta_Q_day1 = 2
-theta_rep_day1 = 1.5
-
-lr0_day2 = 0.1
-lr_lambda_day2 = 0.01
-theta_Q_day2 = 2
-theta_rep_day2 = 1.5
-
-newagent = models.Vbm_C(theta_rep_day1 = theta_rep_day1, \
-                      theta_rep_day2 = theta_rep_day2, \
-                      lr0_day1 = lr0_day1, \
-                      lr0_day2 = lr0_day2, \
-                      lr_lambda_day1 = lr_lambda_day1, \
-                      lr_lambda_day2 = lr_lambda_day2, \
-                      theta_Q_day1 = theta_Q_day1, \
-                      theta_Q_day2 = theta_Q_day2, \
-                      k=4,\
-                      Q_init=[0.4, 0., 0., 0.4])
-    
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
-
-newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-            "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
-
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-lr0_day1 = 0.1
-lr_lambda_day1 = 0.01
-theta_Q_day1 = 2
-theta_rep_day1 = 1.5
-
-lr0_day2 = 0.8
-lr_lambda_day2 = 0.0
-theta_Q_day2 = 2
-theta_rep_day2 = 1.5
-
-newagent = models.Vbm_C(theta_rep_day1 = theta_rep_day1, \
-                      theta_rep_day2 = theta_rep_day2, \
-                      lr0_day1 = lr0_day1, \
-                      lr0_day2 = lr0_day2, \
-                      lr_lambda_day1 = lr_lambda_day1, \
-                      lr_lambda_day2 = lr_lambda_day2, \
-                      theta_Q_day1 = theta_Q_day1, \
-                      theta_Q_day2 = theta_Q_day2, \
-                      k=4,\
-                      Q_init=[0.4, 0., 0., 0.4])
-    
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir=matfile_dir)
-
-newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-            "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
-
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-#%%
-"Model F"
-
-"No lr, theta q and thetar_r are linearly time-dependent"
-npar = 8
-# parameter = numpy.random.uniform(0,1, npar)
-
-theta_rep0_day1 = 1
-theta_replambda_day1 = 0.001
-theta_Q0_day1 = 0
-theta_Qlambda_day1 = 0.007
-
-theta_rep0_day2 = 432*theta_replambda_day1 + theta_rep0_day1 + 1
-theta_replambda_day2 = 0.001
-theta_Q0_day2 = 432*theta_Qlambda_day1 + theta_Q0_day1
-theta_Qlambda_day2 = 0.0
-
-
-newagent = models.Vbm_F(theta_rep0_day1 = theta_rep0_day1, \
-                      theta_replambda_day1 = theta_replambda_day1, \
-                      theta_Q0_day1 = theta_Q0_day1, \
-                      theta_Qlambda_day1 = theta_Qlambda_day1, \
-                      theta_rep0_day2 = theta_rep0_day2, \
-                      theta_replambda_day2 = theta_replambda_day2, \
-                      theta_Q0_day2 = theta_Q0_day2, \
-                      theta_Qlambda_day2 = theta_Qlambda_day2, \
-                      k=4,\
-                      Q_init=[0.8, 0.2, 0.2, 0.8])
-
-newenv = env.Env(newagent, rewprobs=[0.8, 0.2, 0.2, 0.8], matfile_dir = './matlabcode/clipre/')
-
-newenv.run()
-data = {"Choices": newenv.choices, "Outcomes": newenv.outcomes,\
-        "Trialsequence": newenv.data["trialsequence"], "Blocktype": newenv.data["blocktype"],\
-            "Jokertypes": newenv.data["jokertypes"], "Blockidx": newenv.data["blockidx"]}
-
-df = pd.DataFrame(data)
-utils.plot_results(df, group = 0)
-
-#%%
-def reassign(s_idx):
-    
-    if s_idx in [1,3,5]:
-        return s_idx + 1
-    
-    elif s_idx in [8, 10, 12, 14]:
-        return s_idx - 1
-    
-    else: 
-        return s_idx
-
-import data_for_DDM as ddm
-import matplotlib.pyplot as plt
-
-print("Does this weight every participant the same, or according to their number of trials?")
-
-df_ddm = ddm.get_ddm_data(4)
-df_ddm = df_ddm[df_ddm["Blocktype"]=='s']
-df_ddm = df_ddm[df_ddm["Trialsequence"]>10]
-
-df_ddm["Blockidx"] = df_ddm["Blockidx"].map(lambda x: reassign(x))
-
-# df_ddm["rep1"] = df_ddm["repvals"].map(lambda x: x[0])
-# df_ddm["rep2"] = df_ddm["repvals"].map(lambda x: x[1])
-# df_ddm["rep3"] = df_ddm["repvals"].map(lambda x: x[2])
-# df_ddm["rep4"] = df_ddm["repvals"].map(lambda x: x[3])
-
-df_ddm["maxrepval"] = df_ddm["repvals"].map(lambda x: np.max(x))
-
-plt.scatter(range(7), df_ddm.groupby('Blockidx')['maxrepval'].mean())    
-plt.title("repetition values")
-plt.show()
-
 #%%
 "Simulate the group-level behaviour of several agents"
 
 num_agents = 40
 model = 'B'
-parameters = {'theta_rep_day1': 0.4, \
-'theta_rep_day2': 0.8, \
-'theta_Q_day1': 3., \
-'theta_Q_day2': 3., \
-'lr_day1': 0.001, \
-'lr_day2': 0., \
+parameters = {'theta_rep_day1': 0.4,
+'theta_rep_day2': 0.8,
+'theta_Q_day1': 3.,
+'theta_Q_day2': 3.,
+'lr_day1': 0.001,
+'lr_day2': 0.,
 'k': 4.}
 
 utils.simulate_model_behaviour(num_agents, model, **parameters)
@@ -365,51 +116,6 @@ outcomes = torch.tensor([1,1,1,0,0,0])
 mask = torch.ceil(abs(Qoutcomp(Q, choices))).double()
 Qnewmask = Q + lr[..., None]*((outcomes[None,...,None]-Qoutcomp(Q, choices))*mask)
 Qnew = Q + lr[..., None]*((outcomes[None,...,None]-Qoutcomp(Q, choices)))
-
-#%%
-
-
-_, mask = Qoutcomp(Q, choices)
-    
-
-#%%
-
-exec("nval = 7")
-exec("blavec = [1,2,3,4]")
-exec("blavec[-1] = nval")
-exec("print(blavec)")
-
-#%%
-
-import csv
-import random
-
-# List of fantasy countries
-fantasy_countries = ["Eldoria", "Mythland", "Avaloria", "Dragonia", "Feyland"]
-
-# Generate data for fantasy cities
-cities = []
-for i in range(1, 150):
-    city_name = f"Fantasy City {i}"
-    inhabitants = random.randint(1000, 100000)
-    surface_area = random.randint(10, 1000)
-    average_temperature = random.uniform(-20, 40)
-    children_per_household = random.uniform(0.5, 3.5)
-    country = random.choice(fantasy_countries)
-    
-    city_data = [city_name, inhabitants, surface_area, average_temperature, children_per_household, country]
-    cities.append(city_data)
-
-# Save data to a CSV file
-header = ['City Name', 'Inhabitants', 'Surface Area (sq km)', 'Average Temperature (Celsius)', 'Children per Household', 'Country']
-
-with open('fantasy_cities_data_with_country.csv', 'w', newline='') as csvfile:
-    csv_writer = csv.writer(csvfile)
-    csv_writer.writerow(header)
-    csv_writer.writerows(cities)
-
-print("CSV file 'fantasy_cities_data_with_country.csv' created successfully!")
-
 
 #%%
 import numpy as np
@@ -505,21 +211,6 @@ with mp.Pool(mp.cpu_count()) as pool:
 print(results)
 
 #%%
-
-import pandas as pd
-
-# Assuming 'df' is your DataFrame and 'column' is the column with lists
-df = pd.DataFrame({
-    'column_A': [['a', 'b'], ['c', 'd'], ['e', 'f']],
-    'column_B': [[1, 2], [3,4], [5,6]]
-})
-
-# Use explode to transform the DataFrame
-df_transformed = df.explode(['column_A', 'column_B'])
-
-print(df_transformed)
-
-#%%
 '''
 Simulate data
 '''
@@ -536,10 +227,10 @@ import pandas as pd# model = sys.argv[1]
 # method = sys.argv[3] # "svi" or "mcmc"
 # num_agents = 50
 
-model = 'B'
+model = 'B_lrdec'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 4
+num_agents = 60
 
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
@@ -556,26 +247,23 @@ Qs = torch.tensor([[0.2, 0., 0., 0.2],
                    [0, 0.2, 0.2, 0.]]).tile((num_agents, 1, 1))
 Q_init = Qs[range(num_agents),torch.tensor(sequence)-1, :]
 
-# params = {'omega': torch.tensor([0.2]*num_agents),
-#           'dectemp': torch.tensor([1.5]*num_agents),
-#           'lr': torch.tensor([0.01]*num_agents)}
-
-params = {'lr_day1': torch.tensor([0.01]*num_agents),
-          'theta_Q_day1': torch.tensor([2.]*num_agents),
+params = {'lr0': torch.tensor([0.001]*num_agents),
+          'lrk': torch.tensor([0.0]*num_agents),
+          'theta_Q_day1': torch.tensor([1.]*num_agents),
           'theta_rep_day1': torch.tensor([1.]*num_agents),
           
-          'lr_day2': torch.tensor([0]*num_agents),
           'theta_Q_day2': torch.tensor([2.]*num_agents),
           'theta_rep_day2': torch.tensor([1.]*num_agents)}
 
-# params = torch.tensor((np.ones((4,6))*np.array([[0.01, 2., 1., 0, 2., 1.]])).T)
-# params = torch.tensor((np.ones((4,3))*np.array([[0.01, 2., 1.]])).T)
-groupdata_dict, params, params_df = utils.simulate_data(model, 
+group = [0]*(num_agents//4)
+group.extend([1]*(num_agents//4))
+group.extend([2]*(num_agents//4))
+group.extend([3]*(num_agents//4))
+
+groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model, 
                                                     num_agents,
-                                                   Q_init = Q_init,
-                                                    sequence = sequence,
-                                                    params = params,
-                                                    blockorder = blockorder)
+                                                   group = group,
+                                                    params = params)
 
 groupdata_df = pd.DataFrame(groupdata_dict).explode(list(groupdata_dict.keys()))
 

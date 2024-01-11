@@ -35,10 +35,10 @@ HandSeq2
 Random
 '''
 
-model = 'B_lrdec'
+model = 'Vbm_twodays'
 resim =  0 # whether to simulate agents with inferred parameters
 method = 'svi' # "svi" or "mcmc"
-num_agents = 20
+num_agents = 60
 
 assert num_agents%4 == 0, "num_agents must be divisible by 4."
 # k = 4.
@@ -63,17 +63,17 @@ groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model,
 '''
 Inference
 '''
-# import time
-# time.sleep(10*3600)
+import time
+time.sleep(12*3600)
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model, 
-                         group, 
+                         group,
                          num_agents = num_agents)
 
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 2_000, num_particles = 10)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior()

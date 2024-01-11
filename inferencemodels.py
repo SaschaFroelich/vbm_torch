@@ -60,6 +60,7 @@ class GeneralGroupInference():
     def model(self, *args):
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
+        # torch.manual_seed(1234)
         a = pyro.param('a', torch.ones(self.num_params), constraint=dist.constraints.positive)
         lam = pyro.param('lam', torch.ones(self.num_params), constraint=dist.constraints.positive)
         tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # Why a/lam?
@@ -200,6 +201,8 @@ class GeneralGroupInference():
         print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
         
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
+        
+        return (elbos, std)
         
     def sample_posterior(self, n_samples = 1_000, locs = False):
         '''

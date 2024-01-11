@@ -277,7 +277,7 @@ post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2'
 diffs_df = anal.daydiff(inf_mean_df)
 diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
 
-anal.violin(inf_mean_df, model)
+# anal.violin(inf_mean_df, model)
 
 diffs_df = anal.daydiff(post_sample_df, BF = 1)
 
@@ -1183,9 +1183,9 @@ for par in params_day1:
 
 print('\n')
 for par in params_day2:
-    r,p = scipy.stats.pearsonr(complete_df[par], complete_df['points_day2'])
+    r,p = scipy.stats.pearsonr(complete_df[par], complete_df['points_incongruent_day2'])
     
-    print(f"Correlation for points_day2 with {par}: r=%.4f, p=%.4f"%(r, p))
+    print(f"Correlation for points_incong_day2 with {par}: r=%.4f, p=%.4f"%(r, p))
     
 #%%
 params_day1 = ['theta_rep_day1', 'conflict_param_day1']
@@ -1307,3 +1307,45 @@ print(r)
 print(p)
 plt.show()
 
+#%%
+'''
+    points ~ θ_Q, θ_R, θ_Conflict
+'''
+import statsmodels.api as sm
+
+regr_params = ['theta_Q_day2', 'theta_rep_day2', 'conflict_param_day2']
+x = np.array(complete_df.loc[:, [*regr_params]], dtype='float')
+for rpar_idx1 in range(len(regr_params)):
+    for rpar_idx2 in range(rpar_idx1+1, len(regr_params)):
+        r,p = scipy.stats.pearsonr(complete_df[regr_params[rpar_idx1]], complete_df[regr_params[rpar_idx2]])
+        print(f"Correlation for {regr_params[rpar_idx1]} with {regr_params[rpar_idx2]}: r=%.4f, p=%.4f"%(r,p))
+
+y = np.array(complete_df['points_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+y = np.array(complete_df['points_stt_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+y = np.array(complete_df['points_dtt_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+y = np.array(complete_df['points_congruent_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+y = np.array(complete_df['points_incongruent_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+y = np.array(complete_df['points_randomdtt_day2'], dtype = 'float')
+X = sm.add_constant(x)
+model = sm.OLS(y, X).fit()
+print(model.summary())

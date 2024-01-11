@@ -60,7 +60,7 @@ print(f"Starting inference of model {model} for {num_agents} agents.")
 
 #%%
 # import time
-# time.sleep(15*3600)
+# time.sleep(12*3600)
 
 '''
 Prepare Inference
@@ -78,7 +78,7 @@ agent = utils.init_agent(model,
 print("===== Starting inference =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10, block_max = 14)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = 1, num_particles = 10, block_max = 14)
 
 "----- Sample parameter estimates from posterior"
 post_sample_df = infer.sample_posterior( )
