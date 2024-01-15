@@ -534,6 +534,12 @@ def compute_errors(df, identifier = 'ID'):
     ----------
     df : DataFrame
         Contains trial-level agent behaviour.
+            jokertypes : list
+                DTT Types
+                -1/0/1/2 : no joker/random/congruent/incongruent
+
+
+    ERRORS (in 'correct'): 0 = wrong response, 1 = correct response, 2 = too slow, 3 = two keys at once during joker-trials
 
     identifier : str
         Name of df column which uniquely identifies an agent.
@@ -542,7 +548,7 @@ def compute_errors(df, identifier = 'ID'):
     -------
     er_df : DataFrame
         DESCRIPTION.
-
+        
     '''
     
     df = df[df['choices'] != -1]
@@ -556,6 +562,21 @@ def compute_errors(df, identifier = 'ID'):
     ER_dtt = []
     ER_dtt_day1 = []
     ER_dtt_day2 = []
+    
+    ER_randomdtt_day1 = []
+    ER_randomdtt_day2 = []
+    
+    ER_congruent_day1 = []
+    ER_congruent_day2 = []
+    
+    ER_incongruent_day1 = []
+    ER_incongruent_day2 = []
+
+    ER_notimeouterrors_dtt_day1 = []
+    ER_timeouts_dtt_day1 = []
+    
+    ER_notimeouterrors_dtt_day2 = []
+    ER_timeouts_dtt_day2 = []
     
     "--- Timeouts"
     TO_dtt_day2 = []
@@ -571,11 +592,17 @@ def compute_errors(df, identifier = 'ID'):
     ER_stt_rand_day1 = []
     ER_stt_day1 = []
 
+    ER_notimeouterrors_stt_day1 = []
+    ER_timeouts_stt_day1 = []
+
     "STT: Day 2"
     ER_stt_seq_day2 = []
     ER_stt_rand_day2 = []    
     ER_stt_day2 = []
     
+    ER_notimeouterrors_stt_day2 = []
+    ER_timeouts_stt_day2 = []
+
     ER_total = []
     ER_total_day1 = []
     ER_total_day2 = []
@@ -586,9 +613,36 @@ def compute_errors(df, identifier = 'ID'):
 
         mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5)
         ER_dtt_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        ER_notimeouterrors_dtt_day1.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
+        ER_timeouts_dtt_day1.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
 
+
+        "DTT Day 2"
         mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5)
         ER_dtt_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        ER_notimeouterrors_dtt_day2.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
+        ER_timeouts_dtt_day2.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
+        
+        "Random"
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 0)
+        ER_randomdtt_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 0)
+        ER_randomdtt_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        
+        "Congruent"
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 1)
+        ER_congruent_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 1)
+        ER_congruent_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+
+        "Inongruent"
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 2)
+        ER_incongruent_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 2)
+        ER_incongruent_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
 
         "--- Timeouts"
         
@@ -650,6 +704,9 @@ def compute_errors(df, identifier = 'ID'):
                           'ER_dtt': ER_dtt,
                           'ER_dtt_day1': ER_dtt_day1,
                           'ER_dtt_day2': ER_dtt_day2,
+                          'ER_randomdtt_day2': ER_randomdtt_day2,
+                          'ER_congruent_day2': ER_congruent_day2,
+                          'ER_incongruent_day2': ER_incongruent_day2,
                           'ER_stt': ER_stt,
                           'ER_stt_seq_day1': ER_stt_seq_day1,
                           'ER_stt_rand_day1': ER_stt_rand_day1,
@@ -661,7 +718,7 @@ def compute_errors(df, identifier = 'ID'):
                           'ER_total_day1': ER_total_day1,
                           'ER_total_day2': ER_total_day2})
     
-    er_df['ER Diff STT Day 1'] = er_df['ER_stt_rand_day1'] - er_df['ER_stt_seq_day1']
+    er_df['ER_diff_stt_day1'] = er_df['ER_stt_rand_day1'] - er_df['ER_stt_seq_day1']
     er_df['ER_diff_stt_day2'] = er_df['ER_stt_rand_day2'] - er_df['ER_stt_seq_day2']
     return er_df
     

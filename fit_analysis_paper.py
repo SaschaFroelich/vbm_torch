@@ -29,6 +29,7 @@ import itertools
 out = utils.get_data_from_file()
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
 
+_, expdata_df_clipre = expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
 expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
 
 # if len(out) == 7:
@@ -1349,3 +1350,155 @@ y = np.array(complete_df['points_randomdtt_day2'], dtype = 'float')
 X = sm.add_constant(x)
 model = sm.OLS(y, X).fit()
 print(model.summary())
+
+#%% 
+
+'''
+    ANOVA
+'''
+groupdf = utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
+groupdf['plottingcat'] = groupdf.apply(lambda row: 'random1' if row['DTT Types'] == 'random' and row['day'] == 1 else\
+                                       'congruent1' if row['DTT Types'] == 'congruent' and row['day'] == 1 else\
+                                        'incongruent1' if row['DTT Types'] == 'incongruent' and row['day'] == 1 else\
+                                        'random2' if row['DTT Types'] == 'random' and row['day'] == 2 else\
+                                        'congruent2' if row['DTT Types'] == 'congruent' and row['day'] == 2 else\
+                                        'incongruent2', axis = 1)
+
+custom_palette = ['#c7028c', '#63040f', '#96e6c7'] # congruent, incongruent, random
+
+
+RT_df = pd.DataFrame()
+RTs = []
+RTs.extend(list(complete_df['RT_stt_seq_day1']))
+RTs.extend(list(complete_df['RT_stt_rand_day1']))
+RTs.extend(list(complete_df['RT_stt_seq_day2']))
+RTs.extend(list(complete_df['RT_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['RT_stt_seq_day1']))
+days.extend([1]*len(complete_df['RT_stt_rand_day1']))
+days.extend([2]*len(complete_df['RT_stt_seq_day2']))
+days.extend([2]*len(complete_df['RT_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['RT_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['RT_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day2']))
+
+ag_idx = []
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+
+RT_df['RT'] = RTs
+RT_df['day'] = days
+RT_df['Condition'] = condition
+RT_df['ag_idx'] = ag_idx
+
+ER_df = pd.DataFrame()
+ERs = []
+ERs.extend(list(complete_df['ER_stt_seq_day1']))
+ERs.extend(list(complete_df['ER_stt_rand_day1']))
+ERs.extend(list(complete_df['ER_stt_seq_day2']))
+ERs.extend(list(complete_df['ER_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['ER_stt_seq_day1']))
+days.extend([1]*len(complete_df['ER_stt_rand_day1']))
+days.extend([2]*len(complete_df['ER_stt_seq_day2']))
+days.extend([2]*len(complete_df['ER_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['ER_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['ER_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day2']))
+
+ER_df['ER'] = ERs
+ER_df['day'] = days
+ER_df['Condition'] = condition
+ER_df['ag_idx'] = ag_idx
+
+groupdf['choices_GD'] *=  100
+ER_df['ER'] *= 100
+
+groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
+#%%
+
+fig, ax = plt.subplots(1,3, figsize = (15, 5))
+sns.lineplot(x = "day",
+            y = "choices_GD",
+            hue = "DTT Types",
+            data = groupdf,
+            palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[0])
+ax[0].set_xticks([1,2])
+# ax[0].set_ylim([60, 100])
+ax[0].set_xlabel('Day')
+ax[0].set_ylabel('HRCF (%)')
+
+
+sns.lineplot(x = "day",
+            y = "ER",
+            hue = "Condition",
+            data = ER_df,
+            # palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[1])
+ax[1].set_xticks([1,2])
+# ax[2].set_ylim([0.61, 1])
+ax[1].set_xlabel('Day')
+ax[1].set_ylabel('ER (%)')
+
+sns.lineplot(x = "day",
+            y = "RT",
+            hue = "Condition",
+            data = RT_df,
+            # palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[2])
+ax[2].set_xticks([1,2])
+# ax[1].set_ylim([0.61, 1])
+ax[2].set_xlabel('Day')
+ax[2].set_ylabel('RT (ms)')
+plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+plt.show()
+
+groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
+ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTTTypes']]
+ANOVA_df['day'] = ANOVA_df['day'].map(lambda x: 'one' if x == 1 else 'two')
+ANOVA_df['choices_GD'] = pd.to_numeric(ANOVA_df['choices_GD'])
+
+ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTTTypes'], as_index=False).mean()
+ANOVA_df.to_csv('GD_rmanova.csv')
+ER_df.to_csv('ER_rmanova.csv')
+RT_df.to_csv('RT_rmanova.csv')
+
+#%%
+
+import statsmodels.api as sm 
+from statsmodels.formula.api import ols 
+  
+# Create a dataframe 
+dataframe = pd.DataFrame({'Fertilizer': np.repeat(['daily', 'weekly'], 15), 
+                          'Watering': np.repeat(['daily', 'weekly'], 15), 
+                          'height': [14, 16, 15, 15, 16, 13, 12, 11, 
+                                     14, 15, 16, 16, 17, 18, 14, 13,  
+                                     14, 14, 14, 15, 16, 16, 17, 18, 
+                                     14, 13, 14, 14, 14, 15]}) 
+  
+  
+# Performing two-way ANOVA 
+model = ols('height ~ C(Fertilizer) + C(Watering) + C(Fertilizer):C(Watering)', 
+            data=dataframe).fit() 
+result = sm.stats.anova_lm(model, type=2) 
+  
+# Print the result 
+print(result) 
+

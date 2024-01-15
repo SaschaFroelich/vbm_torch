@@ -5,7 +5,7 @@ Created on Fri Jun  9 12:52:24 2023
 
 @author: sascha
 """
-import models_torch_paper as models
+
 import time
 import ipdb
 import torch
@@ -145,6 +145,37 @@ def get_groupdata(data_dir, getall = False):
     group = []
     'Exclude because of errors'
     
+    include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
+           '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
+           '6286672d0165aad8f1386c27', '55cca8f81676ab000ff06ef1',
+           '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
+           '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
+           '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
+           '63af557b3d4f219c3226b7d6', '5eff5f05b92981000a2aed73',
+           '5c6e8dd877955b0001ff0c58', '5d8b66f5d189bd001a378273',
+           '62db2644ab0a3a353c0dcb54', '6329b1add3dcd53cb9c9cab8',
+           '5c321ebf6558270001bd79aa', '5d49d17b3dad1f0001e2aba1',
+           '5eadaff848b26f4483ae62d9', '60a3f8075b013de7b5518e96',
+           '5eec9ee7d900510326d78fc8', '5d8a29c082fec30001d9c24a',
+           '617406fbfced12169896d158', '5e66c77e8ebdaf4466e26326',
+           '57deda2591b7fc0001493e95', '5982eef79dfc3e00011d81e0',
+           '57dd186e6598aa0001992616', '595e7974af78da0001a21c3a',
+           '5a9ed5046475f90001a0189e', '615739949cf5767509a7e29a',
+           '5f16fde210d37701904c9dc2', '5dc5da21d999de45a504651b',
+           '5d0245966e208b0017301561', '63d79fcd741f9cfb2f87152f',
+           '59dd90f6e75b450001a68dac', '63174af7d57182f9bf90c094',
+           '5eaadc0a7adeb404eea9c3c0', '62c97799bd8ab72a531abde0',
+           '60f816ff1fa74fcfab532378', '6500615b226d81ec5db464d7',
+           '5c4b987538878c0001c7883b', '5b2a72f7c293b90001732b89',
+           '57d5ab3a722df500017f3622', '5db4ef4a2986a3000be1f886',
+           '57c4761195a3ea00016e5992', '5db32244dbe39d000be72fb0',
+           '5e850b0e390e520ec806b084', '6116b022b7ef87ef5828748b',
+           '596f961cfe061d00011e3e03', '6044ca22bc6235555362d5bb',
+           '58aca85e0da7f10001de92d4', '65389f0b0f181197c4218f6d',
+           '654abe303c4940ec0502538e', '60e2577f8c52db9d1fb5ffac',
+           '62e02b26e879244a99e852fa', '56f699e876348f000c883bba',
+           '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
+    
     exclude_errors = [
                   '5e07c976f6191f137214e91f' # (Grp 1)
                   ]
@@ -223,7 +254,8 @@ def get_groupdata(data_dir, getall = False):
                 q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
                 
             else:
-                if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
+                # if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
+                if ID in include_IDs:
                     groupdata.append(data)
                     group.append(grp)
                     IDs_included.append(ID)
@@ -414,7 +446,12 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     
     assert group < 4
     
-    ID = file_day1.split("/")[-1][4:9] # Prolific ID
+    if oldpub:
+        ID = file_day1.split("/")[-1][4:9] # NicDB
+    else:
+        # ID = file_day1.split("/")[-1][4:28] # Prolific ID
+        ID = file_day1.split("/")[-1][4:10] # PBIDXX
+
 
     # print(data_dir)
     # print(glob.glob(data_dir + "Grp%d/csv/*%s*Tag2*.mat"%(group+1, ID)))
@@ -747,7 +784,6 @@ def get_trialseq(matfile_dir,
     seq = mat['sequence'][0]
     seq_no_jokers = mat['sequence_without_jokers'][0]
 
-    # jokertypes = (seq>10)*seq
 
     "----- Map Neutral Jokers to 'No Joker' (only necessary for published results)."
     # seq_noneutral = [t if t != 14 and t != 23 else 1 for t in seq]
@@ -877,6 +913,7 @@ def comp_groupdata(groupdata):
             jokertypes
             blockidx
             RT
+            correct
 
     Returns
     -------
@@ -895,6 +932,7 @@ def comp_groupdata(groupdata):
                         'blocktype' : [],
                         'jokertypes' : [],
                         'blockidx' : [],
+                        'correct': [],
                         'RT': []}
 
 
@@ -906,6 +944,7 @@ def comp_groupdata(groupdata):
                         'blocktype' : [],
                         'jokertypes' : [],
                         'blockidx' : [],
+                        'correct': [],
                         'RT': []}
         
     num_trials = len(groupdata[0]["trialsequence"])
@@ -918,6 +957,7 @@ def comp_groupdata(groupdata):
         jokertypes = []
         blockidx = []
         RT = []
+        correct = []
 
         for dt in groupdata:
             choices.append(dt['choices'][trial][0])
@@ -929,7 +969,7 @@ def comp_groupdata(groupdata):
             jokertypes.append(dt['jokertypes'][trial][0])
             blockidx.append(dt['blockidx'][trial][0])
             RT.append(dt['RT'][trial][0])
-            
+            correct.append(dt['correct'][trial][0])
         
         newgroupdata["choices"].append(choices)
         newgroupdata["choices_GD"].append(choices_GD)
@@ -940,6 +980,7 @@ def comp_groupdata(groupdata):
         newgroupdata["jokertypes"].append(jokertypes)
         newgroupdata["blockidx"].append(blockidx)
         newgroupdata["RT"].append(RT)
+        newgroupdata["correct"].append(correct)
     
     return newgroupdata
 
@@ -985,6 +1026,7 @@ def init_agent(model, group, num_agents=1, params = None):
                     params[key] = torch.tensor(params[key])
             
     k = 4.
+    import models_torch_paper as models
     if model == 'Vbm':
         num_params = models.Vbm.num_params #number of latent model parameters
         param_dict = {}
@@ -1807,7 +1849,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'CongCongonflict':
+    elif model == 'CongConflict':
         num_params = models.CongConflict_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1869,6 +1911,30 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['interaction_param_day2'] = params['interaction_param_day2'][None,...]
             
         newagent = models.Interaction_2days_nolr(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+        
+    elif model == 'OnlyR':
+        num_params = models.OnlyR_2days_nolr.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_Q_day2'] = params_uniform[2:3, :]*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
+            param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
+            
+        newagent = models.OnlyR_2days_nolr(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -2247,20 +2313,58 @@ def plot_grouplevel(df1,
     else:
         "----- Remove error trials (where choices_GD == -2"
 
+        # means = grouped_df_1.groupby(['jokertypes', 'blocknum'], as_index = False).mean()
+        # stdvars = grouped_df_1.groupby(['jokertypes', 'blocknum'], as_index = False).std()
+        # means.rename(columns={'jokertypes':'DTT Types'}, inplace = True)
         grouped_df_1.rename(columns={'jokertypes':'DTT Types'}, inplace = True)
+        
+        custom_palette = ['#c7028c', '#63040f', '#96e6c7'] # congruent, incongruent, random
+        grouped_df_1['day'] = grouped_df_1['blocknum'].map(lambda x: 1 if x <=3 else 2)
+        
         fig, ax = plt.subplots()
+        
         sns.lineplot(x = "blocknum",
                     y = "choices_GD",
                     hue = "DTT Types",
                     data = grouped_df_1,
                     palette = custom_palette,
+                    err_style = "bars",
+                    errorbar = ("se", 1),
                     ax = ax)
+        
+        # ax.axvline(3.5, color='k', linewidth=0.5)
+        # sns.lineplot(x = "blocknum",
+        #             y = "choices_GD",
+        #             hue = "DTT Types",
+        #             data = grouped_df_1,
+        #             palette = custom_palette,
+        #             ax = ax)
         ax.set_ylim([0.61, 0.95])
         ax.set_xlabel('Block no.')
         ax.set_ylabel('HRCF (%)')
         plt.title(f'Group Behaviour for model {model_1}')
-        plt.savefig('/home/sascha/Downloads/res_new.png', dpi=600)
+        plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
         plt.show()
+        
+        fig, ax = plt.subplots(figsize = (5, 5))
+        sns.lineplot(x = "day",
+                    y = "choices_GD",
+                    hue = "DTT Types",
+                    data = grouped_df_1,
+                    palette = custom_palette,
+                    err_style = "bars",
+                    errorbar = ("se", 1),
+                    ax = ax)
+        ax.set_xticks([1,2])
+        ax.set_ylim([0.61, 1])
+        ax.set_xlabel('Day')
+        ax.set_ylabel('HRCF (%)')
+        plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+        plt.show()
+        # dfgh
+
+        
+        return grouped_df_1
         
 def plot_dual_behav(agent_df_1, agent_df_2):
     '''
@@ -3010,7 +3114,12 @@ def compute_hpcf(expdata_df):
     return hpcf_df
 
 def compute_RT(expdata_df):
-    RT_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx']]
+    '''
+    jokertypes : list
+        DTT Types
+        -1/0/1/2 : no joker/random/congruent/incongruent
+    '''
+    RT_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'jokertypes']]
     RT_df = RT_df[RT_df['choices'] != -1]
     RT_df = RT_df[RT_df['choices'] != -2]
     RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
@@ -3022,36 +3131,61 @@ def compute_RT(expdata_df):
     RT_df = pd.merge(RT_df_temp, RT_df_temp_day1, on='ID')
     RT_df = pd.merge(RT_df, RT_df_temp_day2, on='ID')
     
-    RT_cond_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'blocktype', 'trialsequence']]
+    RT_cond_df = expdata_df.loc[:, ['ID', 'RT', 'choices', 'blockidx', 'blocktype', 'trialsequence', 'jokertypes']]
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
     
-    RT_df_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & \
+                                              (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_df_rand_day1.rename(columns={'RT':'RT_rand_day1'}, inplace = True)
     
-    RT_df_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                              (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_df_rand_day2.rename(columns={'RT':'RT_rand_day2'}, inplace = True)
     
-    RT_df_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & \
+                                             (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_df_seq_day1.rename(columns={'RT':'RT_seq_day1'}, inplace = True)
     
-    RT_df_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_df_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                             (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_df_seq_day2.rename(columns={'RT':'RT_seq_day2'}, inplace = True)
     
-    RT_stt_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_seq_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & \
+                                              (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_seq_day1.rename(columns={'RT':'RT_stt_seq_day1'}, inplace = True)
     
-    RT_stt_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_rand_day1 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']<=5) & \
+                                               (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_rand_day1.rename(columns={'RT':'RT_stt_rand_day1'}, inplace = True)
 
-    RT_stt_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_seq_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                              (RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_seq_day2.rename(columns={'RT':'RT_stt_seq_day2'}, inplace = True)
     
-    RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_rand_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                               (RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_rand_day2.rename(columns={'RT':'RT_stt_rand_day2'}, inplace = True)
     
-    RT_stt_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                          (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_day2.rename(columns={'RT':'RT_stt_day2'}, inplace = True)
+
+    RT_congruent_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                                (RT_cond_df['jokertypes']==1) & (RT_cond_df['blocktype']==0)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_congruent_day2.rename(columns={'RT':'RT_congruent_day2'}, inplace = True)
+
+    RT_incongruent_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                                  (RT_cond_df['jokertypes']==2)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_incongruent_day2.rename(columns={'RT':'RT_incongruent_day2'}, inplace = True)
+    
+    RT_randomdtt_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                             (RT_cond_df['jokertypes']==0) & (RT_cond_df['blocktype']==1)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_randomdtt_day2.rename(columns={'RT':'RT_randomdtt_day2'}, inplace = True)
+    
+    RT_dtt_day2 = pd.DataFrame(RT_cond_df[(RT_cond_df['blockidx']>5) & \
+                                             (RT_cond_df['trialsequence']>10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_dtt_day2.rename(columns={'RT':'RT_dtt_day2'}, inplace = True)
     
     RT_df = pd.merge(RT_df, RT_df_rand_day1, on = 'ID')
     RT_df = pd.merge(RT_df, RT_df_rand_day2, on = 'ID')
@@ -3063,8 +3197,13 @@ def compute_RT(expdata_df):
     RT_df = pd.merge(RT_df, RT_stt_seq_day2, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt_rand_day2, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_dtt_day2, on = 'ID')
     
-    RT_df['RT Diff STT Day 1'] = RT_df['RT_stt_rand_day1'] - RT_df['RT_stt_seq_day1']
+    RT_df = pd.merge(RT_df, RT_congruent_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_incongruent_day2, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_randomdtt_day2, on = 'ID')
+    
+    RT_df['RT_diff_stt_day1'] = RT_df['RT_stt_rand_day1'] - RT_df['RT_stt_seq_day1']
     RT_df['RT_diff_stt_day2'] = RT_df['RT_stt_rand_day2'] - RT_df['RT_stt_seq_day2']
     
     return RT_df
