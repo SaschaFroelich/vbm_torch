@@ -1052,648 +1052,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    # elif model == 'B_oneday':
-    #     num_params = models.Vbm_B_oneday.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr'] = params_uniform[0:1, :]*0.1
-    #         param_dict['theta_Q'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep'] = params_uniform[2:3, :]*2
-            
-            
-    #     else:
-    #         assert isinstance(params, dict)
-    #         print("Setting initial parameters as provided.\n")
-    #         param_dict['lr'] = params['lr'][None,...]
-    #         param_dict['theta_Q'] = params['theta_Q'][None,...]
-    #         param_dict['theta_rep'] = params['theta_rep'][None,...]
-        
-    #     newagent = models.Vbm_B_oneday(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'Bhand_oneday':
-    #     num_params = models.handedness_oneday.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr'] = params_uniform[0:1, :]*0.1
-    #         param_dict['theta_Q'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep'] = params_uniform[2:3, :]*2
-    #         param_dict['hand_param'] = (params_uniform[2:3, :]-0.5)*3
-            
-            
-    #     else:
-    #         assert isinstance(params, dict)
-    #         print("Setting initial parameters as provided.\n")
-    #         param_dict['lr'] = params['lr'][None,...]
-    #         param_dict['theta_Q'] = params['theta_Q'][None,...]
-    #         param_dict['theta_rep'] = params['theta_rep'][None,...]
-    #         param_dict['hand_param'] = params['hand_param'][None,...]
-        
-    #     newagent = models.handedness_oneday(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'Vbm_twodays':
-    #     num_params = models.Vbm_twodays.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['omega_day1'] = params_uniform[0:1, :]
-    #         param_dict['dectemp_day1'] = (params_uniform[1:2, :]+1)*3
-    #         param_dict['lr_day1'] = params_uniform[2:3, :]*0.01
-            
-    #         param_dict['omega_day2'] = params_uniform[3:4, :]
-    #         param_dict['dectemp_day2'] = (params_uniform[4:5, :]+1)*3
-    #         param_dict['lr_day2'] = params_uniform[5:6, :]*0.01
-            
-            
-    #     else:
-    #         assert isinstance(params, dict)
-    #         print("Setting initial parameters as provided.\n")
-    #         param_dict['omega_day1'] = params['omega_day1'][None,...]
-    #         param_dict['dectemp_day1'] = params['dectemp_day1'][None,...]
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-            
-    #         param_dict['omega_day2'] = params['omega_day2'][None,...]
-    #         param_dict['dectemp_day2'] = params['dectemp_day2'][None,...]
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-        
-    #     newagent = models.Vbm_twodays(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init = Q_init[None, ...])
-        
-        
-    # elif model == 'B':
-    #     num_params = models.Vbm_B.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.01 # shape (1, num_agents)
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*2
-            
-    #         param_dict['lr_day2'] = params_uniform[3:4, :]*0.007
-    #         param_dict['theta_Q_day2'] = params_uniform[4:5, :]*7
-    #         param_dict['theta_rep_day2'] = params_uniform[5:6, :]*2
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            
-    #     newagent = models.Vbm_B(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'Conflict':
-    #     num_params = models.Conflict.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.5
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['theta_conflict_day1'] = (params_uniform[3:4, :]-0.5)*6
-            
-    #         param_dict['lr_day2'] = params_uniform[4:5, :]*0.5
-    #         param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-    #         param_dict['theta_conflict_day2'] = (params_uniform[7:8, :]-0.5)*6
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['theta_conflict_day1'] = params['theta_conflict_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
-        
-    #     newagent = models.Conflict(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-        
-    # elif model == 'Interaction':
-    #     num_params = models.Interaction.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.5
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['interaction_param_day1'] = (params_uniform[3:4, :]-0.5)*6
-            
-    #         param_dict['lr_day2'] = params_uniform[4:5, :]*0.5
-    #         param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-    #         param_dict['interaction_param_day2'] = (params_uniform[7:8, :]-0.5)*6
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['interaction_param_day1'] = params['interaction_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['interaction_param_day2'] = params['interaction_param_day2'][None,...]
-        
-    #     newagent = models.Interaction(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-        
-    # elif model == 'Seqboost':
-    #     num_params = models.Seqboost.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['seq_param_day1'] = params_uniform[3:4, :]-0.5
-            
-    #         param_dict['lr_day2'] = params_uniform[4:5, :]*0.01
-    #         param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-    #         param_dict['seq_param_day2'] = params_uniform[7:8, :]-0.5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-            
-    #     newagent = models.Seqboost(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'Seqboost_nolr':
-    #     num_params = models.Seqboost_nolr.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['theta_Q_day1'] = params_uniform[0:1, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['seq_param_day1'] = (params_uniform[2:3, :]-0.5)
-            
-    #         param_dict['theta_Q_day2'] = params_uniform[3:4, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[4:5, :]*6
-    #         param_dict['seq_param_day2'] = params_uniform[5:6, :]-0.5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-            
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-            
-    #     newagent = models.Seqboost_nolr(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'Random':
-    #     num_params = models.Random.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['p_cong_day1'] = params_uniform[0:1, :]
-    #         param_dict['p_incong_day1'] = params_uniform[1:2, :]
-    #         param_dict['p_rand_day1'] = params_uniform[2:3, :]
-            
-    #         param_dict['p_cong_day2'] = params_uniform[3:4, :]
-    #         param_dict['p_incong_day2'] = params_uniform[4:5, :]
-    #         param_dict['p_rand_day2'] = params_uniform[5:6, :]
-            
-    #     else:
-    #         raise Exception("Not yet implemented")
-
-            
-    #     newagent = models.Random(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'BQ':
-    #     num_params = models.Vbm_B_Q.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-8,4, (1, num_agents, num_params)))
-    #         # param_dict = models.Vbm_B_Q.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.2
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*8
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-            
-    #         param_dict['lr_day2'] = params_uniform[3:4, :]*0.1
-    #         param_dict['theta_Q_day2'] = params_uniform[4:5, :]*8
-    #         param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['Qparam'] = params_uniform[6:7, :]*500
-            
-    #     else:
-    #         raise Exception("Not yet implemented")
-    #         # print("Setting initial parameters as provided.")
-    #         # param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-            
-    #         # param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            
-    #     newagent = models.Vbm_B_Q(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-        
-    # elif model == 'Bk':
-    #     num_params = models.Vbm_B_k.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.Vbm_B_k.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.01
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*8
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-            
-    #         param_dict['lr_day2'] = params_uniform[3:4, :]*0.01
-    #         param_dict['theta_Q_day2'] = params_uniform[4:5, :]*8
-    #         param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['kparam'] = params_uniform[6:7, :]*1000
-            
-    #     else:
-    #         raise Exception("Not yet implemented")
-    #         # print("Setting initial parameters as provided.")
-    #         # param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         # param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         # param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-            
-    #         # param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         # param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         # param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-            
-    #     newagent = models.Vbm_B_k(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model=='Bhand':
-    #     num_params = models.Handedness.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.handedness.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*1.75
-    #         param_dict['hand_param_day1'] = (params_uniform[3:4, :]-0.4)*2.5
-            
-    #         param_dict['lr_day2'] = params_uniform[4:5, :]*0.08
-    #         param_dict['theta_Q_day2'] = params_uniform[5:6, :]*7
-    #         param_dict['theta_rep_day2'] = params_uniform[6:7, :]*2
-    #         param_dict['hand_param_day2'] = (params_uniform[7:8, :]-0.4)*2.5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
-
-    #     newagent = models.Handedness(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'SeqHand':
-    #     num_params = models.SeqHand.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.SeqHand.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*1.5
-    #         param_dict['seq_param_day1'] = (params_uniform[3:4, :]-1)*0.4
-    #         param_dict['hand_param_day1'] = (params_uniform[4:5, :]-0.25)*2
-            
-    #         param_dict['lr_day2'] = params_uniform[5:6, :]*0.007
-    #         param_dict['theta_Q_day2'] = params_uniform[6:7, :]*7
-    #         param_dict['theta_rep_day2'] = params_uniform[7:8, :]*1.5
-    #         param_dict['seq_param_day2'] = params_uniform[8:9, :]-0.5
-    #         param_dict['hand_param_day2'] = (params_uniform[9:10, :]-0.5)*5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-    #         param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-    #         param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
-
-    #     newagent = models.SeqHand(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'SeqHand2':
-    #     num_params = models.SeqHand2.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.SeqHand.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.5
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['hand_param_day1'] = (params_uniform[3:4, :]-0.5)*5
-    #         param_dict['seq_param_day1'] = params_uniform[4:5, :]*0.5
-            
-    #         param_dict['theta_Q_day2'] = params_uniform[5:6, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[6:7, :]*6
-    #         param_dict['hand_param_day2'] = (params_uniform[7:8, :]-0.5)*5
-    #         param_dict['seq_param_day2'] = params_uniform[8:9, :]*0.5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-            
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-
-    #     newagent = models.SeqHand2(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'SeqConflict':
-    #     num_params = models.SeqConflict.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.ConflictHand.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.1
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['seq_param_day1'] = params_uniform[3:4, :]*6
-    #         param_dict['theta_conflict_day1'] = (params_uniform[4:5, :]-0.5)*5
-            
-    #         param_dict['lr_day2'] = params_uniform[5:6, :]*0.1
-    #         param_dict['theta_Q_day2'] = params_uniform[6:7, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[7:8, :]*6
-    #         param_dict['seq_param_day2'] = params_uniform[8:9, :]*6
-    #         param_dict['theta_conflict_day2'] = (params_uniform[9:10, :]-0.5)*5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-    #         param_dict['theta_conflict_day1'] = params['theta_conflict_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-    #         param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
-
-    #     newagent = models.SeqConflict(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'ConflictHand':
-    #     num_params = models.ConflictHand.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.ConflictHand.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.05
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*7
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*2
-    #         param_dict['theta_conflict_day1'] = params_uniform[3:4, :]*1.5
-    #         param_dict['hand_param_day1'] = (params_uniform[4:5, :]-0.3)*2
-            
-    #         param_dict['lr_day2'] = params_uniform[5:6, :]*0.007
-    #         param_dict['theta_Q_day2'] = params_uniform[6:7, :]*7
-    #         param_dict['theta_rep_day2'] = params_uniform[7:8, :]*3
-    #         param_dict['theta_conflict_day2'] = params_uniform[8:9, :]*2.5
-    #         param_dict['hand_param_day2'] = (params_uniform[9:10, :]-0.5)*2.5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['theta_conflict_day1'] = params['theta_conflict_day1'][None,...]
-    #         param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
-    #         param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
-
-    #     newagent = models.ConflictHand(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'SeqConflictHand':
-    #     num_params = models.SeqConflictHand.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         # print("Setting random parameters.")
-    #         # locs = torch.tensor(np.random.uniform(-2,7, (1, num_agents, num_params)))
-    #         # param_dict = models.ConflictHand.locs_to_pars('None', locs)
-            
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr_day1'] = params_uniform[0:1, :]*0.1
-    #         param_dict['theta_Q_day1'] = params_uniform[1:2, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['seq_param_day1'] = params_uniform[3:4, :]*6
-    #         param_dict['theta_conflict_day1'] = (params_uniform[4:5, :]-0.5)*5
-    #         param_dict['hand_param_day1'] = (params_uniform[5:6, :]-0.5)*5
-            
-    #         param_dict['lr_day2'] = params_uniform[6:7, :]*0.1
-    #         param_dict['theta_Q_day2'] = params_uniform[7:8, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[8:9, :]*6
-    #         param_dict['seq_param_day2'] = params_uniform[9:10, :]*6
-    #         param_dict['theta_conflict_day2'] = (params_uniform[10:11, :]-0.5)*5
-    #         param_dict['hand_param_day2'] = (params_uniform[11:12, :]-0.5)*5
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr_day1'] = params['lr_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['seq_param_day1'] = params['seq_param_day1'][None,...]
-    #         param_dict['theta_conflict_day1'] = params['theta_conflict_day1'][None,...]
-    #         param_dict['hand_param_day1'] = params['hand_param_day1'][None,...]
-            
-    #         param_dict['lr_day2'] = params['lr_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['seq_param_day2'] = params['seq_param_day2'][None,...]
-    #         param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
-    #         param_dict['hand_param_day2'] = params['hand_param_day2'][None,...]
-
-    #     newagent = models.SeqConflictHand(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    # elif model == 'B_lrdec':
-    #     num_params = models.Vbm_B_lrdec.num_params #number of latent model parameters
-    #     param_dict = {}
-        
-    #     if params is None:
-    #         print("Setting random parameters.")
-    #         params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
-            
-    #         param_dict['lr0'] = params_uniform[0:1, :]*0.5
-    #         param_dict['lrk'] = torch.ones(params_uniform[1:2, :].shape)*0.1
-    #         param_dict['theta_Q_day1'] = params_uniform[2:3, :]*6
-    #         param_dict['theta_rep_day1'] = params_uniform[3:4, :]*6
-            
-    #         param_dict['theta_Q_day2'] = params_uniform[4:5, :]*6
-    #         param_dict['theta_rep_day2'] = params_uniform[5:6, :]*6
-            
-    #     else:
-    #         print("Setting initial parameters as provided.")
-    #         param_dict['lr0'] = params['lr0'][None,...]
-    #         param_dict['lrk'] = params['lrk'][None,...]
-    #         param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
-    #         param_dict['theta_Q_day1'] = params['theta_Q_day1'][None,...]
-    #         param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
-    #         param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
-            
-    #     newagent = models.Vbm_B_lrdec(param_dict,
-                              
-    #                           k=torch.tensor([k]),
-    #                           Q_init=Q_init[None, ...])
-        
-    elif model == 'Vbm':
+    elif model == 'Vbm_2days':
         num_params = models.Vbm_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1747,6 +1106,30 @@ def init_agent(model, group, num_agents=1, params = None):
             
         newagent = models.Repbias_2days_nolr(param_dict,
                               
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Repbias_1day':
+        num_params = models.Repbias_1day.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            
+            
+        newagent = models.Repbias_1day(param_dict,
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
@@ -1849,8 +1232,8 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'CongConflict':
-        num_params = models.CongConflict_2days_nolr.num_params #number of latent model parameters
+    elif model == 'Repbias_CongConflict_2days':
+        num_params = models.Repbias_CongConflict_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -1877,13 +1260,13 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
             
-        newagent = models.CongConflict_2days_nolr(param_dict,
+        newagent = models.Repbias_CongConflict_2days_nolr(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Interaction':
-        num_params = models.Interaction_2days_nolr.num_params #number of latent model parameters
+    elif model == 'Repbias_Interaction_2days':
+        num_params = models.Repbias_Interaction_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -1935,6 +1318,144 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_Q_day2'] = params['theta_Q_day2'][None,...]
             
         newagent = models.OnlyR_2days_nolr(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+
+    elif model == 'OnlyQ':
+        num_params = models.OnlyQ_2days_nolr.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Qcong_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_Qinc_day1'] = params_uniform[2:3, :]*6
+            param_dict['theta_Qrand_day1'] = params_uniform[3:4, :]*6
+            
+            param_dict['theta_Qcong_day2'] = params_uniform[4:5, :]*6
+            param_dict['theta_Qinc_day2'] = params_uniform[5:6, :]*6
+            param_dict['theta_Qrand_day2'] = params_uniform[6:7, :]*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Qcong_day1'] = params['theta_Qcong_day1'][None,...]
+            param_dict['theta_Qinc_day1'] = params['theta_Qinc_day1'][None,...]
+            param_dict['theta_Qrand_day1'] = params['theta_Qrand_day1'][None,...]
+
+            param_dict['theta_Qcong_day2'] = params['theta_Qcong_day2'][None,...]
+            param_dict['theta_Qinc_day2'] = params['theta_Qinc_day2'][None,...]
+            param_dict['theta_Qrand_day2'] = params['theta_Qrand_day2'][None,...]
+            
+        newagent = models.OnlyQ_2days_nolr(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Repbias_Conflict_1day':
+        num_params = models.Repbias_Conflict_1day.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*6
+            param_dict['theta_conflict'] = params_uniform[3:4, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['theta_conflict'] = params['theta_conflict'][None,...]
+
+            
+        newagent = models.Repbias_Conflict_1day(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Repbias_Handedness_1day':
+        num_params = models.Repbias_Handedness_1day.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*6
+            param_dict['hand_param'] = params_uniform[3:4, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['hand_param'] = params['hand_param'][None,...]
+            
+        newagent = models.Repbias_Handedness_1day(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+        
+    elif model == 'Repbias_Interaction_1day':
+        num_params = models.Repbias_Interaction_1day.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*6
+            param_dict['interaction_param'] = params_uniform[3:4, :]*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['interaction_param'] = params['interaction_param'][None,...]
+            
+        newagent = models.Repbias_Interaction_1day(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Repbias_CongConflict_1day':
+        num_params = models.Repbias_CongConflict_1day.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_Q'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep'] = params_uniform[2:3, :]*6
+            param_dict['theta_conflict'] = params_uniform[3:4, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['theta_conflict'] = params['theta_conflict'][None,...]
+            
+        newagent = models.Repbias_CongConflict_1day(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -2658,46 +2179,6 @@ def get_data_from_file(file_dir = None):
     AIC = res[2][2]
     post_sample_df, expdata_df, _, params_df, agent_elbo_tuple = res
     
-    # if len(res) == 4:
-    #     post_sample_df, expdata_df, res_2, params_df = res
-    #     if isinstance(res_2, tuple):
-    #         loss = res_2[0]
-    #         BIC = res_2[1]
-            
-    #         fit_version = 1
-            
-    #     else:
-    #         loss = res_2
-        
-    #         fit_version = 2
-            
-    # elif len(res) == 5:
-    #     if not isinstance(res[4], tuple):
-    #         post_sample_df, expdata_df, loss, params_df, BIC = res
-            
-    #         fit_version = 3
-            
-    #     else:
-    #         post_sample_df, expdata_df, res_2, params_df, elbo_tuple = res
-    #         if isinstance(res_2, tuple):
-    #             if len(res_2) == 2:
-    #                 loss = res_2[0]
-    #                 BIC = res_2[1]
-                    
-    #                 fit_version = 4
-                    
-    #             elif len(res_2) == 3:
-    #                 loss = res_2[0]
-    #                 BIC = res_2[1]
-    #                 AIC = res_2[2]
-                    
-    #                 fit_version = 5
-                    
-    #         else:
-    #             loss = res_2
-                
-    #             fit_version = 6
-    
     try:
         print("BIC = %.2f"%BIC)
         
@@ -2729,14 +2210,7 @@ def get_data_from_file(file_dir = None):
     del params_df_temp
     
     sociopsy_df = get_sociopsy_df()
-    
     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
-    
-    # if fit_version > 3:
-    #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple
-    
-    # elif fit_version <= 3:
-    #     return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df
         
 def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names):
     '''

@@ -212,6 +212,7 @@ class Env():
         for tau in pyro.markov(range(num_trials_per_block*block_max)):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
+            jtype = torch.tensor(data["jokertypes"][tau])
             
             if all([data["blockidx"][tau][i] <= 5 for i in range(agent.num_agents)]):
                 day = 1
@@ -230,7 +231,8 @@ class Env():
                                 torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
                                 day = day, 
-                                trialstimulus = trial)
+                                trialstimulus = trial,
+                                jokertype = jtype)
                 
                 if not infer:
                     self.choices_GD.append([-1]*self.agent.num_agents)
@@ -246,7 +248,7 @@ class Env():
                 else:
                     "Simulation"
                     # assert(torch.is_tensor(trial))
-                    current_choice = agent.choose_action(trial, day = day, blocktype = blocktype)
+                    current_choice = agent.choose_action(trial, day = day, blocktype = blocktype, jokertype = jtype)
                     outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
                     self.choices_GD.append((data['rewprobs'][range(agent.num_agents), current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                     self.choices.append(current_choice.tolist())
@@ -261,7 +263,7 @@ class Env():
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, day = day, blocktype = blocktype)
+                    probs = agent.compute_probs(trial, day = day, blocktype = blocktype, jokertype = jtype)
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
@@ -276,7 +278,8 @@ class Env():
                                 outcome, 
                                 blocktype, 
                                 day = day, 
-                                trialstimulus = trial)
+                                trialstimulus = trial,
+                                jokertype = jtype)
     
                 if infer and any(trial > 10):
                     "STT are [0.5, 0.5]"

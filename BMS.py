@@ -40,7 +40,7 @@ def sweep_probs(samples, index):
         c_point += c_sign * step_size
     return (samples[:, index] >= c_point).sum() / samples.shape[0]
 
-num_models = 5
+num_models = 2
 num_agents = 60
 elbos = np.zeros((num_agents, num_models))
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
@@ -51,11 +51,14 @@ elbos = np.zeros((num_agents, num_models))
 # 'behav_fit_model_SeqConflict_2023-12-02 15:31:29_60agents.p',
 # 'behav_fit_model_SeqConflictHand_2023-12-03 05:39:36_60agents.p',
 # 'behav_fit_model_SeqHand_2023-12-02 13:21:27_60agents.p']
+model_names = []
 
 for model in range(num_models):
     out = utils.get_data_from_file()
     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
     elbos[:, model] = (-elbo_tuple[0]).tolist()
+    
+    model_names.append(post_sample_df['model'][0])
     
 #%%
 with pm.Model() as BMS:
@@ -69,8 +72,8 @@ with pm.Model() as BMS:
     pm.DensityDist('log_joint', model_probs, logp=logp,
                     observed=elbos)
     
-    BMSinferenceData = pm.sample(chains=4, draws=6000, tune=6000)
-    
+    BMSinferenceData = pm.sample(chains=4, draws=10_000, tune=6000)
+
 az.summary(BMSinferenceData)
 
 #%%
@@ -89,5 +92,9 @@ plt.ylabel(f'$p(r_i\mid{{data}})$', fontsize=16)
 plt.xlabel('Posterior probability of the model', fontsize=16)
 plt.xlim([0,1])
 plt.yticks([])
-# plt.legend(['1', '2', '3', '4', '5'], fontsize=14, title='Model', title_fontsize=14)
+# plt.legend(['Vbm', 'Repbias'], fontsize=14, title='Model', title_fontsize=14)
+plt.savefig('BMS.png', dpi = 300)
 plt.show()
+
+import pickle
+pickle.dump((model_names, posteriorsModelProbs), open(f"{num_models}_models_vbm_1day_vs2days.p", "wb"))
