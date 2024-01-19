@@ -452,12 +452,20 @@ class BC():
             y = (self.y - self.y.mean()) / self.y.std()
             
         elif self.method == 'spearman':
-            _, x_indices = self.x.sort()
-            _, y_indices = self.y.sort()
+            
+            _, x_pos = self.x.sort()
+            _, y_pos = self.y.sort()
+            
+            self.x_rearr = -torch.ones(self.num_datapoints, dtype = int)
+            self.y_rearr = -torch.ones(self.num_datapoints, dtype = int)
+
+            for i in range(self.num_datapoints):
+                self.x_rearr[x_pos[i]] = i
+                self.y_rearr[y_pos[i]] = i
             
             "Standardize the data"
-            x = (x_indices - x_indices.float().mean()) / x_indices.float().std()
-            y = (y_indices - y_indices.float().mean()) / y_indices.float().std()
+            x = (self.x_rearr - self.x_rearr.float().mean()) / self.x_rearr.float().std()
+            y = (self.y_rearr - self.y_rearr.float().mean()) / self.y_rearr.float().std()
             
         else:
             raise Exception("Must specify correlation method.")
