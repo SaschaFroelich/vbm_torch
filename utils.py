@@ -1027,8 +1027,9 @@ def init_agent(model, group, num_agents=1, params = None):
             
     k = 4.
     import models_torch_paper as models
-    if model == 'Vbm':
-        num_params = models.Vbm.num_params #number of latent model parameters
+    print(f"Initializing model {model}")
+    if model == 'Vbm_1day':
+        num_params = models.Vbm_1day.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -1047,7 +1048,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['dectemp'] = params['dectemp'][None,...]
             param_dict['lr'] = params['lr'][None,...]
         
-        newagent = models.Vbm(param_dict,
+        newagent = models.Vbm_1day(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1080,7 +1081,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Repbias':
+    elif model == 'Repbias_2days_nolr':
         num_params = models.Repbias_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1199,8 +1200,8 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Conflict':
-        num_params = models.Conflict_2days_nolr.num_params #number of latent model parameters
+    elif model == 'Repbias_Conflict_2days_nolr' or model == 'Conflict':
+        num_params = models.Repbias_Conflict_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
         if params is None:
@@ -1227,12 +1228,12 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['theta_conflict_day2'] = params['theta_conflict_day2'][None,...]
             
-        newagent = models.Conflict_2days_nolr(param_dict,
+        newagent = models.Repbias_Conflict_2days_nolr(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Repbias_CongConflict_2days':
+    elif model == 'Repbias_CongConflict_2days_nolr':
         num_params = models.Repbias_CongConflict_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1265,7 +1266,7 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
         
-    elif model == 'Repbias_Interaction_2days':
+    elif model == 'Repbias_Interaction_2days_nolr':
         num_params = models.Repbias_Interaction_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1293,7 +1294,7 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
             param_dict['interaction_param_day2'] = params['interaction_param_day2'][None,...]
             
-        newagent = models.Interaction_2days_nolr(param_dict,
+        newagent = models.Repbias_Interaction_2days_nolr(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1322,7 +1323,45 @@ def init_agent(model, group, num_agents=1, params = None):
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
 
-    elif model == 'OnlyQ':
+    elif model == 'OnlyQ_2days_multlr':
+        num_params = models.OnlyQ_2days_multlr.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lrcong'] = params_uniform[0:1, :]
+            param_dict['lrrand'] = params_uniform[1:2, :]
+            param_dict['lrinc'] = params_uniform[2:3, :]
+            param_dict['theta_Qcong_day1'] = params_uniform[3:4, :]*6
+            param_dict['theta_Qinc_day1'] = params_uniform[4:5, :]*6
+            param_dict['theta_Qrand_day1'] = params_uniform[5:6, :]*6
+            
+            param_dict['theta_Qcong_day2'] = params_uniform[6:7, :]*6
+            param_dict['theta_Qinc_day2'] = params_uniform[7:8, :]*6
+            param_dict['theta_Qrand_day2'] = params_uniform[8:9, :]*6
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lrrand'] = params['lrrand'][None,...]
+            param_dict['lrcong'] = params['lrcong'][None,...]
+            param_dict['lrinc'] = params['lrinc'][None,...]
+            param_dict['theta_Qcong_day1'] = params['theta_Qcong_day1'][None,...]
+            param_dict['theta_Qinc_day1'] = params['theta_Qinc_day1'][None,...]
+            param_dict['theta_Qrand_day1'] = params['theta_Qrand_day1'][None,...]
+
+            param_dict['theta_Qcong_day2'] = params['theta_Qcong_day2'][None,...]
+            param_dict['theta_Qinc_day2'] = params['theta_Qinc_day2'][None,...]
+            param_dict['theta_Qrand_day2'] = params['theta_Qrand_day2'][None,...]
+            
+        newagent = models.OnlyQ_2days_multlr(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+        
+    elif model == 'OnlyQ_2days_nolr':
         num_params = models.OnlyQ_2days_nolr.num_params #number of latent model parameters
         param_dict = {}
         
@@ -1456,6 +1495,62 @@ def init_agent(model, group, num_agents=1, params = None):
             param_dict['theta_conflict'] = params['theta_conflict'][None,...]
             
         newagent = models.Repbias_CongConflict_1day(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Bullshitmodel':
+        num_params = models.Bullshitmodel.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_rep'] = params_uniform[1:2, :]*6
+            param_dict['theta_Q'] = params_uniform[2:3, :]*6
+            param_dict['param3'] = params_uniform[3:4, :]*6
+            param_dict['param4'] = params_uniform[4:5, :]*6
+            param_dict['param5'] = params_uniform[5:6, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_rep'] = params['theta_rep'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            param_dict['param3'] = params['param3'][None,...]
+            param_dict['param4'] = params['param4'][None,...]
+            param_dict['param5'] = params['param5'][None,...]
+            
+        newagent = models.Bullshitmodel(param_dict,
+                              
+                              k=torch.tensor([k]),
+                              Q_init=Q_init[None, ...])
+        
+    elif model == 'Repbias_2days_nolr_noQ':
+        num_params = models.Repbias_2days_nolr_noQ.num_params #number of latent model parameters
+        param_dict = {}
+        
+        if params is None:
+            print("Setting random parameters.")
+            params_uniform = torch.tensor(np.random.uniform(0,1, (num_params, num_agents)))
+            
+            param_dict['lr'] = params_uniform[0:1, :]
+            param_dict['theta_rep_day1'] = params_uniform[1:2, :]*6
+            param_dict['theta_rep_day2'] = params_uniform[2:3, :]*6
+            param_dict['theta_Q'] = params_uniform[3:4, :]*6
+
+            
+        else:
+            print("Setting initial parameters as provided.")
+            param_dict['lr'] = params['lr'][None,...]
+            param_dict['theta_rep_day1'] = params['theta_rep_day1'][None,...]
+            param_dict['theta_rep_day2'] = params['theta_rep_day2'][None,...]
+            param_dict['theta_Q'] = params['theta_Q'][None,...]
+            
+        newagent = models.Repbias_2days_nolr_noQ(param_dict,
                               
                               k=torch.tensor([k]),
                               Q_init=Q_init[None, ...])
@@ -1767,6 +1862,7 @@ def plot_grouplevel(df1,
             
     "----- Plot grouplevel"
     groupdata_df_1 = groupdata_df_1.drop(['model'], axis = 1)
+    
     grouped_df_1 = pd.DataFrame(groupdata_df_1.loc[:, ['ag_idx',
                                                'block_num',
                                                'jokertypes',
@@ -1832,7 +1928,7 @@ def plot_grouplevel(df1,
         plt.show()      
 
     else:
-        "----- Remove error trials (where choices_GD == -2"
+        "----- Remove error trials (where choices_GD == -2)"
 
         # means = grouped_df_1.groupby(['jokertypes', 'blocknum'], as_index = False).mean()
         # stdvars = grouped_df_1.groupby(['jokertypes', 'blocknum'], as_index = False).std()
@@ -1883,7 +1979,6 @@ def plot_grouplevel(df1,
         plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
         plt.show()
         # dfgh
-
         
         return grouped_df_1
         
@@ -1950,6 +2045,7 @@ def posterior_predictives(post_sample,
             parameter columns
             ag_idx
             group
+            model
             
     exp_data : DataFrame
         columns
@@ -1981,7 +2077,6 @@ def posterior_predictives(post_sample,
         print("Simulating agent %d of %d with %d repetitions."%(ag_idx+1, num_agents, num_reps))
         post_sample_agent_df = post_sample[post_sample['ag_idx'] == ag_idx]
         model = post_sample_agent_df['model'].unique()[0]
-        
         
         # params = torch.tensor(post_sample_agent_df.iloc[:, 0:-3].to_numpy().T)
         # dfgh #test whether correct
@@ -2402,8 +2497,8 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     
     return complete_df
 
-def compute_points(expdata_df, identifier = 'ID'):
-    expdata_df = expdata_df[expdata_df['outcomes'] != -1]
+def compute_points(df, identifier = 'ID'):
+    expdata_df = df[df['outcomes'] != -1]
     expdata_df = expdata_df[expdata_df['outcomes'] != -2]
     
     "Total"
@@ -2528,14 +2623,12 @@ def compute_hpcf(expdata_df):
     '''
     
     df = expdata_df[expdata_df['choices_GD'] != -1]
-    df = expdata_df[expdata_df['choices_GD'] != -2]
-    df = expdata_df[expdata_df['trialsequence'] > 10]
+    df = df[df['choices_GD'] != -2]
+    df = df[df['trialsequence'] > 10]
     
     hpcf_df = pd.DataFrame(data = {'ID': expdata_df['ID'].unique()})
-    
     hpcf_day1 = pd.DataFrame(df[df['blockidx'] <= 5].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     hpcf_day1.rename(columns={'choices_GD' : 'hpcf_day1'}, inplace = True)
-
     hpcf_day2 = pd.DataFrame(df[df['blockidx'] > 5].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     hpcf_day2.rename(columns={'choices_GD' : 'hpcf_day2'}, inplace = True)
     
