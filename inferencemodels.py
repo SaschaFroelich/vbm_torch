@@ -81,7 +81,9 @@ class GeneralGroupInference():
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_params]).to_event(1)
             transform = dist.transforms.AffineTransform(mu, sig)
+            
             locs = pyro.sample('locs', dist.TransformedDistribution(base_dist, [transform]))
+            
             "locs is either of shape [num_agents, num_params] or of shape [num_particles, num_agents, num_params]"
             if locs.ndim == 2:
                 locs = locs[None, :]
@@ -98,7 +100,7 @@ class GeneralGroupInference():
                              num_particles, 
                              infer = 1,
                              block_max = 14)
-
+            
     def guide(self, *args):
         trns = torch.distributions.biject_to(dist.constraints.positive)
     
@@ -118,13 +120,13 @@ class GeneralGroupInference():
 
         c_tau = trns(unc_tau)
 
-        ld_tau = trns.inv.log_abs_det_jacobian(c_tau, unc_tau)
+        ld_tau = -trns.inv.log_abs_det_jacobian(c_tau, unc_tau)
         ld_tau = dist.util.sum_rightmost(ld_tau, ld_tau.dim() - c_tau.dim() + 1)
     
         # some numerics tricks
         mu = pyro.sample("mu", dist.Delta(unc_mu, event_dim=1))
         tau = pyro.sample("tau", dist.Delta(c_tau, log_density=ld_tau, event_dim=1))
-    
+
         m_locs = pyro.param('m_locs', torch.zeros(self.num_agents, self.num_params))
         st_locs = pyro.param('scale_tril_locs',
                         torch.eye(self.num_params).repeat(self.num_agents, 1, 1),
@@ -134,7 +136,7 @@ class GeneralGroupInference():
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
         return {'tau': tau, 'mu': mu, 'locs': locs, 'm_locs': m_locs, 'st_locs': st_locs}
-
+    
     def infer_posterior(self,
                         iter_steps = 1_000,
                         num_particles = 10,
@@ -504,7 +506,7 @@ class BC():
 
         c_tau = trns(unc_tau)
 
-        ld_tau = trns.inv.log_abs_det_jacobian(c_tau, unc_tau)
+        ld_tau = -trns.inv.log_abs_det_jacobian(c_tau, unc_tau)
         ld_tau = dist.util.sum_rightmost(ld_tau, ld_tau.dim() - c_tau.dim() + 1)
     
         # some numerics tricks
