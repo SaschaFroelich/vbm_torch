@@ -15,8 +15,6 @@ import scipy
 import pyro
 import pyro.distributions as dist
 
-# torch.manual_seed(123)
-
 class Env():
     
     def __init__(self, 
@@ -40,7 +38,6 @@ class Env():
         matfile_dir : TYPE
             DESCRIPTION.
 
-            
         Returns
         -------
         None.
@@ -54,11 +51,11 @@ class Env():
         self.outcomes = []
         self.choices_GD = []
         
-    def run(self, 
+    def run(self,
             sequence = None,
-            blockorder = None):
+            blockorder = None,
+            blocks = [0, 7]):
         '''
-        
         Parameters
         ----------
         sequence : list, len [num_agents]
@@ -70,6 +67,16 @@ class Env():
         blockorder : list, len [num_agents]
             Which blockorder
             1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+            
+        blocks : list len 2
+            From which block to which block (exclusive) to perform inference.
+            0-indexed. 
+            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+             including 1 newcondition trial for conditions F and R.)
+            for instance:
+            blocks = [0,3] ~ Day 1
+            blocks = [3,7] ~ Day 2
+            blocks = [0, 7] ~ Days 1 + 2
 
         Raises
         ------
@@ -170,9 +177,9 @@ class Env():
         self.data['jokertypes'] = jokertypes.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['blockidx'] = blockidx.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         
-        self.run_loop(self.agent, self.data, 1, infer = 0)
+        self.run_loop(self.agent, self.data, 1, infer = 0, blocks = blocks)
         
-    def run_loop(self, agent, data, num_particles, infer = 0, block_max = 14):
+    def run_loop(self, agent, data, num_particles, infer = 0, blocks = []):
         '''
 
         Parameters
@@ -189,8 +196,15 @@ class Env():
         infer : bool, optional
             0/1 simulate data/ infer model parameters
 
-        block_max : int
-            Up to which block (inclusive) to perform inference.
+        blocks : list len 2
+            From which block to which block (exclusive) to perform inference.
+            0-indexed. 
+            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+             including 1 newcondition trial for conditions F and R.)
+            for instance:
+            blocks = [0,3] ~ Day 1
+            blocks = [3,7] ~ Day 2
+            blocks = [0, 7] ~ Days 1 + 2
 
         Raises
         ------
@@ -203,25 +217,27 @@ class Env():
 
         '''
         
-        num_trials = len(data["trialsequence"])
-        num_trials_per_block = 481
-        t = -1
-        # blocknum = 0
-        # print("NEW LOOP")
-        # for tau in pyro.markov(range(num_trials)):
-        for tau in pyro.markov(range(num_trials_per_block*block_max)):
+        assert len(blocks) == 2
+        
+        # num_trials = len(data["trialsequence"])
+        # num_blocks = len(blocks)
+        num_trials_per_block = 962
+        t = -1 # t is the index of the pyro sample sites.
+        print("======")
+        print(f"Iterating from trial no. {blocks[0]*num_trials_per_block} to trial {blocks[1]*num_trials_per_block}")
+        for tau in pyro.markov(range(blocks[0]*num_trials_per_block, blocks[1]*num_trials_per_block)):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             jtype = torch.tensor(data["jokertypes"][tau])
             
-            if all([data["blockidx"][tau][i] <= 5 for i in range(agent.num_agents)]):
-                day = 1
+            # if all([data["blockidx"][tau][i] <= 5 for i in range(agent.num_agents)]):
+            #     day = 1
                 
-            elif all([data["blockidx"][tau][i] > 5 for i in range(agent.num_agents)]):
-                day = 2
+            # elif all([data["blockidx"][tau][i] > 5 for i in range(agent.num_agents)]):
+            #     day = 2
                 
-            else:
-                raise Exception("Da isch a Fehla!")
+            # else:
+            #     raise Exception("Da isch a Fehla!")
             
             if all(trial == -1):
                 "Beginning of new block"
@@ -230,7 +246,7 @@ class Env():
                 agent.update(torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
-                                day = day, 
+                                # day = day, 
                                 trialstimulus = trial,
                                 jokertype = jtype)
                 
@@ -247,10 +263,10 @@ class Env():
             
                 else:
                     "Simulation"
-                    # assert(torch.is_tensor(trial))
-                    current_choice = agent.choose_action(trial, day = day, blocktype = blocktype, jokertype = jtype)
+                    current_choice = agent.choose_action(trial, blocktype = blocktype, jokertype = jtype)
                     outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
-                    self.choices_GD.append((data['rewprobs'][range(agent.num_agents), current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
+                    self.choices_GD.append((data['rewprobs'][range(agent.num_agents), 
+                                                             current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                     self.choices.append(current_choice.tolist())
                     self.outcomes.append(outcome.tolist())
             
@@ -263,7 +279,7 @@ class Env():
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, day = day, blocktype = blocktype, jokertype = jtype)
+                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype)
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
@@ -277,7 +293,7 @@ class Env():
                 agent.update(current_choice, 
                                 outcome, 
                                 blocktype, 
-                                day = day, 
+                                # day = day, 
                                 trialstimulus = trial,
                                 jokertype = jtype)
     

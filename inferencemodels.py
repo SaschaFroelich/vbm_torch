@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jul 25 17:14:10 2023
-
-@author: sascha
+    Created on Tue Jul 25 17:14:10 2023
+    
+    @author: sascha
 """
 
 from tqdm import tqdm
@@ -28,7 +28,7 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 class GeneralGroupInference():
     
-    def __init__(self, agent, group_data):
+    def __init__(self, agent, group_data, blocks):
         '''
         General Group inference..
         
@@ -46,11 +46,23 @@ class GeneralGroupInference():
                 RT : nested list, 'shape' [num_trials, num_agents]
                 group : list, len [num_agents]
                 
+        blocks : list len 2
+            From which block to which block (exclusive) to perform inference.
+            0-indexed. 
+            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+             including 1 newcondition trial for conditions F and R.)
+            for instance:
+            blocks = [0,3] ~ Day 1
+            blocks = [3,7] ~ Day 2
+            blocks = [0, 7] ~ Days 1 + 2
                 
-        inf_block_max : int
-            Block idx up to which to perform inference.
         '''
+        
+        assert isinstance(blocks, list)
+        assert len(blocks) == 2
+        
         self.agent = agent
+        self.blocks = blocks
         self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
         self.data = group_data # list of dictionaries
@@ -61,11 +73,13 @@ class GeneralGroupInference():
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
         # torch.manual_seed(1234)
+        print("Printing args.")
+        print(*args)
         a = pyro.param('a', torch.ones(self.num_params), constraint=dist.constraints.positive)
         lam = pyro.param('lam', torch.ones(self.num_params), constraint=dist.constraints.positive)
         tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # Why a/lam?
         
-        sig = 1/torch.sqrt(tau) # Gauss sigma
+        sig = pyro.deterministic('sig', 1/torch.sqrt(tau)) # Gauss sigma
 
         # each model parameter has a hyperprior defining group level mean
         # in the form of a Normal distribution
@@ -80,7 +94,8 @@ class GeneralGroupInference():
         with pyro.plate('ag_idx', self.num_agents):
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_params]).to_event(1)
-            transform = dist.transforms.AffineTransform(mu, sig)
+            transform = dist.transforms.AffineTransform(mu, sig) # Transform via the pointwise affine mapping y = loc + scale*x (-> Neal's funnel)
+            
             
             locs = pyro.sample('locs', dist.TransformedDistribution(base_dist, [transform]))
             
@@ -99,22 +114,26 @@ class GeneralGroupInference():
                              self.data, 
                              num_particles, 
                              infer = 1,
-                             block_max = 14)
-            
+                             blocks = self.blocks)
+
     def guide(self, *args):
+        # biject_to(constraint) looks up a bijective Transform from constraints.real 
+        # to the given constraint. The returned transform is guaranteed to have 
+        # .bijective = True and should implement .log_abs_det_jacobian().
         trns = torch.distributions.biject_to(dist.constraints.positive)
-    
+
         # define mean vector and covariance matrix of multivariate normal
         m_hyp = pyro.param('m_hyp', torch.zeros(2*self.num_params))
         st_hyp = pyro.param('scale_tril_hyp',
                        torch.eye(2*self.num_params),
                        constraint=dist.constraints.lower_cholesky)
-        
+
         # set hyperprior to be multivariate normal
+        # scale_tril (Tensor) – lower-triangular factor of covariance, with positive-valued diagonal
         hyp = pyro.sample('hyp',
                      dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
                      infer={'is_auxiliary': True})
-    
+
         unc_mu = hyp[..., :self.num_params]
         unc_tau = hyp[..., self.num_params:]
 
@@ -141,8 +160,7 @@ class GeneralGroupInference():
                         iter_steps = 1_000,
                         num_particles = 10,
                         optim_kwargs = {'lr': .01},  # Adam learning rate
-                        automatic_stop = False,
-                        block_max = 14):
+                        automatic_stop = False):
         """Perform SVI over free model parameters."""
 
         pyro.clear_param_store()
@@ -223,13 +241,14 @@ class GeneralGroupInference():
         -------
         TYPE
             DESCRIPTION.
-
         '''
         # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
         param_names = self.agent.param_names
         if locs:
-            sample_dict = {'tau': [], 'mu': [], 'locs': torch.zeros((self.num_agents, self.agent.num_params, n_samples))}
+            sample_dict = {'tau': [], 'mu': [], 'locs': torch.zeros((self.num_agents, 
+                                                                     self.agent.num_params, 
+                                                                     n_samples))}
             
             for i in range(n_samples):
                 sample = self.guide()
@@ -257,6 +276,14 @@ class GeneralGroupInference():
                 sample_dict["ag_idx"].extend(list(range(self.num_agents)))
         
             sample_df = pd.DataFrame(sample_dict)
+            
+            # from pyro.infer import MCMC, NUTS, Predictive
+            # print("BEGINNING PREDICTIVE.")
+            # predictive_svi = Predictive(self.model, guide=self.guide, num_samples=10)()
+            # for k, v in predictive_svi.items():
+            #     print(f"{k}: {tuple(v.shape)}")
+            
+            # dfgh
             return sample_df
     
     def compute_ll(self, df = None):
@@ -428,7 +455,7 @@ class BC():
         lam = pyro.param('lam', torch.ones(self.num_params), constraint=dist.constraints.positive)
         tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # Why a/lam?
         
-        sig = 1/torch.sqrt(tau) # Gauss sigma
+        sig = pyro.deterministic('sig', 1/torch.sqrt(tau)) # Gauss sigma
 
         # each model parameter has a hyperprior defining group level mean
         # in the form of a Normal distribution
@@ -526,8 +553,7 @@ class BC():
                         iter_steps = 1_000,
                         num_particles = 10,
                         optim_kwargs = {'lr': .01},  # Adam learning rate
-                        automatic_stop = False,
-                        block_max = 14):
+                        automatic_stop = False):
         """Perform SVI over free model parameters."""
 
         pyro.clear_param_store()
@@ -648,6 +674,8 @@ class BC():
                 sample_dict["ag_idx"].extend(list(range(self.num_agents)))
         
             sample_df = pd.DataFrame(sample_dict)
+            
+            
             return sample_df
     
     def compute_ll(self, df = None):
