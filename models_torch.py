@@ -1231,6 +1231,139 @@ class OnlyQ_lr(model_master):
         "Q and"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
         
+class OnlyQ_nolr(model_master):
+    param_names = ['theta_Qcong',
+                    'theta_Qrand',
+                    'theta_Qinc']
+    
+    num_params = len(param_names)
+    NA = 4 # no. of possible actions
+    num_blocks = 14
+    trials = 480*num_blocks
+    BAD_CHOICE = -2
+
+    def specific_init(self):
+        pass
+
+    def locs_to_pars(self, locs):
+        param_dict = {'theta_Qcong': torch.exp(locs[..., 0]),
+                    'theta_Qrand': torch.exp(locs[..., 1]),
+                    'theta_Qinc': torch.exp(locs[..., 2])}
+    
+        return param_dict
+    
+    def compute_probs(self, trial, jokertype, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        theta_Qrand = self.param_dict['theta_Qrand']
+        theta_Qcong = self.param_dict['theta_Qcong']
+        theta_Qinc = self.param_dict['theta_Qinc']
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.Q[-1], option1)
+        Vopt1 = theta_Qrand[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, 
+                                                                                      self.num_agents, 
+                                                                                      1) * (jokertype == 0).type(torch.int)[None,..., None] +\
+                theta_Qcong[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, 
+                                                                                      self.num_agents, 
+                                                                                      1) * (jokertype == 1).type(torch.int)[None,..., None] +\
+                theta_Qinc[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, 
+                                                                                     self.num_agents, 
+                                                                                     1) * (jokertype == 2).type(torch.int)[None,..., None]
+        
+        _, mask = self.Qoutcomp(self.Q[-1], option2)
+        Vopt2 = theta_Qrand[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents, 1) * (jokertype == 0).type(torch.int)[None,..., None] +\
+                theta_Qcong[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents, 1) * (jokertype == 1).type(torch.int)[None,..., None] +\
+                theta_Qinc[..., None] * (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents, 1) * (jokertype == 2).type(torch.int)[None,..., None]
+        
+        probs = self.softmax(torch.stack((Vopt1[:,:,0], Vopt2[:,:,0]),2))
+        
+        return probs
+    
+    def update(self, choices, outcomes, blocktype, trialstimulus, jokertype, **kwargs):
+        '''
+        Class Vbm().
+        
+        Parameters
+        ----------
+        choices : torch.tensor with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+                        
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
+            "Set previous actions to -1 because it's the beginning of a new block"
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+
+            self.Q.append(self.Q[-1])
+            
+        else:
+            
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = choices
+        
+    def reset(self, locs):
+        self.param_dict = self.locs_to_pars(locs)
+        
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        
 class Q_seqimpact_lr(model_master):
     param_names = ['lr',
                     'theta_Qrand',
@@ -1672,3 +1805,6 @@ class Q_seqimpact_conflict_lr(model_master):
             
         "Q and"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        
+        
+
