@@ -206,7 +206,10 @@ def violin(df,
     
     plt.show()
 
-def param_corr(df):    
+def param_corr(df, method = 'pearson'):
+    '''
+        Correlation Plots
+    '''
     
     df = df.drop(['ag_idx', 'model', 'group'], axis = 1)
     
@@ -220,7 +223,7 @@ def param_corr(df):
     #     df.rename(columns={df.columns[col] : df.columns[col][4:]}, inplace = True)
     
     def corrdot(*args, **kwargs):
-        corr_r = args[0].corr(args[1], 'pearson')
+        corr_r = args[0].corr(args[1], method)
         corr_text = f"{corr_r:2.2f}".replace("0.", ".")
         ax = plt.gca()
         ax.set_axis_off()
@@ -270,7 +273,13 @@ def within_subject_corr(df, param_names):
     
     num_params = len(param_names)
     
-    df = df.loc[:, ['ID', 'ag_idx', *param_names]]
+    if 'ID' in df.columns:
+        df = df.loc[:, ['ID', 'ag_idx', *param_names]]
+        identifier = 'ID'
+        
+    else:
+        df = df.loc[:, ['ag_idx', *param_names]]
+        identifier = 'ag_idx'
     
     corr_dict = {}
     corr_dict['ID'] = []
@@ -280,11 +289,11 @@ def within_subject_corr(df, param_names):
     
     for ag_idx in np.sort(df['ag_idx'].unique()):
         df_ag = df[df['ag_idx'] == ag_idx]
-        corr_dict['ID'].append(df_ag['ID'].unique()[0])
+        corr_dict['ID'].append(df_ag[identifier].unique()[0])
         
         for param1_idx in range(num_params):
             for param2_idx in range(param1_idx+1, num_params):
-                assert len(df_ag['ID'].unique()) == 1
+                assert len(df_ag[identifier].unique()) == 1
                 corr_dict[param_names[param1_idx] + '_vs_' + param_names[param2_idx]].append(\
                            df_ag.loc[:, param_names[param1_idx]].corr(df_ag.loc[:, param_names[param2_idx]]))
 
@@ -734,6 +743,8 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
         plot difference for those where the difference was statistically significant
         according to a tow-sample t-test.
 
+    BF : Bayes-Factor threshold for differences between days.
+
     Returns
     -------
     diffs_df : DataFrame
@@ -888,15 +899,13 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                                  color='black', 
                                  legend=False)
                     
-                    
-        plt.savefig('/home/sascha/Downloads/daydiff.tiff', dpi=600)
+        plt.savefig('/home/sascha/Downloads/daydiff.svg')
         plt.show()
         
-
         """
             Plot Day 2 - Day 1 as scatterplots
         """
-        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
+        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,8))
         gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
         param_idx = 0
         for par in parameter_names:
@@ -927,7 +936,8 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
                 r,p = scipy.stats.pearsonr(df[par], df['difference'])
                 # dfgh
                 ax[*ax_idxs].text(df[par].min(), df['difference'].min(), "Pearson r=%.4f, p=%.4f"%(r,p))
-                    
+                  
+        plt.savefig('/home/sascha/Downloads/daydiffscatter.svg')
         plt.show()
         
         return diffs_df
@@ -1042,3 +1052,98 @@ def perform_PCA(df, num_components, plot = False, correctfor = None):
     print(f"The first {num_components} components (of possible {len(df_for_pca.columns)}) explain %.4f percent of the variance."%(pca.explained_variance_ratio_.sum()*100))
     
     return principalComponents
+
+
+def network_corr(df, nodes, covars = None, method = 'spearman'):
+    '''
+    Computes all pairwise correlations of columns <nodes> in df.    
+    
+    Parameters
+    ----------
+    df : TYPE
+        DESCRIPTION.
+        
+    nodes : list
+        list entries are str 
+        list entries must be columns of df
+        
+    covars : list
+        list entries are str 
+        list entries must be columns of df
+        
+    method : str, optional
+        Pearson or Spearman correlation. The default is 'spearman'.
+
+    Returns
+    -------
+    r_matrix : numpy array
+        
+    p_matrix : numpy array
+    '''
+    import pingouin
+    num_measures = len(nodes)
+    
+    r_matrix = np.ones((num_measures, num_measures))
+    p_matrix = np.ones((num_measures, num_measures))
+    
+    for idx in range(num_measures):
+        for jdx in range(idx+1, num_measures):
+            
+            if covars is not None:
+                r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
+                
+                r_matrix[idx, jdx] = r
+                r_matrix[jdx, idx] = r
+    
+                p_matrix[idx, jdx] = p
+                p_matrix[jdx, idx] = p
+                
+                if f'{nodes[idx]} & {nodes[jdx]}' in covars.keys():
+                    retain_correlation = True
+                    for covaridx in range(len(covars[f'{nodes[idx]} & {nodes[jdx]}'])):
+                        stats = pingouin.partial_corr(data = df, 
+                                                      x=nodes[idx], 
+                                                      y=nodes[jdx], 
+                                                      covar = covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx], 
+                                                      method ='spearman')
+                        rvalue = stats['r'].iloc[0]
+                        pvalue = stats['p-val'].iloc[0]
+                        if pvalue > 0.05:
+                            retain_correlation = False
+                            print("=========================================")
+                            print(f"Insignificant partial corr between {nodes[idx]}" + 
+                                  f" & {nodes[jdx]} after correcting for "+ 
+                                  f"{covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx]}," + 
+                                  "r=%.3f, p=%.3f"%(rvalue, pvalue))
+                            
+                            r_matrix[idx, jdx] = rvalue
+                            r_matrix[jdx, idx] = rvalue
+                
+                            p_matrix[idx, jdx] = pvalue
+                            p_matrix[jdx, idx] = pvalue
+                            
+                        else:
+                            print("=========================================")
+                            print(f"Significant partial corr between {nodes[idx]}" + 
+                                  f" & {nodes[jdx]} after correcting for "+ 
+                                  f"{covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx]}," + 
+                                  "r=%.3f, p=%.3f"%(rvalue, pvalue))
+                            
+                    
+                else:
+                    r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
+                    r_matrix[idx, jdx] = r
+                    r_matrix[jdx, idx] = r
+        
+                    p_matrix[idx, jdx] = p
+                    p_matrix[jdx, idx] = p
+                    
+            else:
+                r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
+                r_matrix[idx, jdx] = r
+                r_matrix[jdx, idx] = r
+    
+                p_matrix[idx, jdx] = p
+                p_matrix[jdx, idx] = p
+                
+    return r_matrix, p_matrix
