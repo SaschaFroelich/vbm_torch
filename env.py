@@ -193,8 +193,10 @@ class Env():
         num_particles : TYPE
             DESCRIPTION.
             
-        infer : bool, optional
-            0/1 simulate data/ infer model parameters
+        infer : int
+            0 simulate data
+            1 infer model parameters
+            2 MLE estimate: return log-likelihood
 
         blocks : list len 2
             From which block to which block (exclusive) to perform inference.
@@ -219,12 +221,10 @@ class Env():
         
         assert len(blocks) == 2
         
-        # num_trials = len(data["trialsequence"])
-        # num_blocks = len(blocks)
+        log_like = 0.
         num_trials_per_block = 962
         t = -1 # t is the index of the pyro sample sites.
-        print("======")
-        print(f"Iterating from trial no. {blocks[0]*num_trials_per_block} to trial {blocks[1]*num_trials_per_block}")
+        # print(f"Iterating from trial no. {blocks[0]*num_trials_per_block} to trial {blocks[1]*num_trials_per_block}")
         for tau in pyro.markov(range(blocks[0]*num_trials_per_block, blocks[1]*num_trials_per_block)):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
@@ -250,18 +250,19 @@ class Env():
                                 trialstimulus = trial,
                                 jokertype = jtype)
                 
-                if not infer:
+                if infer == 0:
+                    "Simulation"
                     self.choices_GD.append([-1]*self.agent.num_agents)
                     self.choices.append([-1]*self.agent.num_agents)
                     self.outcomes.append([-1]*self.agent.num_agents)
                 
             else:
-                if infer:
+                if infer > 0:
                     "Inference"
                     current_choice = torch.tensor(data["choices"][tau]).type(torch.int)
                     outcome = torch.tensor(data["outcomes"][tau]).type(torch.int)
             
-                else:
+                elif infer == 0:
                     "Simulation"
                     current_choice = agent.choose_action(trial, blocktype = blocktype, jokertype = jtype)
                     outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
@@ -269,8 +270,8 @@ class Env():
                                                              current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                     self.choices.append(current_choice.tolist())
                     self.outcomes.append(outcome.tolist())
-            
-                if infer and any(trial > 10):
+                    
+                if infer>0 and any(trial > 10):
                     "Dual-Target Trial"
                     t+=1
                     option1, option2 = agent.find_resp_options(trial)
@@ -297,10 +298,19 @@ class Env():
                                 trialstimulus = trial,
                                 jokertype = jtype)
     
-                if infer and any(trial > 10):
+                if infer==1 and any(trial > 10):
                     "STT are [0.5, 0.5]"
                     "errors are obs_masked"
                     pyro.sample('res_{}'.format(t), 
                                 dist.Categorical(probs = probs),
                                 obs = choices_bin,
                                 obs_mask = obs_mask)
+                    
+                elif infer==2 and any(trial > 10):
+                    log_like += torch.log(probs[range(agent.num_particles),
+                                      range(agent.num_agents), 
+                                      choices_bin]) * obs_mask
+                    
+                    
+
+        return log_like
