@@ -63,7 +63,7 @@ class GeneralGroupInference():
         
         self.agent = agent
         self.blocks = blocks
-        self.trials = agent.trials # length of experiment
+        # self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
         self.data = group_data # list of dictionaries
         self.num_params = len(self.agent.param_names) # number of parameters
@@ -78,13 +78,23 @@ class GeneralGroupInference():
         data_df = data_df[data_df['blockidx'] >= 2*self.blocks[0]]
         data_df = data_df[data_df['blockidx'] < 2*self.blocks[-1]]
         
-        data_df = data_df.loc[:, ['choices', 'ID']]
-        data_df['trial_count'] = 1
-        data_df = data_df.loc[:, ['trial_count', 'ID']].groupby('ID', as_index = True).sum()
-        
-        "Arange rows as they appear in self.data dict"
-        data_df = data_df.loc[self.data['ID'][0], :]
-        self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
+        if 'ID' in data_df.columns:
+            data_df = data_df.loc[:, ['choices', 'ID']]
+            data_df['trial_count'] = 1
+            data_df = data_df.loc[:, ['trial_count', 'ID']].groupby('ID', as_index = True).sum()
+            
+            "Arange rows as they appear in self.data dict"
+            data_df = data_df.loc[self.data['ID'][0], :]
+            self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
+            
+        else:
+            data_df = data_df.loc[:, ['choices', 'ag_idx']]
+            data_df['trial_count'] = 1
+            data_df = data_df.loc[:, ['trial_count', 'ag_idx']].groupby('ag_idx', as_index = True).sum()
+            
+            "Arange rows as they appear in self.data dict"
+            data_df = data_df.loc[self.data['ag_idx'][0], :]
+            self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
 
     def model(self, *args):
         
@@ -212,11 +222,11 @@ class GeneralGroupInference():
         elbos = ELBOs.mean(dim=0)
         std = ELBOs.std(dim=0)
         
-        print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
+        # print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
         
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
-        return (elbos, std)
+        return (elbos.detach(), std.detach())
         
     def sample_posterior(self, n_samples = 1_000, locs = False):
         '''
@@ -236,38 +246,70 @@ class GeneralGroupInference():
         TYPE
             DESCRIPTION.
         '''
-        # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
-        param_names = self.agent.param_names
-
-        'Original Code'
-        sample_dict = {param: [] for param in param_names}
-        sample_dict["ag_idx"] = []
-
-        for i in range(n_samples):
-            sample = self.guide()
-            for key in sample.keys():
-                sample.setdefault(key, torch.ones(1))
-
-            par_sample = self.agent.locs_to_pars(sample["locs"])
-
-            for param in param_names:
-                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
-
-            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
-    
-        sample_df = pd.DataFrame(sample_dict)
+        import time
+        from pyro.infer import Predictive
+        start = time.time()
+        print(f"Posterior predictives with {n_samples} samples.")
+        firstlevel_dict = {param:[] for param in self.agent.param_names}
         
-        # from pyro.infer import MCMC, NUTS, Predictive
-        # print("BEGINNING PREDICTIVE.")
-        # # predictive_svi = Predictive(self.model, guide=self.guide, num_samples=10)()
-        # # predictive_svi = Predictive(self.model,  posterior_samples = {'tau': self.guide()['tau']}, return_sites = ['sig', 'mu'])()
-        # predictive_svi = Predictive(model = self.model,  guide=self.guide, num_samples=1)()
-        # for k, v in predictive_svi.items():
-        #     print(f"{k}: {tuple(v.shape)}")
+        if 'ID' in self.data.keys():
+            firstlevel_dict['ID'] = []
+        firstlevel_dict['ag_idx'] = []
+
+        secondlevel_dict = {param + '_mu':[] for param in self.agent.param_names}
+        for param in self.agent.param_names:
+            secondlevel_dict[param + '_sig'] = []
+
+        predictive_svi = Predictive(model = self.model,  
+                                    guide = self.guide, 
+                                    num_samples=n_samples)()
+
+        grouplevel_loc = predictive_svi['mu']
+        grouplevel_stdev = predictive_svi['sig']
+        predictive_locs = predictive_svi['locs']
         
-        # dfgh
-        return sample_df
+        predictive_model_params = self.agent.locs_to_pars(predictive_locs)
+        
+        "1st-level DataFrame"
+        for agidx in range(self.num_agents):
+            for param_name in self.agent.param_names:
+                firstlevel_dict[param_name].extend(predictive_model_params[param_name][:, agidx])
+                
+            if 'ID' in self.data.keys():
+                firstlevel_dict['ID'].extend([self.data['ID'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
+            firstlevel_dict['ag_idx'].extend([self.data['ag_idx'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
+
+        "2nd-level DataFrame"
+        # for param_name_idx in range(len(self.agent.param_dict.keys())):
+        #     secondlevel_dict[self.agent.param_dict.keys()[self.agent.param_dict.keys()[param_name_idx]] + '_mu'].\
+        #         append(grouplevel_loc[:, ..., param_name_idx])
+                
+        #     secondlevel_dict[self.agent.param_dict.keys()[self.agent.param_dict.keys()[param_name_idx]] + '_sig'].\
+        #         append(grouplevel_stdev[:, ..., param_name_idx])
+        
+        idx = 0
+        for k, v in self.agent.param_dict.items():
+            secondlevel_dict[k + '_mu'].\
+                extend(grouplevel_loc[:, ..., idx])
+                
+            secondlevel_dict[k + '_sig'].\
+                extend(grouplevel_stdev[:, ..., idx])
+                
+            idx += 1
+
+        firstlevel_df = pd.DataFrame(data = firstlevel_dict)
+        secondlevel_df = pd.DataFrame(data = secondlevel_dict)
+            
+        print(f"Time elapsed: {time.time() - start} secs.")
+        
+        for param_name in self.agent.param_names:
+            firstlevel_df[param_name] = firstlevel_df[param_name].map(lambda x: x.item())
+            
+        for col_name in secondlevel_df.columns:
+            secondlevel_df[col_name] = secondlevel_df[col_name].map(lambda x: x.item())
+            
+        return firstlevel_df, secondlevel_df
     
     def model_mle(self, mle_locs = None):
 
@@ -383,7 +425,6 @@ class GeneralGroupInference():
         
         return BIC.detach(), AIC.detach()
 
-    
 class CoinflipGroupInference():
     
     def __init__(self, agent, group_data):
@@ -429,25 +470,25 @@ class CoinflipGroupInference():
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
         # torch.manual_seed(1234)
-        # print("Printing args.")
-        # print(*args)
         a = pyro.param('a', torch.ones(self.num_params), constraint=dist.constraints.positive)
         lam = pyro.param('lam', torch.ones(self.num_params), constraint=dist.constraints.positive)
-        tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # Why a/lam?
+        # class Gamma(concentration, rate, validate_args=None)
+        # For Gamma distribution(shape, rate), mean is shape/rate, thus 
+        # Gamma(a, a/lam) -> mean = lam
+        tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) 
         
-        sig = pyro.deterministic('sig', 1/torch.sqrt(tau)) # Gauss sigma
+        sig = pyro.deterministic('sig', 1/torch.sqrt(tau))
 
         # each model parameter has a hyperprior defining group level mean
         # in the form of a Normal distribution
         m = pyro.param('m', torch.zeros(self.num_params))
         s = pyro.param('s', torch.ones(self.num_params), constraint=dist.constraints.positive)
-        mu = pyro.sample('mu', dist.Normal(m, s*sig).to_event(1)) # Gauss mu, wieso s*sig?
+        mu = pyro.sample('mu', dist.Normal(m, s*sig).to_event(1)) # Normal(loc, stdev)
 
         # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
         # you embed what should be done for each subject into the "with pyro.plate" context
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
-        
         with pyro.plate('ag_idx', self.num_agents):
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_params]).to_event(1)
@@ -478,7 +519,7 @@ class CoinflipGroupInference():
                 pyro.sample('res_{}'.format(t), 
                             dist.Categorical(probs = probs),
                             obs = self.data[:, t])
-                
+
                 t+=1
 
     def guide(self, *args):
@@ -523,7 +564,7 @@ class CoinflipGroupInference():
 
     def guide_mle(self):
         pass
-    
+
     def model_mle(self, mle_locs = None):
         
         with pyro.plate('ag_idx', self.num_agents):
@@ -595,7 +636,7 @@ class CoinflipGroupInference():
                 break
 
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
-        
+
     def sample_posterior(self, n_samples = 1_000, locs = False):
         '''
 
@@ -603,7 +644,7 @@ class CoinflipGroupInference():
         ----------
         n_samples : int, optional
             The number of samples from each posterior. The default is 1_000.
-            
+
         locs : bool, optional
             0 : return parameters in DataFrame
             1 : return locs as dictionary
@@ -616,28 +657,59 @@ class CoinflipGroupInference():
         '''
         # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
-        param_names = self.agent.param_names
+        # param_names = self.agent.param_names
 
-        'Original Code'
-        sample_dict = {param: [] for param in param_names}
-        sample_dict["ag_idx"] = []
+        # 'Original Code'
+        # sample_dict = {param: [] for param in param_names}
+        # sample_dict["ag_idx"] = []
 
-        for i in range(n_samples):
-            sample = self.guide()
-            for key in sample.keys():
-                sample.setdefault(key, torch.ones(1))
+        # for i in range(n_samples):
+        #     sample = self.guide()
+        #     for key in sample.keys():
+        #         sample.setdefault(key, torch.ones(1))
 
-            par_sample = self.agent.locs_to_pars(sample["locs"])
+        #     par_sample = self.agent.locs_to_pars(sample["locs"])
 
-            for param in param_names:
-                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
+        #     for param in param_names:
+        #         sample_dict[param].extend(list(par_sample[param].detach().numpy()))
 
-            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
-    
-        sample_df = pd.DataFrame(sample_dict)
+        #     sample_dict["ag_idx"].extend(list(range(self.num_agents)))
+
+        # sample_df = pd.DataFrame(sample_dict)
         
+        from pyro.infer import Predictive
+        print("BEGINNING PREDICTIVE.")
+        firstlevel_dict = {param:[] for param in self.agent.param_names}
+
+        secondlevel_dict = {param + '_mu':[] for param in self.agent.param_names}
+        for param in self.agent.param_names:
+            secondlevel_dict[param + '_sig'] = []
+
+        predictive_svi = Predictive(model = self.model,  
+                                    guide = self.guide, 
+                                    num_samples=n_samples)()
+
+        grouplevel_loc = predictive_svi['mu']
+        grouplevel_stdev = predictive_svi['sig']
+        predictive_locs = predictive_svi['locs']
+        
+        predictive_model_params = self.agent.locs_to_pars(predictive_locs)
+        
+        "1st-level DataFrame"
+        for param_name in self.agent.param_names:
+            for agidx in range(self.num_agents):
+                firstlevel_dict[param_name].append(predictive_model_params[param_name][:, agidx])
+        
+        "2nd-level DataFrame"
+        for param_name_idx in len(self.agent.param_dict.keys()):
+            secondlevel_dict[self.agent.param_dict.keys()[param_name_idx] + '_mu'].append(grouplevel_loc[:, ..., param_name_idx])
+            secondlevel_dict[self.agent.param_dict.keys()[param_name_idx] + '_sig'].append(grouplevel_loc[:, ..., param_name_idx])
+
+
+        firstlevel_df = pd.DataFrame(data = firstlevel_dict)
+        secondlevel_df = pd.DataFrame(data = secondlevel_dict)
             
-        return sample_df
+        return firstlevel_df, secondlevel_df
     
     def train_mle(self, 
                   iter_steps = 1000,
@@ -762,15 +834,15 @@ class BC():
         # torch.manual_seed(1234)
         a = pyro.param('a', torch.ones(self.num_params), constraint=dist.constraints.positive)
         lam = pyro.param('lam', torch.ones(self.num_params), constraint=dist.constraints.positive)
-        tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # Why a/lam?
+        tau = pyro.sample('tau', dist.Gamma(a, a/lam).to_event(1)) # class Gamma(concentration, rate, validate_args=None)
         
-        sig = pyro.deterministic('sig', 1/torch.sqrt(tau)) # Gauss sigma
+        sig = pyro.deterministic('sig', 1/torch.sqrt(tau)) 
 
         # each model parameter has a hyperprior defining group level mean
         # in the form of a Normal distribution
         m = pyro.param('m', torch.zeros(self.num_params))
         s = pyro.param('s', torch.ones(self.num_params), constraint=dist.constraints.positive)
-        mu = pyro.sample('mu', dist.Normal(m, s*sig).to_event(1)) # Gauss mu, wieso s*sig?
+        mu = pyro.sample('mu', dist.Normal(m, s*sig).to_event(1)) # Normal(log, stdev)
 
         # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
         # you embed what should be done for each subject into the "with pyro.plate" context

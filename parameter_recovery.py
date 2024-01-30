@@ -14,39 +14,51 @@ import utils
 import inferencemodels
 from datetime import datetime
 import pickle
+import pandas as pd
 
 '''
 Modelle:
 
-Vbm
-Vbm_twodays
-random
-B
-B_oneday
-Conflict
-Seqboost
-Seqboost_nolr
-Bhand
-Bhand_oneday
-BQ
-BK
-HandSeq
-HandSeq2
-Random
+    Vbm
+    Vbm_twodays
+    random
+    B
+    B_oneday
+    Conflict
+    Seqboost
+    Seqboost_nolr
+    Bhand
+    Bhand_oneday
+    BQ
+    BK
+    HandSeq
+    HandSeq2
+    Random
+    
+    OnlyR
+    OnlyQ
 '''
 
-model = 'Vbm_twodays'
-resim =  0 # whether to simulate agents with inferred parameters
-method = 'svi' # "svi" or "mcmc"
-num_agents = 60
+'''
+Modelle:
 
-assert num_agents%4 == 0, "num_agents must be divisible by 4."
-# k = 4.
-print(f"Running model {model}")
+    Vbm_lr
+    Repbias_lr
+    Repbias_Conflict
+    Repbias_CongConflict_lr
+    OnlyQ_lr
+'''
+
+model_day1 = 'OnlyQ_lr'
+model_day2 = 'OnlyQ_nolr'
+num_inf_steps = 2
+halting_rtol = 1e-02 # for MLE estimation
+num_agents = 60
+posterior_pred_samples = 2
 
 #%%
 '''
-Simulate data in parallel
+    Simulate data in parallel
 '''
 
 group = [0]*(num_agents//4)
@@ -54,39 +66,195 @@ group.extend([1]*(num_agents//4))
 group.extend([2]*(num_agents//4))
 group.extend([3]*(num_agents//4))
 
-groupdata_dict, group_behav_df, _, params_sim_df = utils.simulate_data(model, 
-                                                                      num_agents,
-                                                                      group = group)
-
 # utils.plot_grouplevel(group_behav_df)
 #%%
 '''
-Inference
+    Simulate Data Day 1
 '''
-import time
-time.sleep(12*3600)
+# import time
+# time.sleep(5*3600)
+
+blocks_day1 = [0, 3]
+
+groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
+                                                                      num_agents,
+                                                                      group = group,
+                                                                      blocks = blocks_day1)
+
+'''
+    Simulate Data Day 1
+'''
+# import time
+# time.sleep(5*3600)
+
+blocks_day2 = [3, 7]
+
+groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
+                                                                      num_agents,
+                                                                      group = group,
+                                                                      blocks = blocks_day2,
+                                                                      Q_init = agent_day1.Q[-1])
+
+#%%
+# '''
+#     Recovery Day 1
+# '''
+# "----- Initialize new agent object with num_agents agents for inference"
+# agent = utils.init_agent(model, 
+#                           group,
+#                           num_agents = num_agents)
+
+# print("===== Starting inference =====")
+# "----- Start Inference"
+# infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict, blocks = blocks_day1)
+# agent_elbo_tuple = infer.infer_posterior(iter_steps = 3_000, num_particles = 10)
+
+# firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = 5_000)
+# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
+# BIC, AIC = infer.compute_IC()
+
+# "----- Sample parameter estimates from posterior"
+# post_sample_df = infer.sample_posterior()
+# post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: groupdata_dict['group'][0][x])
+# post_sample_df['model'] = [model]*len(post_sample_df)
+
+
+# "----- Save results to file"
+# timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# # posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
+
+# extra_storage = (Q_init_day1,
+#                   agent.Q[-1].detach(),
+#                   blocks_day1,
+#                   'no preceding model',
+#                   max_log_like,
+#                   mle_locs)
+
+# pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC, AIC), params_sim_df, agent_elbo_tuple), 
+# #             open(f"parameter_recovery/param_recov_model_{model}_{timestamp}_{num_agents}agents.p", "wb" ) )
+
+#%%
+'''
+    Fit day 1
+'''
+# import time
+# time.sleep(8*3600)
+
+# blocks_day1 = [0,3]
+
+'''
+    Inference
+'''
 "----- Initialize new agent object with num_agents agents for inference"
-agent = utils.init_agent(model, 
-                         group,
+agent = utils.init_agent(model_day1, 
+                         group, 
                          num_agents = num_agents)
+
+Q_init_day1 = agent.Q_init
 
 print("===== Starting inference =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = 8_000, num_particles = 10)
+infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1, blocks = blocks_day1)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
-"----- Sample parameter estimates from posterior"
-post_sample_df = infer.sample_posterior()
-post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: groupdata_dict['group'][0][x])
-post_sample_df['model'] = [model]*len(post_sample_df)
+"----- Sample parameter estimates from posterior and add information to DataFrame"
+firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+
+firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day1['group'][0][x])
+firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
+
+ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
+# firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day1['ID'][0][x])
+
+"----- MLE & IC"
+max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
 BIC, AIC = infer.compute_IC()
 
-"----- Save results to file"
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-# posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
-pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC, AIC), params_sim_df, agent_elbo_tuple), 
-            open(f"parameter_recovery/param_recov_model_{model}_{timestamp}_{num_agents}agents.p", "wb" ) )
+"----- Q_init for next day"
+Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
 
-#%%
-# log_like = infer.compute_ll()
+"----- Save parameter names to DataFrame"
+params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
+for col in params_sim_df.columns:
+    params_sim_df[col] = ['unknown']
+
+params_sim_df['ag_idx']  = None
+params_sim_df['group']  = None
+params_sim_df['model']  = model_day1
+
+"----- Store results"
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+extra_storage = (Q_init_day1,
+                 agent.Q[-1].detach(),
+                 blocks_day1,
+                 'no preceding model',
+                 max_log_like,
+                 mle_locs)
+
+pickle.dump( (firstlevel_df, 
+              group_behav_df_day1[(group_behav_df_day1['trialidx'] >= blocks_day1[0]*962) & (group_behav_df_day1['trialidx'] < blocks_day1[1]*962)], 
+              (infer.loss, BIC, AIC), 
+              params_sim_df, 
+              agent_elbo_tuple, 
+              extra_storage), 
+            open(f"parameter_recovery/recovery_model_{model_day1}_blocks{blocks_day1[0]}{blocks_day1[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+
+'''
+    Fit day 2
+'''
+
+# blocks_day2 = [3,7]
+
+agent = utils.init_agent(model_day2, 
+                         group, 
+                         num_agents = num_agents,
+                         Q_init = Q_init_day2)
+
+print("===== Starting inference =====")
+"----- Start Inference"
+infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2, blocks = blocks_day2)
+agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
+
+"----- Sample parameter estimates from posterior and add information to DataFrame"
+firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+
+firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['group'][0][x])
+firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
+
+ID_df = group_behav_df_day2.loc[:, ['ag_idx']].drop_duplicates()
+# firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['ID'][0][x])
+
+"----- MLE & IC"
+max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
+BIC, AIC = infer.compute_IC()
+
+# "----- Q_init for next day"
+# Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
+
+"----- Save parameter names to DataFrame"
+params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
+for col in params_sim_df.columns:
+    params_sim_df[col] = ['unknown']
+
+params_sim_df['ag_idx']  = None
+params_sim_df['group']  = None
+params_sim_df['model']  = model_day2
+
+"----- Store results"
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+extra_storage = (Q_init_day2,  # initial Q-values
+                 agent.Q[-1].detach(), # final Q-values
+                 blocks_day2, # blocks
+                 model_day1, # preceding model
+                 max_log_like,
+                 mle_locs) 
+
+pickle.dump( (firstlevel_df, 
+              group_behav_df_day2[(group_behav_df_day2['trialidx'] >= blocks_day2[0]*962) & (group_behav_df_day2['trialidx'] < blocks_day2[1]*962)], 
+              (infer.loss, BIC, AIC), 
+              params_sim_df, 
+              agent_elbo_tuple, 
+              extra_storage), 
+            open(f"parameter_recovery/recovery_model2_{model_day2}_model1_{model_day1}_blocks{blocks_day2[0]}{blocks_day2[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+
 

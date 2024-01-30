@@ -449,8 +449,8 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     if oldpub:
         ID = file_day1.split("/")[-1][4:9] # NicDB
     else:
-        # ID = file_day1.split("/")[-1][4:28] # Prolific ID
-        ID = file_day1.split("/")[-1][4:10] # PBIDXX
+        ID = file_day1.split("/")[-1][4:28] # Prolific ID
+        # ID = file_day1.split("/")[-1][4:10] # PBIDXX
 
 
     # print(data_dir)
@@ -531,6 +531,7 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     if 'rew_cell' in participant_day2.keys():
         assert indices_ch == indices_out
     
+    trialidx = [-1]
     trialsequence = []
     trialsequence_wo_jokers = []
     jokertypes = []
@@ -538,6 +539,7 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     blockidx = []
     for block in range(14):
         "Mark the beginning of a new block"
+        trialidx.append(trialidx[-1]+1)
         trialsequence.append(-1)
         trialsequence_wo_jokers.append(-1)
         jokertypes.append(-1)
@@ -554,6 +556,8 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
                                                      group, 
                                                      block)
         
+        for i in range(len(seq)):
+            trialidx.append(trialidx[-1]+1)
         trialsequence.extend(seq)
         trialsequence_wo_jokers.extend(seq_wo_jokers)
         jokertypes.extend(jtypes)
@@ -568,16 +572,21 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     
     num_trials = len(choices)
     
+    trialidx = trialidx[1:]
+    
     assert  len(trialsequence) == num_trials and \
             len(trialsequence_wo_jokers) == num_trials and \
             len(jokertypes) == num_trials and \
             len(blocktype) == num_trials and \
             len(blockidx) == num_trials and \
-            len(RT) == num_trials
+            len(RT) == num_trials and \
+            len(trialidx) == num_trials
     
     if 'rew_cell' in participant_day2.keys():
-        len(outcomes) == num_trials
-        
+        len(outcomes) == num_trials and \
+        len(trialidx) == num_trials
+    
+    trialidx = [[trialidx[i]] for i in range(num_trials)]
     jokertypes = [[jokertypes[i]] for i in range(num_trials)]
     trialsequence = [[trialsequence[i]] for i in range(num_trials)]
     trialsequence_wo_jokers = [[trialsequence_wo_jokers[i]] for i in range(num_trials)]
@@ -631,7 +640,8 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     assert len(correct) == len(choices)
     
     if 'rew_cell' in participant_day2.keys():
-        data = {'trialsequence': trialsequence,
+        data = {'trialidx': trialidx,
+                'trialsequence': trialsequence,
                 'trialsequence_no_jokers': trialsequence_wo_jokers,
                 'jokertypes' : jokertypes,
                 'correct' : correct,
@@ -644,7 +654,8 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
         
     else:
         "Because of old published data"
-        data = {'trialsequence': trialsequence,
+        data = {'trialidx': trialidx,
+                'trialsequence': trialsequence,
                 'trialsequence_no_jokers': trialsequence_wo_jokers,
                 'jokertypes' : jokertypes,
                 'choices': choices,
@@ -909,6 +920,8 @@ def comp_groupdata(groupdata):
             choices_GD
             outcomes
             trialsequence
+            trialsequence_no_jokers
+            trialidx
             blocktype
             jokertypes
             blockidx
@@ -924,63 +937,59 @@ def comp_groupdata(groupdata):
 
     '''
     
-    if 'outcomes' in groupdata[0].keys():
-        newgroupdata = {'choices' : [],
-                        'choices_GD' : [],
-                        'outcomes' : [],
-                        'trialsequence' : [],
-                        'blocktype' : [],
-                        'jokertypes' : [],
-                        'blockidx' : [],
-                        'correct': [],
-                        'RT': []}
+    # if 'outcomes' in groupdata[0].keys():
+    #     newgroupdata = {'choices' : [],
+    #                     'choices_GD' : [],
+    #                     'outcomes' : [],
+    #                     'trialsequence' : [],
+    #                     'blocktype' : [],
+    #                     'jokertypes' : [],
+    #                     'blockidx' : [],
+    #                     'correct': [],
+    #                     'RT': []}
 
 
-    else:
-        "Because of old published data"
-        newgroupdata = {'choices' : [],
-                        'choices_GD' : [],
-                        'trialsequence' : [],
-                        'blocktype' : [],
-                        'jokertypes' : [],
-                        'blockidx' : [],
-                        'correct': [],
-                        'RT': []}
+    # else:
+    #     "Because of old published data"
+    #     newgroupdata = {'choices' : [],
+    #                     'choices_GD' : [],
+    #                     'trialsequence' : [],
+    #                     'blocktype' : [],
+    #                     'jokertypes' : [],
+    #                     'blockidx' : [],
+    #                     'correct': [],
+    #                     'RT': []}
+    
+    keys = groupdata[0].keys()
+    
+    newgroupdata = {}
+    for key in keys:
+        newgroupdata[key] = []
         
     num_trials = len(groupdata[0]["trialsequence"])
     for trial in range(num_trials):
-        trialsequence = []
-        choices = []
-        choices_GD = []
-        outcomes = []
-        blocktype = []
-        jokertypes = []
-        blockidx = []
-        RT = []
-        correct = []
+
+        newgroupdata_trial = {}
+        for key in keys:
+            newgroupdata_trial[key] = []        
 
         for dt in groupdata:
-            choices.append(dt['choices'][trial][0])
-            choices_GD.append(dt['choices_GD'][trial][0])
-            if 'outcomes' in groupdata[0].keys():
-                outcomes.append(dt['outcomes'][trial][0])
-            trialsequence.append(dt['trialsequence'][trial][0])
-            blocktype.append(dt['blocktype'][trial][0])
-            jokertypes.append(dt['jokertypes'][trial][0])
-            blockidx.append(dt['blockidx'][trial][0])
-            RT.append(dt['RT'][trial][0])
-            correct.append(dt['correct'][trial][0])
+            for key in keys:
+                newgroupdata_trial[key].append(dt[key][trial][0])
         
-        newgroupdata["choices"].append(choices)
-        newgroupdata["choices_GD"].append(choices_GD)
-        if 'outcomes' in groupdata[0].keys():
-            newgroupdata["outcomes"].append(outcomes)
-        newgroupdata["trialsequence"].append(trialsequence)
-        newgroupdata["blocktype"].append(blocktype)
-        newgroupdata["jokertypes"].append(jokertypes)
-        newgroupdata["blockidx"].append(blockidx)
-        newgroupdata["RT"].append(RT)
-        newgroupdata["correct"].append(correct)
+        for key in keys:
+            newgroupdata[key].append(newgroupdata_trial[key])
+            
+        # newgroupdata["choices"].append(choices)
+        # newgroupdata["choices_GD"].append(choices_GD)
+        # if 'outcomes' in groupdata[0].keys():
+        #     newgroupdata["outcomes"].append(outcomes)
+        # newgroupdata["trialsequence"].append(trialsequence)
+        # newgroupdata["blocktype"].append(blocktype)
+        # newgroupdata["jokertypes"].append(jokertypes)
+        # newgroupdata["blockidx"].append(blockidx)
+        # newgroupdata["RT"].append(RT)
+        # newgroupdata["correct"].append(correct)
     
     return newgroupdata
 
@@ -1003,6 +1012,10 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
     params : dict, each values is tensor or list with shape/ len [num_agents]
         Parameters to initialize agents with
         If None, parameters will be set randomly.
+        
+        
+    Q_init : torch tensor, ndim = 3, shape [num_particles, num_agents, 4]
+    
 
 
     Returns
@@ -1045,12 +1058,14 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
         newagent = model_class(Q_init = Q_init, param_dict = params)
         
     return newagent
-        
+
 def simulate_data(model, 
                   num_agents,
                   group = None,
                   params = None,
-                  plotres = True):
+                  plotres = True,
+                  blocks = None,
+                  Q_init = None):
     '''
     Simulates data and plots results.
     
@@ -1147,23 +1162,18 @@ def simulate_data(model,
         assert isinstance(params, dict)
     
     "----- Initialize agent"
-    if params == None:
-        newagent = init_agent(model, 
-                              group, 
-                              num_agents = num_agents)
+    newagent = init_agent(model, 
+                          group, 
+                          num_agents = num_agents,
+                          params = params,
+                          Q_init = Q_init)
     
+    if params == None:
         params_sim = {}
         for key in newagent.param_dict.keys():
             params_sim[key] = torch.squeeze(newagent.param_dict[key])
-        # for param_idx in range(len(newagent.param_names)):
-            # [param_idx, :] = newagent.par_dict[newagent.param_names[param_idx]]
-    
+
     else:
-        newagent = init_agent(model, 
-                              group, 
-                              num_agents = num_agents, 
-                              params = params)
-    
         params_sim = params
 
     "----- Set environment for agent"
@@ -1171,7 +1181,8 @@ def simulate_data(model,
     
     "----- Simulate"
     newenv.run(sequence = sequence,
-               blockorder = blockorder)
+               blockorder = blockorder,
+               blocks = blocks)
     
     "----- Save Data"
     data = {'choices': newenv.choices, 
@@ -1184,9 +1195,12 @@ def simulate_data(model,
             'group': [group]*len(newenv.choices),
             'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
             'model' : [[model]*num_agents]*len(newenv.choices)}
-    
+
     for key in data:
-        assert len(data[key])==6734
+        if len(data[key]) == 14*481:
+            data[key] = data[key][2*blocks[0]*481: 2*blocks[1]*481]
+        
+        assert len(data[key]) == len(range(2*blocks[0], 2*blocks[1]))*481
     
     group_behav_df = pd.DataFrame(data).explode(list(data.keys()))    
     
@@ -1198,7 +1212,7 @@ def simulate_data(model,
     params_sim_df['model'] = [model]*num_agents
     
     print("Simulation took %.4f seconds."%(time.time()-start))
-    return data, group_behav_df, params_sim, params_sim_df
+    return data, group_behav_df, params_sim, params_sim_df, newagent
 
 def plot_grouplevel(df1,
                     df2 = None,

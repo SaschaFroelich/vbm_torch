@@ -51,10 +51,9 @@ class Env():
         self.outcomes = []
         self.choices_GD = []
         
-    def run(self,
-            sequence = None,
-            blockorder = None,
-            blocks = [0, 7]):
+    def create_experiment(self,
+                          sequence = None,
+                          blockorder = None):
         '''
         Parameters
         ----------
@@ -67,25 +66,6 @@ class Env():
         blockorder : list, len [num_agents]
             Which blockorder
             1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
-            
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
-
-        Raises
-        ------
-        Exception
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
 
         '''
         
@@ -100,7 +80,7 @@ class Env():
         
         self.data['rewprobs'] = torch.tensor(rewprobs)[torch.tensor(sequence)-1,:]
         
-        num_blocks = self.agent.num_blocks
+        num_blocks = 14
         
         seq_idxs = [1, 3, 5, 6, 8, 10, 12] # seq idxs for blockorder == 1
         rand_idxs = [0, 2, 4, 7, 9, 11, 13] # random idxs for blockorder == 1
@@ -134,8 +114,9 @@ class Env():
         
         blocktype_counter = torch.zeros((self.agent.num_agents, 2), dtype=torch.int8)
         # seq_block = 0
-        # random_block = 0 
+        # random_block = 0
         for block in range(num_blocks):
+            
             "New block!"
             blockidx[:, block, :] = block
             
@@ -171,13 +152,58 @@ class Env():
                     
                 trialsequence[ag_idx, block, 1:481] = torch.tensor(seq_matlab)
                 jokertypes[ag_idx, block, 1:481] = torch.tensor(seq_jokertypes)
-                
+
         self.data['trialsequence'] = trialsequence.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['blocktype'] = blocktype.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['jokertypes'] = jokertypes.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         self.data['blockidx'] = blockidx.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         
-        self.run_loop(self.agent, self.data, 1, infer = 0, blocks = blocks)
+    def run(self,
+            sequence = None,
+            blockorder = None,
+            blocks = None):
+        '''
+        Parameters
+        ----------
+        sequence : list, len [num_agents]
+            Whether sequence or mirror sequence.
+            1/2 : sequence/ mirror sequence
+            1: reward probs = [0.8, 0.2, 0.2, 0.8]
+            2: reward probs = [0.2, 0.8, 0.8, 0.2]
+
+        blockorder : list, len [num_agents]
+            Which blockorder
+            1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+            
+        blocks : list len 2
+            From which block to which block (exclusive) to perform inference.
+            0-indexed. 
+            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+             including 1 newcondition trial for conditions F and R.)
+            for instance:
+            blocks = [0,3] ~ Day 1
+            blocks = [3,7] ~ Day 2
+            blocks = [0, 7] ~ Days 1 + 2
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        self.create_experiment(sequence = sequence,
+                               blockorder = blockorder)
+        
+        self.run_loop(self.agent, 
+                      self.data, 
+                      num_particles = 1, 
+                      infer = 0, 
+                      blocks = blocks)
         
     def run_loop(self, agent, data, num_particles, infer = 0, blocks = []):
         '''
@@ -222,10 +248,11 @@ class Env():
         assert len(blocks) == 2
         
         log_like = 0.
-        num_trials_per_block = 962
+        # num_trials_per_block = 962
         t = -1 # t is the index of the pyro sample sites.
         # print(f"Iterating from trial no. {blocks[0]*num_trials_per_block} to trial {blocks[1]*num_trials_per_block}")
-        for tau in pyro.markov(range(blocks[0]*num_trials_per_block, blocks[1]*num_trials_per_block)):
+        # 962 trial per R_F condition (two blocks, including newblock trials).
+        for tau in pyro.markov(range(blocks[0]*962, blocks[1]*962)):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             jtype = torch.tensor(data["jokertypes"][tau])
