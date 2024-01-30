@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov  7 17:31:18 2023
+    Created on Tue Nov  7 17:31:18 2023
 
-Analysis of models fitted to behaviour.
+    Analysis of models fitted to behaviour.
 
-@author: sascha
+    @author: sascha
 """
 
 "----- Open Files"
@@ -29,7 +29,7 @@ import itertools
 out = utils.get_data_from_file()
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
 
-_, expdata_df_clipre = expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+_, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
 expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
 
 # if len(out) == 7:
@@ -76,7 +76,7 @@ print(f"Model fit of model {model} for {num_agents} agents after %d inference st
 Plot ELBO
 '''
 fig, ax = plt.subplots()
-plt.plot(loss[-2000:])
+plt.plot(loss)
 plt.title(f"ELBO for model {model} ({num_agents} agents)")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
@@ -104,12 +104,17 @@ for param_idx in range(num_params):
     else:
         ax_idxs = [plot_col_idx]
     
-    ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[*ax_idxs])
-    ax[*ax_idxs].set_xlabel(post_sample_df.columns[param_idx])    
+    # ca = sns.kdeplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[*ax_idxs], cut = 0)
+    ca = sns.histplot(inf_mean_df[post_sample_df.columns[param_idx]], ax = ax[*ax_idxs], kde = False)
+    ax[*ax_idxs].set_xlabel(post_sample_df.columns[param_idx], fontsize = 20)    
 
     if plot_col_idx > 0:
         ax[*ax_idxs].set_ylabel(None)
-
+        
+    else:
+        ax[*ax_idxs].set_ylabel('Density', fontsize = 20)
+        ax[*ax_idxs].set_ylabel('Counts', fontsize = 20)
+        
     if plot_row_idx > 0:
         ax[*ax_idxs].get_position().y0 += 10
 
@@ -152,7 +157,7 @@ if model == 'Conflict':
 for param_idx in range(len(param_names)):
     sns.kdeplot(post_sample_df[param_names[param_idx]], ax = ax[param_idx])
     ax[param_idx].set_xlabel(param_names[param_idx])
-    ax[param_idx].set_xlim(xlims[param_idx])
+    # ax[param_idx].set_xlim(xlims[param_idx])
 
 plt.show()
 
@@ -217,10 +222,10 @@ for param in [*param_names]:
 
 #%%
 '''
-    Check for how many participants parameters are 0:
+    Check for how many participants parameters are different from 0:
 '''
 threshold = 0
-BF = 3.2
+BF = 5
 inf_mean_df_nozero = inf_mean_df.copy()
 "Bayesian Approach"
 for param in post_sample_df.columns:
@@ -268,7 +273,6 @@ print(f"slope: {linmodel.coef_}\n")
 '''
     Differences day 1 & day 2
 '''
-
 inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 
@@ -280,7 +284,7 @@ diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])
 
 # anal.violin(inf_mean_df, model)
 
-diffs_df = anal.daydiff(post_sample_df, BF = 1)
+diffs_df = anal.daydiff(post_sample_df, BF = 5)
 
 anal.daydiff(post_sample_df[post_sample_df['group']==0], BF = 3.2)
 anal.daydiff(post_sample_df[post_sample_df['group']==1], BF = 3.2)
@@ -538,7 +542,8 @@ for param_idx in range(num_params):
     Correlations between subjects
 '''
 import analysis_tools as anal
-anal.param_corr(inf_mean_df)
+anal.param_corr(inf_mean_df, method = 'spearman')
+
 
 #%%
 '''
@@ -705,28 +710,40 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'].isin(cluster_groups_day1[1
 
 #%%
 '''
-Plot Experimental Data
+    Plot Experimental Data
 '''
 utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'] == 35], plot_single = False)
 
 #%%
 '''
-Simulate only from means
+    Simulate only from means
 '''
+
 groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
                                                                         num_agents,
                                                                         group = list(inf_mean_df['group']),
-                                                                        params = inf_mean_df)
+                                                                        params = inf_mean_df.loc[:, [*param_names]])
 
 utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
 # utils.plot_grouplevel(expdata_df, plot_single = True)
 
 
 #%%
+
+utils.plot_grouplevel(group_behav_df, plot_single = False)
+
+# df_temp = expdata_df[expdata_df['choices_GD']>=0]
+# df_temp = df_temp[df_temp['trialsequence']>10]
+# cgd = pd.DataFrame(df_temp.loc[:, ['ID', 'choices_GD', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).mean())
+
+# cgd[cgd['jokertypes'] == 0]['choices_GD'].mean() # Random
+# cgd[cgd['jokertypes'] == 1]['choices_GD'].mean() # Congruent
+# cgd[cgd['jokertypes'] == 2]['choices_GD'].mean() # Incongruent
+#%%
 '''
-Posterior Predictives
+    Posterior Predictives
 '''
-complete_df = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
+complete_df = utils.posterior_predictives(post_sample_df.loc[:, ['ag_idx', 'group', 'model', *param_names]], exp_data = expdata_df)
 
 #%%
 '''
