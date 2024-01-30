@@ -25,8 +25,8 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 class model_master():
 
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2    
 
     def __init__(self, Q_init, num_agents = None, param_dict = None, k=4.):
@@ -267,7 +267,6 @@ class model_master():
             # assert choice_python_stt.ndim == 1
             return choice_python_stt.clone().detach()
 
-
 class Vbm_lr(model_master):
     '''
     Parameters
@@ -281,7 +280,8 @@ class Vbm_lr(model_master):
     num_params = len(param_names)
     
     def specific_init(self):
-        self.V = [((1-self.param_dict['omega'])[..., None]*self.rep[-1] + self.param_dict['omega'][..., None]*self.Q[-1])]
+        self.V = [((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
+                   self.param_dict['omega'][..., None]*self.Q[-1])]
 
     def locs_to_pars(self, locs):
         '''
@@ -295,9 +295,9 @@ class Vbm_lr(model_master):
 
         '''
         
-        param_dict = {'omega': torch.sigmoid(locs[..., 0]),
-                    'dectemp': torch.exp(locs[..., 1]),
-                    'lr': torch.sigmoid(locs[..., 2])}
+        param_dict = {'omega': torch.sigmoid(locs[..., self.param_names.index('omega')]),
+                    'dectemp': torch.exp(locs[..., self.param_names.index('dectemp')]),
+                    'lr': torch.sigmoid(locs[..., self.param_names.index('lr')])}
         
         print(locs.shape)
         
@@ -440,7 +440,8 @@ class Vbm_lr(model_master):
         self.rep = [torch.ones(self.num_particles, self.num_agents, 4)*0.25] # habitual values (repetition values)
         
         "Compute V"        
-        self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + self.param_dict['omega'][..., None]*self.Q[-1])
+        self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + \
+                      self.param_dict['omega'][..., None]*self.Q[-1])
         
         "Sequence Counter"
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
@@ -467,9 +468,9 @@ class Repbias_lr(model_master):
                 theta_Q[..., None]*self.Q[-1]
         
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Q': torch.exp(locs[..., 1]),
-                    'theta_rep': torch.exp(locs[..., 2])}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')])}
         
         return param_dict
     
@@ -654,8 +655,8 @@ class Repbias_nolr(model_master):
                 theta_Q[..., None]*self.Q[-1]
         
     def locs_to_pars(self, locs):
-        param_dict = {'theta_Q': torch.exp(locs[..., 0]),
-                    'theta_rep': torch.exp(locs[..., 1])}
+        param_dict = {'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')])}
         
         return param_dict
     
@@ -819,10 +820,10 @@ class Repbias_Conflict_lr(Repbias_lr):
     num_params = len(param_names)
 
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Q': torch.exp(locs[..., 1]),
-                    'theta_rep': torch.exp(locs[..., 2]),
-                    'theta_conflict': locs[..., 3]}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')]),
+                    'theta_conflict': locs[..., self.param_names.index('theta_conflict')]}
     
         return param_dict
     
@@ -911,9 +912,9 @@ class Repbias_Conflict_nolr(Repbias_lr):
     num_params = len(param_names)
 
     def locs_to_pars(self, locs):
-        param_dict = {'theta_Q': torch.exp(locs[..., 0]),
-                    'theta_rep': torch.exp(locs[..., 1]),
-                    'theta_conflict': locs[..., 2]}
+        param_dict = {'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')]),
+                    'theta_conflict': locs[..., self.param_names.index('theta_conflict')]}
     
         return param_dict
     
@@ -1002,10 +1003,10 @@ class Repbias_CongConflict_lr(Repbias_lr):
     num_params = len(param_names)
 
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Q': torch.exp(locs[..., 1]),
-                    'theta_rep': torch.exp(locs[..., 2]),
-                    'theta_conflict': locs[..., 3]}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')]),
+                    'theta_conflict': locs[..., self.param_names.index('theta_conflict')]}
     
         return param_dict
     
@@ -1093,18 +1094,18 @@ class OnlyQ_lr(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
         pass
 
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Qcong': torch.exp(locs[..., 1]),
-                    'theta_Qrand': torch.exp(locs[..., 2]),
-                    'theta_Qinc': torch.exp(locs[..., 3])}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Qcong': torch.exp(locs[..., self.param_names.index('theta_Qcong')]),
+                    'theta_Qrand': torch.exp(locs[..., self.param_names.index('theta_Qrand')]),
+                    'theta_Qinc': torch.exp(locs[..., self.param_names.index('theta_Qinc')])}
     
         return param_dict
     
@@ -1238,17 +1239,17 @@ class OnlyQ_nolr(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
         pass
 
     def locs_to_pars(self, locs):
-        param_dict = {'theta_Qcong': torch.exp(locs[..., 0]),
-                    'theta_Qrand': torch.exp(locs[..., 1]),
-                    'theta_Qinc': torch.exp(locs[..., 2])}
+        param_dict = {'theta_Qcong': torch.exp(locs[..., self.param_names.index('theta_Qcong')]),
+                    'theta_Qrand': torch.exp(locs[..., self.param_names.index('theta_Qrand')]),
+                    'theta_Qinc': torch.exp(locs[..., self.param_names.index('theta_Qinc')])}
     
         return param_dict
     
@@ -1371,17 +1372,17 @@ class Q_seqimpact_lr(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
         pass
 
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Qrand': torch.exp(locs[..., 1]),
-                    'theta_seq': torch.exp(locs[..., 2])}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Qrand': torch.exp(locs[..., self.param_names.index('theta_Qrand')]),
+                    'theta_seq': torch.exp(locs[..., self.param_names.index('theta_seq')])}
     
         return param_dict
     
@@ -1520,16 +1521,16 @@ class Q_seqimpact_nolr(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
         pass
 
     def locs_to_pars(self, locs):
-        param_dict = {'theta_Qrand': torch.exp(locs[..., 0]),
-                    'theta_seq': torch.exp(locs[..., 1])}
+        param_dict = {'theta_Qrand': torch.exp(locs[..., self.param_names.index('theta_Qrand')]),
+                    'theta_seq': torch.exp(locs[..., self.param_names.index('theta_seq')])}
     
         return param_dict
     
@@ -1659,18 +1660,18 @@ class Q_seqimpact_conflict_lr(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
         pass
 
     def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., 0]),
-                    'theta_Qrand': torch.exp(locs[..., 1]),
-                    'theta_seq': torch.exp(locs[..., 2]),
-                    'theta_conflict': torch.exp(locs[..., 3])}
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Qrand': torch.exp(locs[..., self.param_names.index('theta_Qrand')]),
+                    'theta_seq': torch.exp(locs[..., self.param_names.index('theta_seq')]),
+                    'theta_conflict': torch.exp(locs[..., self.param_names.index('theta_conflict')])}
     
         return param_dict
     
@@ -1811,8 +1812,8 @@ class Coinflip_test(model_master):
     
     num_params = len(param_names)
     NA = 4 # no. of possible actions
-    num_blocks = 14
-    trials = 480*num_blocks
+    # num_blocks = 14
+    # trials = 480*num_blocks
     BAD_CHOICE = -2
 
     def specific_init(self):
