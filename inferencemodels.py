@@ -6,6 +6,7 @@
     @author: sascha
 """
 
+import env
 from tqdm import tqdm
 import ipdb
 import numpy as np
@@ -61,40 +62,33 @@ class GeneralGroupInference():
         assert isinstance(blocks, list)
         assert len(blocks) == 2
         
+        print("Make sure data is truncated.")
+        
         self.agent = agent
-        self.blocks = blocks
+        # self.blocks = blocks
         # self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
-        self.data = group_data # list of dictionaries
+        self.data = group_data # dict of lists (truncated data)
         self.num_params = len(self.agent.param_names) # number of parameters
         self.loss = []
         self.comp_subj_trials() # Trials per subject (used for AIC and BIC computation)
 
     def comp_subj_trials(self):
         data_df = pd.DataFrame(self.data).explode(list(self.data.keys()))
-        data_df = data_df[data_df['trialsequence']>10]
+        data_df = data_df[data_df['trialsequence'] > 10]
         data_df = data_df[data_df['choices'] != -2]
         
-        data_df = data_df[data_df['blockidx'] >= 2*self.blocks[0]]
-        data_df = data_df[data_df['blockidx'] < 2*self.blocks[-1]]
+        # data_df = data_df[data_df['blockidx'] >= 2*self.blocks[0]]
+        # data_df = data_df[data_df['blockidx'] < 2*self.blocks[-1]]
         
-        if 'ID' in data_df.columns:
-            data_df = data_df.loc[:, ['choices', 'ID']]
-            data_df['trial_count'] = 1
-            data_df = data_df.loc[:, ['trial_count', 'ID']].groupby('ID', as_index = True).sum()
-            
-            "Arange rows as they appear in self.data dict"
-            data_df = data_df.loc[self.data['ID'][0], :]
-            self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
-            
-        else:
-            data_df = data_df.loc[:, ['choices', 'ag_idx']]
-            data_df['trial_count'] = 1
-            data_df = data_df.loc[:, ['trial_count', 'ag_idx']].groupby('ag_idx', as_index = True).sum()
-            
-            "Arange rows as they appear in self.data dict"
-            data_df = data_df.loc[self.data['ag_idx'][0], :]
-            self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
+        data_df = data_df.loc[:, ['choices', 'ID']]
+        data_df['trial_count'] = 1
+        data_df = data_df.loc[:, ['trial_count', 'ID']].groupby('ID', as_index = True).sum()
+        
+        "Arrange rows as they appear in self.data dict"
+        data_df = data_df.loc[self.data['ID'][0], :]
+        self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
+        
 
     def model(self, *args):
         
@@ -139,12 +133,12 @@ class GeneralGroupInference():
             num_particles = locs.shape[0]
             # print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
             
-            env.Env.run_loop(None, 
-                             self.agent, 
-                             self.data, 
-                             num_particles, 
-                             infer = 1,
-                             blocks = self.blocks)
+            env.Env.run_loop(None,
+                             agent = self.agent, 
+                             data = self.data, 
+                             num_particles = num_particles, 
+                             infer = 1)
+                             # blocks = self.blocks)
 
     def guide(self, *args):
         # biject_to(constraint) looks up a bijective Transform from constraints.real 
@@ -253,8 +247,7 @@ class GeneralGroupInference():
         print(f"Posterior predictives with {n_samples} samples.")
         firstlevel_dict = {param:[] for param in self.agent.param_names}
         
-        if 'ID' in self.data.keys():
-            firstlevel_dict['ID'] = []
+        firstlevel_dict['ID'] = []
         firstlevel_dict['ag_idx'] = []
 
         secondlevel_dict = {param + '_mu':[] for param in self.agent.param_names}
@@ -276,8 +269,7 @@ class GeneralGroupInference():
             for param_name in self.agent.param_names:
                 firstlevel_dict[param_name].extend(predictive_model_params[param_name][:, agidx])
                 
-            if 'ID' in self.data.keys():
-                firstlevel_dict['ID'].extend([self.data['ID'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
+            firstlevel_dict['ID'].extend([self.data['ID'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
             firstlevel_dict['ag_idx'].extend([self.data['ag_idx'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
 
         "2nd-level DataFrame"
@@ -336,11 +328,11 @@ class GeneralGroupInference():
             num_particles = locs.shape[0]
             
             mll = env.Env.run_loop(None, 
-                              self.agent, 
-                              self.data, 
-                              num_particles, 
-                              infer = (mle_locs != None)+1,
-                              blocks = self.blocks)
+                              agent = self.agent, 
+                              data = self.data, 
+                              num_particles = num_particles, 
+                              infer = (mle_locs != None)+1)
+                              # blocks = self.blocks)
             
         return mll
 
@@ -460,7 +452,7 @@ class CoinflipGroupInference():
         self.agent = agent
         self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
-        self.data = group_data # list of dictionaries
+        self.data = group_data # dict of lists
         self.num_trials = self.data.shape[-1]
         print(f"{self.num_trials} Trials.")
         self.num_params = len(self.agent.param_names) # number of parameters

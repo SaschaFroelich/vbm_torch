@@ -49,12 +49,12 @@ Modelle:
     OnlyQ_lr
 '''
 
-model_day1 = 'OnlyQ_lr'
-model_day2 = 'OnlyQ_nolr'
-num_inf_steps = 2
-halting_rtol = 1e-02 # for MLE estimation
+model_day1 = 'Repbias_lr'
+model_day2 = 'Repbias_lr'
+num_inf_steps = 5_000
+halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 2
+posterior_pred_samples = 5_000
 
 #%%
 '''
@@ -73,65 +73,24 @@ group.extend([3]*(num_agents//4))
 '''
 # import time
 # time.sleep(5*3600)
-
 blocks_day1 = [0, 3]
-
 groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
                                                                       num_agents,
                                                                       group = group,
                                                                       blocks = blocks_day1)
 
 '''
-    Simulate Data Day 1
+    Simulate Data Day 2
 '''
 # import time
 # time.sleep(5*3600)
 
 blocks_day2 = [3, 7]
-
 groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
                                                                       num_agents,
                                                                       group = group,
                                                                       blocks = blocks_day2,
                                                                       Q_init = agent_day1.Q[-1])
-
-#%%
-# '''
-#     Recovery Day 1
-# '''
-# "----- Initialize new agent object with num_agents agents for inference"
-# agent = utils.init_agent(model, 
-#                           group,
-#                           num_agents = num_agents)
-
-# print("===== Starting inference =====")
-# "----- Start Inference"
-# infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict, blocks = blocks_day1)
-# agent_elbo_tuple = infer.infer_posterior(iter_steps = 3_000, num_particles = 10)
-
-# firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = 5_000)
-# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
-# BIC, AIC = infer.compute_IC()
-
-# "----- Sample parameter estimates from posterior"
-# post_sample_df = infer.sample_posterior()
-# post_sample_df['group'] = post_sample_df['ag_idx'].map(lambda x: groupdata_dict['group'][0][x])
-# post_sample_df['model'] = [model]*len(post_sample_df)
-
-
-# "----- Save results to file"
-# timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-# # posterior_params = (infer.guide()['m_locs'], infer.guide()['st_locs'])
-
-# extra_storage = (Q_init_day1,
-#                   agent.Q[-1].detach(),
-#                   blocks_day1,
-#                   'no preceding model',
-#                   max_log_like,
-#                   mle_locs)
-
-# pickle.dump((post_sample_df, group_behav_df, (infer.loss, BIC, AIC), params_sim_df, agent_elbo_tuple), 
-# #             open(f"parameter_recovery/param_recov_model_{model}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 #%%
 '''
@@ -152,7 +111,7 @@ agent = utils.init_agent(model_day1,
 
 Q_init_day1 = agent.Q_init
 
-print("===== Starting inference =====")
+print("===== Starting inference of day 1 =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1, blocks = blocks_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
@@ -210,7 +169,7 @@ agent = utils.init_agent(model_day2,
                          num_agents = num_agents,
                          Q_init = Q_init_day2)
 
-print("===== Starting inference =====")
+print("===== Starting inference of day 2 =====")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2, blocks = blocks_day2)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)

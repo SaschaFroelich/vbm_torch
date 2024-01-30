@@ -1061,7 +1061,7 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
 
 def simulate_data(model, 
                   num_agents,
-                  group = None,
+                  group,
                   params = None,
                   plotres = True,
                   blocks = None,
@@ -1127,33 +1127,34 @@ def simulate_data(model,
     start = time.time()
     print("Simulating %d agents."%num_agents)
 
-    "Only group is set"
-    print('Inferring sequence and blockorder from group.')
+    # assert group is not None
+    # "Only group is set"
+    # print('Inferring sequence and blockorder from group.')
     if torch.is_tensor(group):
         assert group.ndim == 1
         group = list(group)
     assert isinstance(group, list)
-    sequences = [1, 1, 2, 2]
-    blockorders = [1, 2, 1, 2]
-    sequence = [sequences[g] for g in group]
-    blockorder = [blockorders[g] for g in group]
+    # sequences = [1, 1, 2, 2]
+    # blockorders = [1, 2, 1, 2]
+    # sequence = [sequences[g] for g in group]
+    # blockorder = [blockorders[g] for g in group]
         
-    if group == None:
-        "seuqence and blockorder are set."
-        print('Inferring group from sequence and blockorder.')
-        seq_torch = torch.tensor(sequence)
-        blockorder_torch = torch.tensor(blockorder)
-        group = (seq_torch == 1).type(torch.int) * (blockorder_torch == 1).type(torch.int)*0 +\
-        (seq_torch == 1).type(torch.int) * (blockorder_torch == 2).type(torch.int)*1 +\
-        (seq_torch == 2).type(torch.int) * (blockorder_torch == 1).type(torch.int)*2 +\
-        (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
-        group = group.tolist()
+    # if group == None:
+    #     "seuqence and blockorder are set."
+    #     print('Inferring group from sequence and blockorder.')
+    #     seq_torch = torch.tensor(sequence)
+    #     blockorder_torch = torch.tensor(blockorder)
+    #     group = (seq_torch == 1).type(torch.int) * (blockorder_torch == 1).type(torch.int)*0 +\
+    #     (seq_torch == 1).type(torch.int) * (blockorder_torch == 2).type(torch.int)*1 +\
+    #     (seq_torch == 2).type(torch.int) * (blockorder_torch == 1).type(torch.int)*2 +\
+    #     (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
+    #     group = group.tolist()
         
         
-    assert len(blockorder) == num_agents
-    assert len(sequence) == num_agents
-    assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
-    assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
+    # assert len(blockorder) == num_agents
+    # assert len(sequence) == num_agents
+    # assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
+    # assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
     
     if params is not None:
         if isinstance(params, pd.DataFrame):
@@ -1180,8 +1181,7 @@ def simulate_data(model,
     newenv = env.Env(newagent, matfile_dir = './matlabcode/clipre/')
     
     "----- Simulate"
-    newenv.run(sequence = sequence,
-               blockorder = blockorder,
+    newenv.run(group = group,
                blocks = blocks)
     
     "----- Save Data"
@@ -1189,13 +1189,15 @@ def simulate_data(model,
             'choices_GD' : newenv.choices_GD,
             'outcomes': newenv.outcomes,
             'trialsequence': newenv.data['trialsequence'], 
+            'trialidx': newenv.data['trialidx'], 
             'blocktype': newenv.data['blocktype'],
             'jokertypes': newenv.data['jokertypes'], 
             'blockidx': newenv.data['blockidx'],
             'group': [group]*len(newenv.choices),
             'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
             'model' : [[model]*num_agents]*len(newenv.choices)}
-
+    
+    print(len(data['ag_idx']))
     for key in data:
         if len(data[key]) == 14*481:
             data[key] = data[key][2*blocks[0]*481: 2*blocks[1]*481]
@@ -1212,6 +1214,12 @@ def simulate_data(model,
     params_sim_df['model'] = [model]*num_agents
     
     print("Simulation took %.4f seconds."%(time.time()-start))
+    "Add columns ID = column ag_idx, for compatibility with behav data."
+    data['ID'] = data['ag_idx']
+    group_behav_df['ID'] = group_behav_df['ag_idx']
+    params_sim_df['ID'] = params_sim_df['ag_idx']
+    print(len(data['ag_idx']))
+    print(len(data['ID']))
     return data, group_behav_df, params_sim, params_sim_df, newagent
 
 def plot_grouplevel(df1,
