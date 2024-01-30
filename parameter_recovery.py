@@ -51,10 +51,10 @@ Modelle:
 
 model_day1 = 'Repbias_lr'
 model_day2 = 'Repbias_lr'
-num_inf_steps = 5_000
-halting_rtol = 1e-06 # for MLE estimation
+num_inf_steps = 2
+halting_rtol = 1e-02 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 5_000
+posterior_pred_samples = 2
 
 #%%
 '''
@@ -132,15 +132,6 @@ BIC, AIC = infer.compute_IC()
 "----- Q_init for next day"
 Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
 
-"----- Save parameter names to DataFrame"
-params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
-for col in params_sim_df.columns:
-    params_sim_df[col] = ['unknown']
-
-params_sim_df['ag_idx']  = None
-params_sim_df['group']  = None
-params_sim_df['model']  = model_day1
-
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day1,
@@ -151,9 +142,9 @@ extra_storage = (Q_init_day1,
                  mle_locs)
 
 pickle.dump( (firstlevel_df, 
-              group_behav_df_day1[(group_behav_df_day1['trialidx'] >= blocks_day1[0]*962) & (group_behav_df_day1['trialidx'] < blocks_day1[1]*962)], 
+              group_behav_df_day1,
               (infer.loss, BIC, AIC), 
-              params_sim_df, 
+              params_sim_df_day1, 
               agent_elbo_tuple, 
               extra_storage), 
             open(f"parameter_recovery/recovery_model_{model_day1}_blocks{blocks_day1[0]}{blocks_day1[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
@@ -190,14 +181,6 @@ BIC, AIC = infer.compute_IC()
 # "----- Q_init for next day"
 # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
 
-"----- Save parameter names to DataFrame"
-params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
-for col in params_sim_df.columns:
-    params_sim_df[col] = ['unknown']
-
-params_sim_df['ag_idx']  = None
-params_sim_df['group']  = None
-params_sim_df['model']  = model_day2
 
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -209,9 +192,9 @@ extra_storage = (Q_init_day2,  # initial Q-values
                  mle_locs) 
 
 pickle.dump( (firstlevel_df, 
-              group_behav_df_day2[(group_behav_df_day2['trialidx'] >= blocks_day2[0]*962) & (group_behav_df_day2['trialidx'] < blocks_day2[1]*962)], 
+              group_behav_df_day2, 
               (infer.loss, BIC, AIC), 
-              params_sim_df, 
+              params_sim_df_day2, 
               agent_elbo_tuple, 
               extra_storage), 
             open(f"parameter_recovery/recovery_model2_{model_day2}_model1_{model_day1}_blocks{blocks_day2[0]}{blocks_day2[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )

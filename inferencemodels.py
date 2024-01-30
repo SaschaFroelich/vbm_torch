@@ -29,7 +29,7 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 class GeneralGroupInference():
     
-    def __init__(self, agent, group_data, blocks):
+    def __init__(self, agent, group_data):
         '''
         General Group inference..
         
@@ -47,25 +47,11 @@ class GeneralGroupInference():
                 RT : nested list, 'shape' [num_trials, num_agents]
                 group : list, len [num_agents]
                 
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1, blocks 0, 1, and 2
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
-                
         '''
         
-        assert isinstance(blocks, list)
-        assert len(blocks) == 2
-        
-        print("Make sure data is truncated.")
+        print(">>> Make sure data is truncated. <<<")
         
         self.agent = agent
-        # self.blocks = blocks
         # self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
         self.data = group_data # dict of lists (truncated data)
@@ -77,9 +63,6 @@ class GeneralGroupInference():
         data_df = pd.DataFrame(self.data).explode(list(self.data.keys()))
         data_df = data_df[data_df['trialsequence'] > 10]
         data_df = data_df[data_df['choices'] != -2]
-        
-        # data_df = data_df[data_df['blockidx'] >= 2*self.blocks[0]]
-        # data_df = data_df[data_df['blockidx'] < 2*self.blocks[-1]]
         
         data_df = data_df.loc[:, ['choices', 'ID']]
         data_df['trial_count'] = 1
@@ -138,7 +121,6 @@ class GeneralGroupInference():
                              data = self.data, 
                              num_particles = num_particles, 
                              infer = 1)
-                             # blocks = self.blocks)
 
     def guide(self, *args):
         # biject_to(constraint) looks up a bijective Transform from constraints.real 
@@ -332,7 +314,6 @@ class GeneralGroupInference():
                               data = self.data, 
                               num_particles = num_particles, 
                               infer = (mle_locs != None)+1)
-                              # blocks = self.blocks)
             
         return mll
 
@@ -436,16 +417,6 @@ class CoinflipGroupInference():
                 blockidx : nested list, 'shape' [num_trials, num_agents]
                 RT : nested list, 'shape' [num_trials, num_agents]
                 group : list, len [num_agents]
-                
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
                 
         '''
         

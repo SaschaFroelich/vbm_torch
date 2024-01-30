@@ -18,16 +18,7 @@ import analysis_tools as anal
 import numpy as np
 import matplotlib.pylab as plt
 
-out = utils.get_data_from_file()
-
-if len(out) == 7:
-    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
-    
-elif len(out) == 6:
-    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
-    BIC = loss[1]
-    AIC = loss[2]
-    loss = loss[0]
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
 
 # params_df['paramtype'] = ['sim']*len(params_df)
 
