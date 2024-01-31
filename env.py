@@ -6,7 +6,6 @@ Created on Fri May 19 10:16:01 2023
 @author: sascha
 """
 
-
 import utils
 import torch
 import ipdb
@@ -16,6 +15,32 @@ import pyro
 import pyro.distributions as dist
 
 def truncate_data(data, blocks):
+    '''
+    
+
+    Parameters
+    ----------
+    data : dict, len 6734
+        dict of lists. Each element of len num_agents.
+        
+        blocks : list len 2
+            From which block to which block (exclusive) to perform inference.
+            0-indexed. 
+            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+             including 1 newcondition trial for conditions F and R.)
+            for instance:
+            blocks = [0,3] ~ Day 1, blocks 0, 1, and 2
+            blocks = [3,7] ~ Day 2
+            blocks = [0, 7] ~ Days 1 + 2
+            
+    Returns
+    -------
+    data_new : dict, len num_trials (where num_trials is determined by blocks variable)
+        dict of lists. Each element of len num_agents.
+
+    '''
+    
+    
     print("Truncating data.")
     "Truncate self.data to only contain the range specified by blocks."
     

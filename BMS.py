@@ -7,6 +7,7 @@ Created on Mon Dec  4 12:52:23 2023
 """
 
 import pymc as pm
+import pandas as pd
 import numpy as np
 import utils
 import pytensor.tensor as pt
@@ -40,7 +41,7 @@ def sweep_probs(samples, index):
         c_point += c_sign * step_size
     return (samples[:, index] >= c_point).sum() / samples.shape[0]
 
-num_models = 2
+num_models = 5
 num_agents = 60
 elbos = np.zeros((num_agents, num_models))
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
@@ -53,12 +54,21 @@ elbos = np.zeros((num_agents, num_models))
 # 'behav_fit_model_SeqHand_2023-12-02 13:21:27_60agents.p']
 model_names = []
 
+participants = pd.DataFrame()
+
 for model in range(num_models):
     out = utils.get_data_from_file()
     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
     elbos[:, model] = (-elbo_tuple[0]).tolist()
     
     model_names.append(post_sample_df['model'][0])
+
+    "Check that all models have the same ag_idx -> ID mapping."    
+    if model == 1:
+        participants = expdata_df.loc[:, ['ag_idx', 'ID']].drop_duplicates(subset=['ID', 'ag_idx'])
+        
+    elif model >= 2:
+        assert np.all(participants == expdata_df.loc[:, ['ag_idx', 'ID']].drop_duplicates(subset=['ID', 'ag_idx']))
     
 #%%
 with pm.Model() as BMS:
@@ -76,6 +86,7 @@ with pm.Model() as BMS:
 
 az.summary(BMSinferenceData)
 
+
 #%%
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
 exceedance_probability(posteriorsModelProbs)
@@ -83,18 +94,29 @@ exceedance_probability(posteriorsModelProbs)
 #%%
 import matplotlib.pyplot as plt
 import seaborn as sns
+figname = 'Repbias_1day_vs_2days_wo_Q'
+
 # extract samples of all chains
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
-plt.figure()
-sns.histplot(posteriorsModelProbs, stat='density', element='step', bins=30, alpha=.1) #, fill=False)
-sns.kdeplot(posteriorsModelProbs, linewidth=4)
+fig, ax = plt.subplots()
+sns.histplot(posteriorsModelProbs, stat='density', element='step', bins=30, alpha=.1, ax = ax) #, fill=False)
+
+for modelidx in range(num_models):
+    sns.kdeplot(posteriorsModelProbs[:, modelidx], linewidth=4, label = model_names[modelidx])
+    
 plt.ylabel(f'$p(r_i\mid{{data}})$', fontsize=16)
 plt.xlabel('Posterior probability of the model', fontsize=16)
 plt.xlim([0,1])
 plt.yticks([])
-# plt.legend(['Vbm', 'Repbias'], fontsize=14, title='Model', title_fontsize=14)
-plt.savefig('BMS.png', dpi = 300)
+# plt.legend(['Bullshit', 'Repbias'], fontsize=14, title='Model', title_fontsize=14)
+plt.legend()
+# sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
+# plt.yscale('log')
+plt.ylim([0, 10])
+plt.savefig(f'BMS/{num_models}_models_{figname}.png', dpi = 300)
+plt.savefig(f'BMS/{num_models}_models_{figname}.svg')
 plt.show()
 
 import pickle
-pickle.dump((model_names, posteriorsModelProbs), open(f"{num_models}_models_vbm_1day_vs2days.p", "wb"))
+
+# pickle.dump((model_names, posteriorsModelProbs), open(f"BMS/{num_models}_models_{figname}.p", "wb"))
