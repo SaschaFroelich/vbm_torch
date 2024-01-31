@@ -198,13 +198,11 @@ class GeneralGroupInference():
         elbos = ELBOs.mean(dim=0)
         std = ELBOs.std(dim=0)
         
-        # print(f"Final ELBO after {iter_steps} steps is {elbos} +- {std}.")
-        
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
         
         return (elbos.detach(), std.detach())
-        
-    def sample_posterior(self, n_samples = 1_000, locs = False):
+    
+    def sample_posterior(self, n_samples = 1_000):
         '''
 
         Parameters
@@ -212,10 +210,42 @@ class GeneralGroupInference():
         n_samples : int, optional
             The number of samples from each posterior. The default is 1_000.
             
-        locs : bool, optional
-            0 : return parameters in DataFrame
-            1 : return locs as dictionary
-            The default is False.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        '''
+
+        param_names = self.agent.param_names
+        'Original Code'
+        sample_dict = {param: [] for param in param_names}
+        sample_dict["ag_idx"] = []
+
+        for i in range(n_samples):
+            sample = self.guide()
+            for key in sample.keys():
+                sample.setdefault(key, torch.ones(1))
+
+            par_sample = self.agent.locs_to_pars(sample["locs"])
+
+            for param in param_names:
+                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
+
+            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
+    
+        firstlevel_df = pd.DataFrame(sample_dict)
+        return firstlevel_df
+    
+    def posterior_predictives(self, n_samples = 1_000):
+        '''
+
+        Parameters
+        ----------
+        n_samples : int, optional
+            The number of predictive samples. The default is 1_000.
+            
 
         Returns
         -------
@@ -236,53 +266,37 @@ class GeneralGroupInference():
         for param in self.agent.param_names:
             secondlevel_dict[param + '_sig'] = []
 
-        predictive_svi = Predictive(model = self.model,  
-                                    guide = self.guide, 
-                                    num_samples=n_samples)()
+        for i in range(n_samples):
+            predictive_svi = Predictive(model = self.model,  
+                                        guide = self.guide, 
+                                        num_samples=1)()
 
-        grouplevel_loc = predictive_svi['mu']
-        grouplevel_stdev = predictive_svi['sig']
-        predictive_locs = predictive_svi['locs']
+            "----- 1st Level"
+            predictive_locs = predictive_svi['locs']
+            
+            predictive_model_params = self.agent.locs_to_pars(predictive_locs)
         
-        predictive_model_params = self.agent.locs_to_pars(predictive_locs)
-        
-        "1st-level DataFrame"
-        for agidx in range(self.num_agents):
+            "1st-level DataFrame"
+            for agidx in range(self.num_agents):
+                for param_name in self.agent.param_names:
+                    firstlevel_dict[param_name].append(predictive_model_params[param_name][:, agidx].item())
+                    
+                firstlevel_dict['ID'].append(self.data['ID'][0][agidx])
+                firstlevel_dict['ag_idx'].append(self.data['ag_idx'][0][agidx])
+
+            "----- 2nd Level"
+            grouplevel_loc = predictive_svi['mu']
+            grouplevel_stdev = predictive_svi['sig']
+
             for param_name in self.agent.param_names:
-                firstlevel_dict[param_name].extend(predictive_model_params[param_name][:, agidx])
-                
-            firstlevel_dict['ID'].extend([self.data['ID'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
-            firstlevel_dict['ag_idx'].extend([self.data['ag_idx'][0][agidx]]*len(predictive_model_params[param_name][:, agidx]))
-
-        "2nd-level DataFrame"
-        # for param_name_idx in range(len(self.agent.param_dict.keys())):
-        #     secondlevel_dict[self.agent.param_dict.keys()[self.agent.param_dict.keys()[param_name_idx]] + '_mu'].\
-        #         append(grouplevel_loc[:, ..., param_name_idx])
-                
-        #     secondlevel_dict[self.agent.param_dict.keys()[self.agent.param_dict.keys()[param_name_idx]] + '_sig'].\
-        #         append(grouplevel_stdev[:, ..., param_name_idx])
-        
-        idx = 0
-        for k, v in self.agent.param_dict.items():
-            secondlevel_dict[k + '_mu'].\
-                extend(grouplevel_loc[:, ..., idx])
-                
-            secondlevel_dict[k + '_sig'].\
-                extend(grouplevel_stdev[:, ..., idx])
-                
-            idx += 1
-
+                secondlevel_dict[param_name + '_mu'].append(grouplevel_loc[..., self.agent.param_names.index(param_name)].item())
+                secondlevel_dict[param_name + '_sig'].append(grouplevel_stdev[..., self.agent.param_names.index(param_name)].item())
+                    
         firstlevel_df = pd.DataFrame(data = firstlevel_dict)
         secondlevel_df = pd.DataFrame(data = secondlevel_dict)
             
         print(f"Time elapsed: {time.time() - start} secs.")
         
-        for param_name in self.agent.param_names:
-            firstlevel_df[param_name] = firstlevel_df[param_name].map(lambda x: x.item())
-            
-        for col_name in secondlevel_df.columns:
-            secondlevel_df[col_name] = secondlevel_df[col_name].map(lambda x: x.item())
-            
         return firstlevel_df, secondlevel_df
     
     def model_mle(self, mle_locs = None):

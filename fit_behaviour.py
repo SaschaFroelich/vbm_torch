@@ -13,6 +13,7 @@ import pandas as pd
 from datetime import datetime
 import pickle
 
+import env
 import analysis_tools as anal
 import inferencemodels
 import utils
@@ -27,10 +28,12 @@ Modelle:
     OnlyQ_lr
 '''
 
-model_day1 = 'OnlyQ_lr'
-models_day2 = ['OnlyQ_nolr', 'OnlyQ_lr']
-num_inf_steps = 2
-halting_rtol = 1e-02 # for MLE estimation
+post_pred = 0
+model_day1 = 'Repbias_lr'
+models_day2 = ['Repbias_lr', 'Repbias_nolr']
+num_inf_steps = 5_000
+halting_rtol = 1e-06 # for MLE estimation
+posterior_pred_samples = 5_000
 
 #%%
 
@@ -71,19 +74,27 @@ agent = utils.init_agent(model_day1,
 
 Q_init_day1 = agent.Q_init
 
-print("===== Starting inference =====")
+"----- Truncate data"
+behav_data_for_inf_day1 = env.truncate_data(exp_behav_dict, blocks_day1)
+
+print("===== Starting inference for day 1 =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict, blocks = blocks_day1)
+infer = inferencemodels.GeneralGroupInference(agent, behav_data_for_inf_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
-firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = 5_000)
+if post_pred:
+    firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+    
+else:
+    firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+    secondlevel_df = None
 
-firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict['group'][0][x])
+firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day1['group'][0][x])
 firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
 
 ID_df = expdata_df.loc[:, ['ID', 'ag_idx']].drop_duplicates()
-firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict['ID'][0][x])
+firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day1['ID'][0][x])
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
@@ -129,19 +140,26 @@ for model_day2 in models_day2:
                              num_agents = num_agents,
                              Q_init = Q_init_day2)
     
-    print("===== Starting inference =====")
+    "----- Truncate data"
+    behav_data_for_inf_day2 = env.truncate_data(exp_behav_dict, blocks_day2)
+    
+    print("===== Starting inference for day 2 =====")
     "----- Start Inference"
-    infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict, blocks = blocks_day2)
+    infer = inferencemodels.GeneralGroupInference(agent, behav_data_for_inf_day2)
     agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
-    firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = 5_000)
+    if post_pred:
+        firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+    else:
+        firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+        secondlevel_df = None
     
-    firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict['group'][0][x])
+    firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day2['group'][0][x])
     firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
     
     ID_df = expdata_df.loc[:, ['ID', 'ag_idx']].drop_duplicates()
-    firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict['ID'][0][x])
+    firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day2['ID'][0][x])
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)

@@ -49,12 +49,13 @@ Modelle:
     OnlyQ_lr
 '''
 
+post_pred = 0
 model_day1 = 'Repbias_lr'
 model_day2 = 'Repbias_lr'
-num_inf_steps = 4_000
+num_inf_steps = 5_000
 halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 4_000
+posterior_pred_samples = 5_000
 
 #%%
 '''
@@ -98,7 +99,6 @@ groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = ut
 '''
 # import time
 # time.sleep(8*3600)
-
 # blocks_day1 = [0,3]
 
 '''
@@ -117,7 +117,12 @@ infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
-firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+if post_pred:
+    firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+    
+else:
+    firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+    secondlevel_df = None
 
 firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day1['group'][0][x])
 firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
@@ -166,8 +171,13 @@ infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
-firstlevel_df, secondlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
-
+if post_pred:
+    firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+    
+else:
+    firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
+    secondlevel_df = None
+    
 firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['group'][0][x])
 firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
 
