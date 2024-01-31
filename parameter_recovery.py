@@ -51,10 +51,10 @@ Modelle:
 
 model_day1 = 'Repbias_lr'
 model_day2 = 'Repbias_lr'
-num_inf_steps = 2
-halting_rtol = 1e-02 # for MLE estimation
+num_inf_steps = 4_000
+halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 2
+posterior_pred_samples = 4_000
 
 #%%
 '''
@@ -113,7 +113,7 @@ Q_init_day1 = agent.Q_init
 
 print("===== Starting inference of day 1 =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1, blocks = blocks_day1)
+infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
@@ -162,7 +162,7 @@ agent = utils.init_agent(model_day2,
 
 print("===== Starting inference of day 2 =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2, blocks = blocks_day2)
+infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
