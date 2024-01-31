@@ -11,12 +11,43 @@ import numpy as np
 import pickle
 import pandas as pd
 import numpy as np
+import utils
 
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
 # expdata_df = expdata_df[expdata_df['choices'] != -1]
 # expdata_df = expdata_df[expdata_df['jokertypes'] != -1]
 
 num_agents = 60
+
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
+param_names = params_df.iloc[:, 0:-3].columns
+assert len(param_names) == num_params
+
+inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+                                                   'ag_idx', 
+                                                   'group', 
+                                                   'ID'], as_index = False).mean())
+
+complete_df_day1 = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+
+rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') else col for col in complete_df_day1.columns}
+complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
+
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
+param_names = params_df.iloc[:, 0:-3].columns
+assert len(param_names) == num_params
+
+inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+                                                   'ag_idx', 
+                                                   'group', 
+                                                   'ID'], as_index = False).mean())
+
+complete_df_day2 = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+
+rename_dict = {col: col+'_day2' if (col != 'ID') and (col != 'ag_idx') else col for col in complete_df_day2.columns}
+complete_df_day2 = complete_df_day2.rename(columns=rename_dict)
+
+complete_df = pd.merge(complete_df_day1, complete_df_day2.drop('ag_idx', axis = 1), on='ID')
 
 #%%
 '''
@@ -931,3 +962,135 @@ complete_df['learnscore'] = complete_df['RT_diff_stt_day2'] / complete_df['RT_di
                         + complete_df['theta_rep_day2']
 
 complete_df['exploitscore'] = complete_df['learnscore'] + complete_df['conflict_param_day2']
+
+#%%
+exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+groupdf = utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
+groupdf['plottingcat'] = groupdf.apply(lambda row: 'random1' if row['DTT Types'] == 'random' and row['day'] == 1 else
+                                       'congruent1' if row['DTT Types'] == 'congruent' and row['day'] == 1 else
+                                        'incongruent1' if row['DTT Types'] == 'incongruent' and row['day'] == 1 else
+                                        'random2' if row['DTT Types'] == 'random' and row['day'] == 2 else
+                                        'congruent2' if row['DTT Types'] == 'congruent' and row['day'] == 2 else
+                                        'incongruent2', axis = 1)
+
+custom_palette = ['#348abd', '#CF3E53', '#E334B6']
+
+RT_df = pd.DataFrame()
+RTs = []
+RTs.extend(list(complete_df['RT_stt_seq_day1']))
+RTs.extend(list(complete_df['RT_stt_rand_day1']))
+RTs.extend(list(complete_df['RT_stt_seq_day2']))
+RTs.extend(list(complete_df['RT_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['RT_stt_seq_day1']))
+days.extend([1]*len(complete_df['RT_stt_rand_day1']))
+days.extend([2]*len(complete_df['RT_stt_seq_day2']))
+days.extend([2]*len(complete_df['RT_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['RT_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['RT_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day2']))
+
+ag_idx = []
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+
+RT_df['RT'] = RTs
+RT_df['day'] = days
+RT_df['Condition'] = condition
+RT_df['ag_idx'] = ag_idx
+
+ER_df = pd.DataFrame()
+ERs = []
+ERs.extend(list(complete_df['ER_stt_seq_day1']))
+ERs.extend(list(complete_df['ER_stt_rand_day1']))
+ERs.extend(list(complete_df['ER_stt_seq_day2']))
+ERs.extend(list(complete_df['ER_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['ER_stt_seq_day1']))
+days.extend([1]*len(complete_df['ER_stt_rand_day1']))
+days.extend([2]*len(complete_df['ER_stt_seq_day2']))
+days.extend([2]*len(complete_df['ER_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['ER_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['ER_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day2']))
+
+ER_df['ER'] = ERs
+ER_df['day'] = days
+ER_df['Condition'] = condition
+ER_df['ag_idx'] = ag_idx
+
+groupdf['choices_GD'] *=  100
+ER_df['ER'] *= 100
+
+groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
+
+'''
+    Plot HPCF by day.
+'''
+
+import seaborn as sns
+
+fig, ax = plt.subplots(1,3, figsize = (15, 5))
+sns.lineplot(x = "day",
+            y = "choices_GD",
+            hue = "DTT Types",
+            data = groupdf,
+            palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[0])
+ax[0].set_xticks([1,2])
+# ax[0].set_ylim([60, 100])
+ax[0].set_xlabel('Day')
+ax[0].set_ylabel('HRCF (%)')
+
+
+sns.lineplot(x = "day",
+            y = "ER",
+            hue = "Condition",
+            data = ER_df,
+            # palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[1])
+ax[1].set_xticks([1,2])
+# ax[2].set_ylim([0.61, 1])
+ax[1].set_xlabel('Day')
+ax[1].set_ylabel('ER (%)')
+
+sns.lineplot(x = "day",
+            y = "RT",
+            hue = "Condition",
+            data = RT_df,
+            # palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[2])
+ax[2].set_xticks([1,2])
+# ax[1].set_ylim([0.61, 1])
+ax[2].set_xlabel('Day')
+ax[2].set_ylabel('RT (ms)')
+# plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.png', dpi=600)
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.svg')
+plt.show()
+
+groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
+ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTTTypes']]
+ANOVA_df['day'] = ANOVA_df['day'].map(lambda x: 'one' if x == 1 else 'two')
+ANOVA_df['choices_GD'] = pd.to_numeric(ANOVA_df['choices_GD'])
+
+ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTTTypes'], as_index=False).mean()
+ANOVA_df.to_csv('GD_rmanova.csv')
+ER_df.to_csv('ER_rmanova.csv')
+RT_df.to_csv('RT_rmanova.csv')

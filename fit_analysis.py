@@ -26,35 +26,35 @@ from sklearn.linear_model import LinearRegression
 import scipy
 import itertools
 
-out = utils.get_data_from_file()
-post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
-
-_, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
-
-# if len(out) == 7:
-#     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, elbo_tuple = out
-
-# elif len(out) == 6:
-#     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df = out
-
-# else:
-#     raise Exception("Output length invalid.")
+post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
 
 param_names = params_df.iloc[:, 0:-3].columns
-if 'ID' in expdata_df.columns:
+assert len(param_names) == num_params
+
+blocks = extra_storage[2]
+
+if sociopsy_df is None:
+    "Experimental data"
+    experimental_data = 1
+    
+else:
+    "Simulated data"
+    experimental_data = 0
+
+_, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+# expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
+
+if experimental_data:
     "For compatibility with param_recov data"
     ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
     "Add IDs"
     post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
     
-assert len(param_names) == num_params
 
 if 'ID_x' in post_sample_df.columns:
-    post_sample_df=post_sample_df.drop(['ID_x'],axis=1)
-    post_sample_df=post_sample_df.rename(columns={'ID_y': 'ID'})
+    raise Exception("NONONONONO")
 
-if 'ID' in post_sample_df:
+if experimental_data:
     inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                        'ag_idx', 
                                                        'group', 
@@ -64,7 +64,8 @@ if 'ID' in post_sample_df:
 else:
     inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                        'ag_idx', 
-                                                       'group'], as_index = False).mean())    
+                                                       'group', 
+                                                       'ID'], as_index = False).mean())  
 
 inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
 
@@ -73,7 +74,7 @@ num_agents = len(post_sample_df['ag_idx'].unique())
 
 print(f"Model fit of model {model} for {num_agents} agents after %d inference steps."%len(loss))
 '''
-Plot ELBO
+    Plot ELBO
 '''
 fig, ax = plt.subplots()
 plt.plot(loss)
@@ -84,7 +85,7 @@ plt.show()
 print(np.array(loss[-1000:]).mean())
 
 '''
-Plot Parameter Distributions
+    Plot Parameter Distributions
 '''
 num_plot_cols = 3
 num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
@@ -135,10 +136,10 @@ anal.violin(inf_mean_df.loc[:, [*param_names]], model)
 complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
 
 if 'ID' in inf_mean_df.columns:
-    anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points_total']], model = 'sociopsy')
+    anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points']], model = 'sociopsy')
     
 else:
-    anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points_total']], model = 'errors')
+    anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points']], model = 'errors')
 
 '''
     Kdpelots
@@ -1443,6 +1444,9 @@ ER_df['ER'] *= 100
 
 groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
 #%%
+'''
+    Plot HPCF by day.
+'''
 
 fig, ax = plt.subplots(1,3, figsize = (15, 5))
 sns.lineplot(x = "day",
@@ -1484,7 +1488,8 @@ ax[2].set_xticks([1,2])
 # ax[1].set_ylim([0.61, 1])
 ax[2].set_xlabel('Day')
 ax[2].set_ylabel('RT (ms)')
-plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+# plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.png', dpi=600)
 plt.show()
 
 groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
@@ -1519,3 +1524,6 @@ result = sm.stats.anova_lm(model, type=2)
 # Print the result 
 print(result) 
 
+#%%
+
+day1_df = complete_df

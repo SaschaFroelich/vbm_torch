@@ -273,13 +273,9 @@ def within_subject_corr(df, param_names):
     
     num_params = len(param_names)
     
-    if 'ID' in df.columns:
-        df = df.loc[:, ['ID', 'ag_idx', *param_names]]
-        identifier = 'ID'
-        
-    else:
-        df = df.loc[:, ['ag_idx', *param_names]]
-        identifier = 'ag_idx'
+    df = df.loc[:, ['ID', 'ag_idx', *param_names]]
+    identifier = 'ID'
+
     
     corr_dict = {}
     corr_dict['ID'] = []
@@ -547,7 +543,6 @@ def compute_errors(df, identifier = 'ID'):
                 DTT Types
                 -1/0/1/2 : no joker/random/congruent/incongruent
 
-
     ERRORS (in 'correct'): 0 = wrong response, 1 = correct response, 2 = too slow, 3 = two keys at once during joker-trials
 
     identifier : str
@@ -562,148 +557,72 @@ def compute_errors(df, identifier = 'ID'):
     
     df = df[df['choices'] != -1]
     
-    error_rates = pd.DataFrame()
-    
     group = []
     IDs = []
     
     "DTT"
     ER_dtt = []
-    ER_dtt_day1 = []
-    ER_dtt_day2 = []
     
-    ER_randomdtt_day1 = []
-    ER_randomdtt_day2 = []
-    
-    ER_congruent_day1 = []
-    ER_congruent_day2 = []
-    
-    ER_incongruent_day1 = []
-    ER_incongruent_day2 = []
+    ER_randomdtt = []
+    ER_congruent = []
+    ER_incongruent = []
 
-    ER_notimeouterrors_dtt_day1 = []
-    ER_timeouts_dtt_day1 = []
-    
-    ER_notimeouterrors_dtt_day2 = []
-    ER_timeouts_dtt_day2 = []
+    ER_notimeouterrors_dtt = []
+    ER_timeouts_dtt = []
     
     "--- Timeouts"
-    TO_dtt_day2 = []
-    TO_incong_day2 = []
-    TO_cong_day2 = []
-    TO_randomdtt_day2 = []
+    TO_dtt = []
+    TO_incong = []
+    TO_cong = []
+    TO_randomdtt = []
     
     "STT"
     ER_stt = []
+    ER_stt_seq = []
+    ER_stt_rand = []    
+    ER_stt = []
     
-    "STT: Day 1"
-    ER_stt_seq_day1 = []
-    ER_stt_rand_day1 = []
-    ER_stt_day1 = []
-
-    ER_notimeouterrors_stt_day1 = []
-    ER_timeouts_stt_day1 = []
-
-    "STT: Day 2"
-    ER_stt_seq_day2 = []
-    ER_stt_rand_day2 = []    
-    ER_stt_day2 = []
-    
-    ER_notimeouterrors_stt_day2 = []
-    ER_timeouts_stt_day2 = []
+    ER_notimeouterrors_stt = []
+    ER_timeouts_stt = []
 
     ER_total = []
-    ER_total_day1 = []
-    ER_total_day2 = []
     for ID in df[identifier].unique():
         "DTT"
-        ER_dtt.append(len(df[(df['trialsequence'] > 10) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] > 10) & (df[identifier] == ID)]))
-
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5)
-        ER_dtt_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        ER_notimeouterrors_dtt_day1.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
-        ER_timeouts_dtt_day1.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
-
-
-        "DTT Day 2"
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5)
-        ER_dtt_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        ER_notimeouterrors_dtt_day2.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
-        ER_timeouts_dtt_day2.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID)
+        ER_dtt.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        
+        ER_notimeouterrors_dtt.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
+        ER_timeouts_dtt.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
         
         "Random"
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 0)
-        ER_randomdtt_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 0)
-        ER_randomdtt_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['jokertypes'] == 0)
+        ER_randomdtt.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
         
         "Congruent"
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 1)
-        ER_congruent_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 1)
-        ER_congruent_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['jokertypes'] == 1)
+        ER_congruent.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
 
         "Inongruent"
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] <= 5) & (df['jokertypes'] == 2)
-        ER_incongruent_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        
-        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['blockidx'] > 5) & (df['jokertypes'] == 2)
-        ER_incongruent_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['jokertypes'] == 2)
+        ER_incongruent.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
 
         "--- Timeouts"
-        
-
         "STT"
-        ER_stt.append(len(df[(df['trialsequence'] < 10) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
-                 len(df[(df['trialsequence'] < 10) & (df[identifier] == ID)]))
-
-        "STT: Day 1"
         mask =  (df['trialsequence'] < 10) & \
                 (df[identifier] == ID) & \
-                (df['blockidx'] <= 5) & \
                 (df['blocktype'] == 0)
-        ER_stt_seq_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-
-        mask =  (df['trialsequence'] < 10) & \
-                (df[identifier] == ID) & \
-                (df['blockidx'] <= 5) & \
-                (df['blocktype'] == 1)
-        ER_stt_rand_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-
-        mask =  (df['trialsequence'] < 10) & \
-                (df[identifier] == ID) & \
-                (df['blockidx'] <= 5)
-        ER_stt_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-
-        "STT: Day 2"
-        mask =  (df['trialsequence'] < 10) & \
-                (df[identifier] == ID) & \
-                (df['blockidx'] > 5) & \
-                (df['blocktype'] == 0)
-        ER_stt_seq_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        ER_stt_seq.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
         
         mask =  (df['trialsequence'] < 10) & \
                 (df[identifier] == ID) & \
-                (df['blockidx'] > 5) & \
                 (df['blocktype'] == 1)
-        ER_stt_rand_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        ER_stt_rand.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
         
-        mask =  (df['trialsequence'] < 10) & \
-                (df[identifier] == ID) & \
-                (df['blockidx'] > 5)
-        ER_stt_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
+        mask =  (df['trialsequence'] < 10) & (df[identifier] == ID)
+        ER_stt.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
 
-        mask = (df['trialsequence'] > -1) & (df[identifier] == ID) & (df['blockidx'] <= 5)
-        ER_total_day1.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-            
-        mask = (df['trialsequence'] > -1) & (df[identifier] == ID) & (df['blockidx'] > 5)
-        ER_total_day2.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-            
-        ER_total.append(len(df[(df['trialsequence'] > -1) & (df[identifier] == ID) & (df['choices'] == -2)]) /\
-                        len(df[(df['trialsequence'] > -1) & (df[identifier] == ID)]))
+        mask = (df['trialsequence'] > -1) & (df[identifier] == ID)
+        ER_total.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
         
         IDs.append(ID)
         group.append(df[df[identifier] == ID]['group'].unique()[0])
@@ -711,24 +630,15 @@ def compute_errors(df, identifier = 'ID'):
     er_df = pd.DataFrame({'group': group,
                           identifier: IDs,
                           'ER_dtt': ER_dtt,
-                          'ER_dtt_day1': ER_dtt_day1,
-                          'ER_dtt_day2': ER_dtt_day2,
-                          'ER_randomdtt_day2': ER_randomdtt_day2,
-                          'ER_congruent_day2': ER_congruent_day2,
-                          'ER_incongruent_day2': ER_incongruent_day2,
+                          'ER_randomdtt': ER_randomdtt,
+                          'ER_congruent': ER_congruent,
+                          'ER_incongruent': ER_incongruent,
                           'ER_stt': ER_stt,
-                          'ER_stt_seq_day1': ER_stt_seq_day1,
-                          'ER_stt_rand_day1': ER_stt_rand_day1,
-                          'ER_stt_day1': ER_stt_day1,
-                          'ER_stt_seq_day2': ER_stt_seq_day2,
-                          'ER_stt_rand_day2': ER_stt_rand_day2,
-                          'ER_stt_day2': ER_stt_day2,
-                          'ER_total': ER_total,
-                          'ER_total_day1': ER_total_day1,
-                          'ER_total_day2': ER_total_day2})
+                          'ER_stt_seq': ER_stt_seq,
+                          'ER_stt_rand': ER_stt_rand,
+                          'ER_total': ER_total})
     
-    er_df['ER_diff_stt_day1'] = er_df['ER_stt_rand_day1'] - er_df['ER_stt_seq_day1']
-    er_df['ER_diff_stt_day2'] = er_df['ER_stt_rand_day2'] - er_df['ER_stt_seq_day2']
+    er_df['ER_diff_stt'] = er_df['ER_stt_rand'] - er_df['ER_stt_seq']
     return er_df
     
 def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
