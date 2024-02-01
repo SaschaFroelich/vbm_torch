@@ -1055,6 +1055,9 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
         newagent = model_class(Q_init = Q_init, num_agents = num_agents)
         
     else:
+        for key in params.keys():
+            assert params[key].ndim == 2
+            assert params[key].shape[-1] == num_agents
         newagent = model_class(Q_init = Q_init, param_dict = params)
         
     return newagent
@@ -1158,10 +1161,18 @@ def simulate_data(model,
     
     if params is not None:
         if isinstance(params, pd.DataFrame):
+            params_sim_df = params.copy()
             params = params.to_dict(orient='list')
             
         assert isinstance(params, dict)
     
+        for key in params.keys():
+            if isinstance(params[key], list):
+                params[key] = torch.tensor(params[key])
+            if params[key].ndim == 1:
+                assert params[key].shape[0] == num_agents
+                params[key] = params[key][None, ...]
+                
     "----- Initialize agent"
     newagent = init_agent(model, 
                           group, 
@@ -1174,8 +1185,7 @@ def simulate_data(model,
         for key in newagent.param_dict.keys():
             params_sim[key] = torch.squeeze(newagent.param_dict[key])
 
-    else:
-        params_sim = params
+        params_sim_df = pd.DataFrame(params_sim)
 
     "----- Set environment for agent"
     newenv = env.Env(newagent, matfile_dir = './matlabcode/clipre/')
@@ -1210,9 +1220,7 @@ def simulate_data(model,
     
     group_behav_df = pd.DataFrame(data).explode(list(data.keys()))    
     
-    "----- Create DataFrame containing the parameters."
-    params_sim_df = pd.DataFrame(params_sim)
-    
+    "----- DataFrame containing the simulation parameters."
     params_sim_df['ag_idx'] = [i for i in range(num_agents)]
     params_sim_df['group'] = group
     params_sim_df['model'] = [model]*num_agents
@@ -1224,7 +1232,7 @@ def simulate_data(model,
     params_sim_df['ID'] = params_sim_df['ag_idx']
     # print(len(data['ag_idx']))
     # print(len(data['ID']))
-    return data, group_behav_df, params_sim, params_sim_df, newagent
+    return data, group_behav_df, params_sim_df, newagent
 
 def plot_grouplevel(df1,
                     df2 = None,
@@ -1596,7 +1604,7 @@ def posterior_predictives(post_sample,
         for key in params.keys():
             params[key] = torch.tensor(params[key])
         
-        ag_data_dict, ag_data_df, params, params_df = simulate_data(model, 
+        ag_data_dict, ag_data_df, params_df, agent = simulate_data(model, 
                                                                     num_reps,
                                                                     group = params['group'],
                                                                     params = params)
@@ -1660,13 +1668,23 @@ def posterior_predictives(post_sample,
                                              blocknums_blockorder2[row['blockidx']] if row['group']==1 or row['group']==3 \
                                              else row['blockidx'], axis=1)
         model_exp = exp_data['model'].unique()[0]
-        exp_data = exp_data.drop(['group', 'blockidx', 'trialsequence', 'outcomes', 'choices', 'model'], axis = 1)
+        exp_data = exp_data.drop(['group', 
+                                  'blockidx', 
+                                  'trialsequence', 
+                                  'outcomes', 
+                                  'choices', 
+                                  'model'], axis = 1)
         exp_data['jokertypes'] = exp_data['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
         
         if 'ID' in exp_data.columns:
-            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes', 'ID'], as_index = False).mean())
+            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 
+                                                              'block_num',
+                                                              'jokertypes', 
+                                                              'ID'], as_index = False).mean())
         else:
-            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 'block_num','jokertypes'], as_index = False).mean())
+            exp_data_grouped = pd.DataFrame(exp_data.groupby(['ag_idx', 
+                                                              'block_num',
+                                                              'jokertypes'], as_index = False).mean())
         # exp_data_grouped_all = pd.DataFrame(exp_data_grouped.groupby(['block_num','jokertypes'], as_index = False).mean())
         
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
@@ -2061,14 +2079,14 @@ def compute_hpcf(expdata_df):
     df_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
     
-    
     hpcf_df = pd.merge(hpcf_df, hpcf, on = 'ID')
-    
     hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
-    
     hpcf_df = pd.merge(hpcf_df, df_cong, on = 'ID')
-    
     hpcf_df = pd.merge(hpcf_df, df_inc, on = 'ID')
+    
+    hpcf_df['RIspread'] = hpcf_df['hpcf_rand'] - hpcf_df['hpcf_incong']
+    hpcf_df['CRspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_rand']
+    hpcf_df['CIspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_incong']
     
     return hpcf_df
 
