@@ -29,8 +29,8 @@ Modelle:
 '''
 
 post_pred = 0
-model_day1 = 'Vbm_lr'
-models_day2 = ['Vbm_lr', 'Vbm_nolr']
+model_day1 = 'Repbias_Conflict_lr'
+models_day2 = ['Repbias_Conflict_lr', 'Repbias_Conflict_nolr']
 num_inf_steps = 5_000
 halting_rtol = 1e-06 # for MLE estimation
 posterior_pred_samples = 5_000
@@ -60,7 +60,7 @@ assert np.abs(np.diff(group_distro)).sum() == 0
     Fit day 1
 '''
 import time
-time.sleep(11*3600)
+time.sleep(14*3600)
 
 day = 1
 
@@ -125,14 +125,12 @@ pickle.dump( (firstlevel_df,
               params_sim_df, 
               agent_elbo_tuple, 
               extra_storage), 
-            open(f"behav_fit/behav_fit_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
+            open(f"behav_fit/behav_fit_model_day1_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 '''
     Fit day 2
 '''
 for model_day2 in models_day2:
-    blocks_day2 = [3,7]
-
     agent = utils.init_agent(model_day2, 
                              group, 
                              num_agents = num_agents,
@@ -176,7 +174,7 @@ for model_day2 in models_day2:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     extra_storage = (Q_init_day2,  # initial Q-values
                      agent.Q[-1].detach(), # final Q-values
-                     blocks_day2, # blocks
+                     '', # blocks
                      model_day1, # preceding model
                      max_log_like,
                      mle_locs) 
@@ -187,4 +185,4 @@ for model_day2 in models_day2:
                   params_sim_df, 
                   agent_elbo_tuple, 
                   extra_storage), 
-                open(f"behav_fit/behav_fit_model2_{model_day2}_model1_{model_day1}_blocks{blocks_day2[0]}{blocks_day2[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+                open(f"behav_fit/behav_fit_model_day2_{model_day2}_model1_{timestamp}_{num_agents}agents.p", "wb" ) )

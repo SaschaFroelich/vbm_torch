@@ -50,8 +50,8 @@ Modelle:
 '''
 
 post_pred = 0
-model_day1 = 'Vbm_lr'
-model_day2 = 'Vbm_lr'
+model_day1 = 'OnlyQ_lr'
+model_day2 = 'OnlyQ_lr'
 num_inf_steps = 5_000
 halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
@@ -72,10 +72,9 @@ group.extend([3]*(num_agents//4))
 '''
     Simulate Data Day 1
 '''
-import time
-time.sleep(20*3600)
+
 day = 1
-groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
+groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
                                                                       num_agents,
                                                                       group = group,
                                                                       day = day)
@@ -87,7 +86,7 @@ groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = ut
 # time.sleep(5*3600)
 
 day = 2
-groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
+groupdata_dict_day2, group_behav_df_day2, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
                                                                       num_agents,
                                                                       group = group,
                                                                       day = day,
@@ -97,9 +96,8 @@ groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = ut
 '''
     Fit day 1
 '''
-# import time
-# time.sleep(8*3600)
-# blocks_day1 = [0,3]
+import time
+time.sleep(7*3600)
 
 '''
     Inference

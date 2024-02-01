@@ -27,11 +27,11 @@ import scipy
 import itertools
 
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
-
+Q_init = extra_storage[0]
 param_names = params_df.iloc[:, 0:-3].columns
 assert len(param_names) == num_params
 
-blocks = extra_storage[2]
+# blocks = extra_storage[2]
 
 if sociopsy_df is None:
     "Experimental data"
@@ -720,9 +720,10 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'] == 35], plot_single = Fals
     Simulate only from means
 '''
 
-groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
+groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
                                                                         num_agents,
                                                                         group = list(inf_mean_df['group']),
+                                                                        day = day,
                                                                         params = inf_mean_df.loc[:, [*param_names]])
 
 utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
@@ -785,12 +786,12 @@ newdf['labels'] = kmeans.labels_
 newdf0 = newdf[newdf['labels'] == 0]
 newdf1 = newdf[newdf['labels'] == 1]
 
-_, group_behav_df0, _, _ = utils.simulate_data('B', 
+_, group_behav_df0, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf1)
 
-_, group_behav_df1, _, _ = utils.simulate_data('B', 
+_, group_behav_df1, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf1['group']),
                                                 params = newdf1)
@@ -823,12 +824,12 @@ newdf['labels'] = kmeans.labels_
 newdf0 = newdf[newdf['labels'] == 0]
 newdf1 = newdf[newdf['labels'] == 0]
 
-_, group_behav_df0, _, _ = utils.simulate_data('B', 
+_, group_behav_df0, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf0)
 
-_, group_behav_df1, _, _ = utils.simulate_data('B', 
+_, group_behav_df1, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf0)

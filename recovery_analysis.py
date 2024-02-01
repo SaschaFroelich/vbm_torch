@@ -161,15 +161,15 @@ for param in params_df.columns[0:-3]:
 
 #%%
 '''
-Posterior Predictives
+    Posterior Predictives
 '''
 _ = utils.posterior_predictives(post_sample_df, exp_data = expdata_df)
 
 #%%
 '''
-Simulate only from means
+    Simulate only from means
 '''
-groupdata_dict, group_behav_df, params_sim, params_sim_df = utils.simulate_data(model, 
+groupdata_dict, group_behav_df, params_sim_df, agent = utils.simulate_data(model, 
                                                                         num_agents,
                                                                         group = list(inf_mean_df['group']),
                                                                         params = inf_mean_df)
@@ -178,13 +178,13 @@ utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = True)
 
 #%%
 '''
-Correlations between subjects
+    Correlations between subjects
 '''
 anal.param_corr(inf_mean_df)
 
 #%%
 '''
-Correlations within subjects
+    Correlations within subjects
 '''
 corr_dict = anal.within_subject_corr(post_sample_df)
 
@@ -195,7 +195,7 @@ for key in corr_dict.keys():
     
 #%%
 '''
-Correlation analysis_tools both days
+    Correlation analysis_tools both days
 '''
 import random
 num_sims = 1000
@@ -225,7 +225,7 @@ for sim in range(num_sims):
 
 #%%
 '''
-Correlation analysis_tools day 1
+    Correlation analysis_tools day 1
 '''
 import random
 num_sims = 1000

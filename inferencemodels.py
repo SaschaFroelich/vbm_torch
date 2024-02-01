@@ -49,8 +49,6 @@ class GeneralGroupInference():
                 
         '''
         
-        print(">>> Make sure data is truncated. <<<")
-        
         self.agent = agent
         # self.trials = agent.trials # length of experiment
         self.num_agents = agent.num_agents # no. of participants
