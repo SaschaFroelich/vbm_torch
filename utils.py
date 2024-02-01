@@ -1062,9 +1062,9 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
 def simulate_data(model, 
                   num_agents,
                   group,
+                  day,
                   params = None,
                   plotres = True,
-                  blocks = None,
                   Q_init = None):
     '''
     Simulates data and plots results.
@@ -1182,7 +1182,7 @@ def simulate_data(model,
     
     "----- Simulate"
     newenv.run(group = group,
-               blocks = blocks)
+               day = day)
     
     "----- Save Data"
     data = {'choices': newenv.choices, 
@@ -1197,12 +1197,16 @@ def simulate_data(model,
             'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
             'model' : [[model]*num_agents]*len(newenv.choices)}
     
-    print(len(data['ag_idx']))
+    # print(len(data['ag_idx']))
     for key in data:
-        if len(data[key]) == 14*481:
-            data[key] = data[key][2*blocks[0]*481: 2*blocks[1]*481]
+        # if len(data[key]) == 14*481:
+        #     data[key] = data[key][2*blocks[0]*481: 2*blocks[1]*481]
         
-        assert len(data[key]) == len(range(2*blocks[0], 2*blocks[1]))*481
+        if day == 1:
+            assert len(data[key]) == 2886
+            
+        elif day == 2:
+            assert len(data[key]) == 3848
     
     group_behav_df = pd.DataFrame(data).explode(list(data.keys()))    
     
@@ -1218,8 +1222,8 @@ def simulate_data(model,
     data['ID'] = data['ag_idx']
     group_behav_df['ID'] = group_behav_df['ag_idx']
     params_sim_df['ID'] = params_sim_df['ag_idx']
-    print(len(data['ag_idx']))
-    print(len(data['ID']))
+    # print(len(data['ag_idx']))
+    # print(len(data['ID']))
     return data, group_behav_df, params_sim, params_sim_df, newagent
 
 def plot_grouplevel(df1,

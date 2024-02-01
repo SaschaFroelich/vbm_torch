@@ -50,8 +50,8 @@ Modelle:
 '''
 
 post_pred = 0
-model_day1 = 'Repbias_lr'
-model_day2 = 'Repbias_lr'
+model_day1 = 'Vbm_lr'
+model_day2 = 'Vbm_lr'
 num_inf_steps = 5_000
 halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
@@ -72,13 +72,13 @@ group.extend([3]*(num_agents//4))
 '''
     Simulate Data Day 1
 '''
-# import time
-# time.sleep(5*3600)
-blocks_day1 = [0, 3]
+import time
+time.sleep(20*3600)
+day = 1
 groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
                                                                       num_agents,
                                                                       group = group,
-                                                                      blocks = blocks_day1)
+                                                                      day = day)
 
 '''
     Simulate Data Day 2
@@ -86,11 +86,11 @@ groupdata_dict_day1, group_behav_df_day1, _, params_sim_df_day1, agent_day1 = ut
 # import time
 # time.sleep(5*3600)
 
-blocks_day2 = [3, 7]
+day = 2
 groupdata_dict_day2, group_behav_df_day2, _, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
                                                                       num_agents,
                                                                       group = group,
-                                                                      blocks = blocks_day2,
+                                                                      day = day,
                                                                       Q_init = agent_day1.Q[-1])
 
 #%%
@@ -141,7 +141,7 @@ Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day1,
                  agent.Q[-1].detach(),
-                 blocks_day1,
+                 '',
                  'no preceding model',
                  max_log_like,
                  mle_locs)
@@ -152,7 +152,7 @@ pickle.dump( (firstlevel_df,
               params_sim_df_day1, 
               agent_elbo_tuple, 
               extra_storage), 
-            open(f"parameter_recovery/recovery_model_{model_day1}_blocks{blocks_day1[0]}{blocks_day1[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+            open(f"parameter_recovery/recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 '''
     Fit day 2
@@ -196,7 +196,7 @@ BIC, AIC = infer.compute_IC()
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day2,  # initial Q-values
                  agent.Q[-1].detach(), # final Q-values
-                 blocks_day2, # blocks
+                 '', # blocks
                  model_day1, # preceding model
                  max_log_like,
                  mle_locs) 
@@ -207,6 +207,6 @@ pickle.dump( (firstlevel_df,
               params_sim_df_day2, 
               agent_elbo_tuple, 
               extra_storage), 
-            open(f"parameter_recovery/recovery_model2_{model_day2}_model1_{model_day1}_blocks{blocks_day2[0]}{blocks_day2[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+            open(f"parameter_recovery/recovery_model2_{model_day2}_model1_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 

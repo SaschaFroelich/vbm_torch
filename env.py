@@ -14,57 +14,57 @@ import scipy
 import pyro
 import pyro.distributions as dist
 
-def truncate_data(data, blocks):
-    '''
+# def truncate_data(data, blocks):
+#     '''
     
 
-    Parameters
-    ----------
-    data : dict, len 6734
-        dict of lists. Each element of len num_agents.
+#     Parameters
+#     ----------
+#     data : dict, len 6734
+#         dict of lists. Each element of len num_agents.
         
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1, blocks 0, 1, and 2
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
+#         blocks : list len 2
+#             From which block to which block (exclusive) to perform inference.
+#             0-indexed. 
+#             (Here, a block is a R-F condition pair consisting of 962 trials in total, 
+#              including 1 newcondition trial for conditions F and R.)
+#             for instance:
+#             blocks = [0,3] ~ Day 1, blocks 0, 1, and 2
+#             blocks = [3,7] ~ Day 2
+#             blocks = [0, 7] ~ Days 1 + 2
             
-    Returns
-    -------
-    data_new : dict, len num_trials (where num_trials is determined by blocks variable)
-        dict of lists. Each element of len num_agents.
+#     Returns
+#     -------
+#     data_new : dict, len num_trials (where num_trials is determined by blocks variable)
+#         dict of lists. Each element of len num_agents.
 
-    '''
+#     '''
     
     
-    print("Truncating data.")
-    "Truncate self.data to only contain the range specified by blocks."
+#     print("Truncating data.")
+#     "Truncate self.data to only contain the range specified by blocks."
     
-    data_new = {}
-    for key in data.keys():
-        data_new[key] = data[key][blocks[0]*962: blocks[1]*962]
+#     data_new = {}
+#     for key in data.keys():
+#         data_new[key] = data[key][blocks[0]*962: blocks[1]*962]
     
-    # num_trials = len(data['trialsequence'])
-    # for tau in range(num_trials-1, -1, -1):
-    #    if tau in range(blocks[0]*962, blocks[1]*962):
-    #        pass
-    #    else:
-    #        for key in data.keys():
-    #            if key != 'rewprobs':
-    #                data[key].pop(tau)
+#     # num_trials = len(data['trialsequence'])
+#     # for tau in range(num_trials-1, -1, -1):
+#     #    if tau in range(blocks[0]*962, blocks[1]*962):
+#     #        pass
+#     #    else:
+#     #        for key in data.keys():
+#     #            if key != 'rewprobs':
+#     #                data[key].pop(tau)
 
-    "Make sure truncation worked out correctly for all keys."
-    for key in data_new.keys():
-        assert len(data_new[key]) == len(range(blocks[0]*962, blocks[1]*962))
-        assert data_new[key][0] == data[key][blocks[0]*962]
-        assert data_new[key][-1] == data[key][blocks[1]*962 - 1]
+#     "Make sure truncation worked out correctly for all keys."
+#     for key in data_new.keys():
+#         assert len(data_new[key]) == len(range(blocks[0]*962, blocks[1]*962))
+#         assert data_new[key][0] == data[key][blocks[0]*962]
+#         assert data_new[key][-1] == data[key][blocks[1]*962 - 1]
             
             
-    return data_new
+#     return data_new
 
 class Env():
     
@@ -102,22 +102,16 @@ class Env():
         self.outcomes = []
         self.choices_GD = []
         
-    def create_experiment(self, group, blocks):
+    def create_experiment(self, group, day):
         '''
         Creates experiment, i.e. sequence of stimuli by fetching from preprocessed
         data file.
         
         Parameters
         ----------
-        sequence : list, len [num_agents]
-            Whether sequence or mirror sequence.
-            1/2 : sequence/ mirror sequence
-            1: reward probs = [0.8, 0.2, 0.2, 0.8]
-            2: reward probs = [0.2, 0.8, 0.8, 0.2]
+        group
 
-        blockorder : list, len [num_agents]
-            Which blockorder
-            1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+        day
             
         STORES
         ----------
@@ -131,7 +125,7 @@ class Env():
         '''
         
         import pickle
-        exp_behav_dict, _ = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+        exp_behav_dict, _ = pickle.load(open(f"behav_data/preproc_data_day{day}.p", "rb" ))
         
         self.data = {}
         if exp_behav_dict['group'][0] == group:
@@ -141,8 +135,8 @@ class Env():
             self.data['blockidx'] = exp_behav_dict['blockidx'].copy()
             self.data['trialidx'] = exp_behav_dict['trialidx'].copy()
         
-        print("Let's truncate the preprocessed experimental data for simulation setup.")
-        self.data = truncate_data(self.data, blocks)
+        # print("Let's truncate the preprocessed experimental data for simulation setup.")
+        # self.data = truncate_data(self.data, blocks)
         
         rewprobs = [[0.8, 0.2, 0.2, 0.8],
                     [0.8, 0.2, 0.2, 0.8],
@@ -237,7 +231,7 @@ class Env():
         # self.data['jokertypes'] = jokertypes.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         # self.data['blockidx'] = blockidx.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
         
-    def run(self, group, blocks):
+    def run(self, group, day):
         '''
         Parameters
         ----------
@@ -251,15 +245,8 @@ class Env():
             Which blockorder
             1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
             
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
+        day : int
+            1 or 2
 
         Raises
         ------
@@ -272,10 +259,8 @@ class Env():
 
         '''
         
-        assert len(blocks) == 2
-        
         self.create_experiment(group = group,
-                               blocks = blocks)
+                               day = day)
         
         print("Simulating data...")
         self.run_loop(agent = self.agent, 
@@ -302,16 +287,6 @@ class Env():
             1 infer model parameters
             2 MLE estimate: return log-likelihood
 
-        blocks : list len 2
-            From which block to which block (exclusive) to perform inference.
-            0-indexed. 
-            (Here, a block is a R-F condition pair consisting of 962 trials in total, 
-             including 1 newcondition trial for conditions F and R.)
-            for instance:
-            blocks = [0,3] ~ Day 1
-            blocks = [3,7] ~ Day 2
-            blocks = [0, 7] ~ Days 1 + 2
-
         Raises
         ------
         Exception
@@ -326,9 +301,6 @@ class Env():
         log_like = 0.
         # num_trials_per_block = 962
         t = -1 # t is the index of the pyro sample sites.
-        # print(f"Iterating from trial no. {blocks[0]*num_trials_per_block} to trial {blocks[1]*num_trials_per_block}")
-        # 962 trial per R_F condition (two blocks, including newblock trials).
-        # for tau in pyro.markov(range(blocks[0]*962, blocks[1]*962)):
         for tau in pyro.markov(range(len(data["trialsequence"]))):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])

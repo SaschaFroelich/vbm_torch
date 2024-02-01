@@ -29,44 +29,45 @@ Modelle:
 '''
 
 post_pred = 0
-model_day1 = 'Repbias_lr'
-models_day2 = ['Repbias_lr', 'Repbias_nolr']
+model_day1 = 'Vbm_lr'
+models_day2 = ['Vbm_lr', 'Vbm_nolr']
 num_inf_steps = 5_000
 halting_rtol = 1e-06 # for MLE estimation
 posterior_pred_samples = 5_000
 
 #%%
 
-exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-# dfnew = pd.DataFrame(expdata_df.groupby(['ag_idx', 'group', 'model', 'ID'], as_index = False).mean())
-dfnew = pd.DataFrame(expdata_df.loc[:, ['ID', 'group']].groupby(['ID'], as_index = False).mean())
-group_distro = [len(dfnew[dfnew['group']== grp]) for grp in range(4)]
-print(group_distro)
+"Day 1"
+exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
+num_agents = len(expdata_df_day1['ag_idx'].unique())
+group = exp_behav_dict_day1['group'][0]
+
+"Make sure same number of participants in each group"
+group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
 assert np.abs(np.diff(group_distro)).sum() == 0
-del dfnew
 
-# er_df = anal.compute_errors(expdata_df)
-print("-------------------------------------------------------\n\n")
-# print("Maximum errorrate for STT: %.2f, DTT: %.2f, total: %.2f"%(errorrates[0,:].max(),errorrates[1,:].max(),errorrates[2,:].max()))
+"Day 2"
+exp_behav_dict_day2, expdata_df_day2 = pickle.load(open("behav_data/preproc_data_day2.p", "rb" ))
+num_agents = len(expdata_df_day2['ag_idx'].unique())
+group = exp_behav_dict_day2['group'][0]
 
-utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
-num_agents = len(expdata_df['ag_idx'].unique())
+"Make sure same number of participants in each group"
+group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
+assert np.abs(np.diff(group_distro)).sum() == 0
 
-print(f"Starting inference of model {model_day1} for day 1 for {num_agents} agents.")
-
-group = exp_behav_dict['group'][0]
 #%%
 '''
     Fit day 1
 '''
-# import time
-# time.sleep(8*3600)
+import time
+time.sleep(11*3600)
 
-blocks_day1 = [0,3]
+day = 1
 
 '''
     Inference
 '''
+print(f"Starting inference of model {model_day1} for day 1 for {num_agents} agents.")
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model_day1, 
                          group, 
@@ -74,12 +75,9 @@ agent = utils.init_agent(model_day1,
 
 Q_init_day1 = agent.Q_init
 
-"----- Truncate data"
-behav_data_for_inf_day1 = env.truncate_data(exp_behav_dict, blocks_day1)
-
 print("===== Starting inference for day 1 =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, behav_data_for_inf_day1)
+infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
@@ -90,11 +88,11 @@ else:
     firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
     secondlevel_df = None
 
-firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day1['group'][0][x])
+firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['group'][0][x])
 firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
 
-ID_df = expdata_df.loc[:, ['ID', 'ag_idx']].drop_duplicates()
-firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day1['ID'][0][x])
+ID_df = expdata_df_day1.loc[:, ['ID', 'ag_idx']].drop_duplicates()
+firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['ID'][0][x])
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
@@ -116,18 +114,18 @@ params_sim_df['model']  = model_day1
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day1,
                  agent.Q[-1].detach(),
-                 blocks_day1,
+                 '',
                  'no preceding model',
                  max_log_like,
                  mle_locs)
 
 pickle.dump( (firstlevel_df, 
-              expdata_df[(expdata_df['trialidx'] >= blocks_day1[0]*962) & (expdata_df['trialidx'] < blocks_day1[1]*962)], 
+              expdata_df_day1,
               (infer.loss, BIC, AIC), 
               params_sim_df, 
               agent_elbo_tuple, 
               extra_storage), 
-            open(f"behav_fit/behav_fit_model_{model_day1}_blocks{blocks_day1[0]}{blocks_day1[1]}_{timestamp}_{num_agents}agents.p", "wb" ) )
+            open(f"behav_fit/behav_fit_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 '''
     Fit day 2
@@ -140,12 +138,9 @@ for model_day2 in models_day2:
                              num_agents = num_agents,
                              Q_init = Q_init_day2)
     
-    "----- Truncate data"
-    behav_data_for_inf_day2 = env.truncate_data(exp_behav_dict, blocks_day2)
-    
     print("===== Starting inference for day 2 =====")
     "----- Start Inference"
-    infer = inferencemodels.GeneralGroupInference(agent, behav_data_for_inf_day2)
+    infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
     agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particles = 10)
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
@@ -155,11 +150,11 @@ for model_day2 in models_day2:
         firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
         secondlevel_df = None
     
-    firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day2['group'][0][x])
+    firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['group'][0][x])
     firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
     
-    ID_df = expdata_df.loc[:, ['ID', 'ag_idx']].drop_duplicates()
-    firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: behav_data_for_inf_day2['ID'][0][x])
+    ID_df = expdata_df_day2.loc[:, ['ID', 'ag_idx']].drop_duplicates()
+    firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['ID'][0][x])
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
@@ -187,7 +182,7 @@ for model_day2 in models_day2:
                      mle_locs) 
     
     pickle.dump( (firstlevel_df, 
-                  expdata_df[(expdata_df['trialidx'] >= blocks_day2[0]*962) & (expdata_df['trialidx'] < blocks_day2[1]*962)], 
+                  expdata_df_day2,
                   (infer.loss, BIC, AIC), 
                   params_sim_df, 
                   agent_elbo_tuple, 
