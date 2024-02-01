@@ -2,3 +2,7 @@
 *_archive.py
 archive/
 playground.py
+*.png
+matlabcode/
+temp.py
+*.ods
