@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Oct 25 11:05:13 2023
+    Created on Wed Oct 25 11:05:13 2023
 
-Fit model to behaviour.
+    Fit model to behaviour.
 
-@author: sascha
+    @author: sascha
 """
 import numpy as np
 import torch
@@ -55,12 +55,12 @@ group = exp_behav_dict_day2['group'][0]
 group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
 assert np.abs(np.diff(group_distro)).sum() == 0
 
-#%%
+
 '''
     Fit day 1
 '''
-import time
-time.sleep(14*3600)
+# import time
+# time.sleep(0.5*3600)
 
 day = 1
 
@@ -99,7 +99,25 @@ max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
 BIC, AIC = infer.compute_IC()
 
 "----- Q_init for next day"
-Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
+param_names = agent.param_names
+inf_mean_df = firstlevel_df.loc[:, [*param_names, 
+                      'ag_idx', 
+                      'ID']].groupby(['ag_idx', 
+                                      'ID'], as_index = False).mean()
+assert torch.all(torch.tensor(inf_mean_df['ag_idx']) == torch.tensor(exp_behav_dict_day1['ag_idx'][0]))
+assert all([inf_mean_df['ID'][i] == exp_behav_dict_day1['ID'][0][i] for i in range(num_agents)])
+                                      
+_, _, _, sim_agent = utils.simulate_data(model_day1, 
+                                        num_agents,
+                                        group = group,
+                                        day = day,
+                                        params = inf_mean_df.loc[:, [*param_names]])
+
+assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
+Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
+Q_init_day2 = Q_init_day2[None, ...]
+assert Q_init_day2.ndim == 3
+Q_init_day2 = torch.tensor(Q_init_day2)
 
 "----- Save parameter names to DataFrame"
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -130,11 +148,13 @@ pickle.dump( (firstlevel_df,
 '''
     Fit day 2
 '''
+del exp_behav_dict_day1
+del expdata_df_day1
 for model_day2 in models_day2:
     agent = utils.init_agent(model_day2, 
                              group, 
                              num_agents = num_agents,
-                             Q_init = Q_init_day2)
+                             Q_init = Q_init_day2.detach())
     
     print("===== Starting inference for day 2 =====")
     "----- Start Inference"

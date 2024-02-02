@@ -220,7 +220,7 @@ class GeneralGroupInference():
         'Original Code'
         sample_dict = {param: [] for param in param_names}
         sample_dict["ag_idx"] = []
-
+        sample_dict["ID"] = []
         for i in range(n_samples):
             sample = self.guide()
             for key in sample.keys():
@@ -231,7 +231,8 @@ class GeneralGroupInference():
             for param in param_names:
                 sample_dict[param].extend(list(par_sample[param].detach().numpy()))
 
-            sample_dict["ag_idx"].extend(list(range(self.num_agents)))
+            sample_dict["ag_idx"].extend(self.data['ag_idx'][0])
+            sample_dict["ID"].extend(self.data['ID'][0])
     
         firstlevel_df = pd.DataFrame(sample_dict)
         return firstlevel_df

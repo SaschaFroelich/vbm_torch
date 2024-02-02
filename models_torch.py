@@ -414,11 +414,11 @@ class Vbm_lr(model_master):
             "----- Compute new V-values for next trial -----"
             self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + self.param_dict['omega'][..., None]*self.Q[-1])
             
-            if len(self.Q) > 10:
+            if len(self.Q) > 20:
                 "Free up some memory space"
-                self.V[0:-2] = []
-                self.Q[0:-2] = []
-                self.rep[0:-2] = []
+                self.V[0:-10] = []
+                self.Q[0:-10] = []
+                self.rep[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -590,10 +590,10 @@ class Vbm_nolr(model_master):
             "----- Compute new V-values for next trial -----"
             self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + self.param_dict['omega'][..., None]*self.Q[-1])
             
-            if len(self.rep) > 10:
+            if len(self.rep) > 20:
                 "Free up some memory space"
-                self.V[0:-2] = []
-                self.rep[0:-2] = []
+                self.V[0:-10] = []
+                self.rep[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -770,11 +770,11 @@ class Repbias_lr(model_master):
             "----- Compute new V-values for next trial -----"
             self.V.append(self.compute_V(theta_rep, theta_Q))
 
-            if len(self.Q) > 10:
+            if len(self.Q) > 20:
                 "Free up some memory space"
-                self.V[0:-2] = []
-                self.Q[0:-2] = []
-                self.rep[0:-2] = []
+                self.V[0:-10] = []
+                self.Q[0:-10] = []
+                self.rep[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -943,10 +943,10 @@ class Repbias_nolr(model_master):
             "----- Compute new V-values for next trial -----"
             self.V.append(self.compute_V(theta_rep, theta_Q))
 
-            if len(self.V) > 10:
+            if len(self.V) > 20:
                 "Free up some memory space"
-                self.V[0:-2] = []
-                self.rep[0:-2] = []
+                self.V[0:-10] = []
+                self.rep[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -1383,9 +1383,9 @@ class OnlyQ_lr(model_master):
             
             # print(Qnew.mean(axis=1))
             
-            if len(self.Q) > 10:
+            if len(self.Q) > 20:
                 "Free up memory space"
-                self.Q[0:-2] = []
+                self.Q[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -1666,9 +1666,9 @@ class Q_seqimpact_lr(model_master):
             
             # print(Qnew.mean(axis=1))
             
-            if len(self.Q) > 10:
+            if len(self.Q) > 20:
                 "Free up memory space"
-                self.Q[0:-2] = []
+                self.Q[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
@@ -1958,9 +1958,9 @@ class Q_seqimpact_conflict_lr(model_master):
             
             # print(Qnew.mean(axis=1))
             
-            if len(self.Q) > 10:
+            if len(self.Q) > 20:
                 "Free up memory space"
-                self.Q[0:-2] = []
+                self.Q[0:-10] = []
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
