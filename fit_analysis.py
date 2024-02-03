@@ -8,6 +8,9 @@
     @author: sascha
 """
 
+from IPython import get_ipython
+get_ipython().run_line_magic("reset", "-f")
+
 "----- Open Files"
 # import sys
 # sys.modules[__name__].__dict__.clear() # Clear variables
@@ -29,6 +32,10 @@ import itertools
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
 Q_init = extra_storage[0]
 param_names = params_df.iloc[:, 0:-3].columns
+day = extra_storage[2]
+seq_counter_day2 = extra_storage[6]
+
+print(f"Preceding model is {extra_storage[3]}.")
 assert len(param_names) == num_params
 
 # blocks = extra_storage[2]
@@ -41,15 +48,8 @@ else:
     "Simulated data"
     experimental_data = 0
 
-_, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+# _, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
 # expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
-
-if experimental_data:
-    "For compatibility with param_recov data"
-    ID_df = expdata_df.loc[:, ['ID', 'ag_idx', 'handedness']].drop_duplicates()
-    "Add IDs"
-    post_sample_df = pd.merge(post_sample_df, ID_df, on = 'ag_idx')
-    
 
 if 'ID_x' in post_sample_df.columns:
     raise Exception("NONONONONO")
@@ -82,7 +82,7 @@ plt.title(f"ELBO for model {model} ({num_agents} agents)")
 ax.set_xlabel("Number of iterations")
 ax.set_ylabel("ELBO")
 plt.show()
-print(np.array(loss[-1000:]).mean())
+# print(np.array(loss[-1000:]).mean())
 
 '''
     Plot Parameter Distributions
@@ -141,26 +141,88 @@ if 'ID' in inf_mean_df.columns:
 else:
     anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points']], model = 'errors')
 
-'''
-    Kdpelots
-'''
-fig, ax = plt.subplots(len(param_names), 1, figsize=(10,35))
-if model == 'Conflict':
-    xlims = [[0, 0.08],
-             [0, 9],
-             [0, 3.0],
-             [-2.5, 3],
-             [0, 0.08],
-            [0, 9],
-            [0, 3.0],
-            [-2.5, 3]]
+if 0:
+    '''
+        Kdpelots
+    '''
+    fig, ax = plt.subplots(len(param_names), 1, figsize=(10,35))
+    if model == 'Conflict':
+        xlims = [[0, 0.08],
+                 [0, 9],
+                 [0, 3.0],
+                 [-2.5, 3],
+                 [0, 0.08],
+                [0, 9],
+                [0, 3.0],
+                [-2.5, 3]]
+        
+    for param_idx in range(len(param_names)):
+        sns.kdeplot(post_sample_df[param_names[param_idx]], ax = ax[param_idx])
+        ax[param_idx].set_xlabel(param_names[param_idx])
+        # ax[param_idx].set_xlim(xlims[param_idx])
     
-for param_idx in range(len(param_names)):
-    sns.kdeplot(post_sample_df[param_names[param_idx]], ax = ax[param_idx])
-    ax[param_idx].set_xlabel(param_names[param_idx])
-    # ax[param_idx].set_xlim(xlims[param_idx])
+    plt.show()
 
-plt.show()
+'''
+    Simulate from means
+'''
+if day == 1:
+    groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+                                                                            num_agents,
+                                                                            group = list(inf_mean_df['group']),
+                                                                            day = day,
+                                                                            params = inf_mean_df.loc[:, [*param_names]])
+    
+    utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+    
+elif day == 2:
+    groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+                                                                            num_agents,
+                                                                            group = list(inf_mean_df['group']),
+                                                                            day = day,
+                                                                            Q_init = Q_init,
+                                                                            seq_init = seq_counter_day2,
+                                                                            params = inf_mean_df.loc[:, [*param_names]])
+    
+    utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+
+if day == 2 and len(extra_storage) > 6:
+    print("Creating and appending dataframe for day 1.")
+    filename_day1 = extra_storage[7]
+    post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')
+    param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
+    
+    if experimental_data:
+        inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                           'ag_idx', 
+                                                           'group', 
+                                                           'ID', 
+                                                           'handedness'], as_index = False).mean())
+    
+    else:
+        inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                           'ag_idx', 
+                                                           'group', 
+                                                           'ID'], as_index = False).mean())  
+    
+    inf_mean_df_day1 = inf_mean_df_day1.sort_values(by=['ag_idx'])
+    
+    model_day1 = post_sample_df_day1['model'][0]
+    
+    complete_df_day1 = utils.create_complete_df(inf_mean_df_day1, 
+                                                sociopsy_df_day1,
+                                                expdata_df_day1,
+                                                post_sample_df_day1, 
+                                                param_names_day1)
+    
+    # rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
+    # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
+    complete_df_day1['day'] = [1]*len(complete_df_day1)
+    complete_df['day'] = [2]*len(complete_df_day1)
+    
+    complete_df_all = pd.concat([complete_df_day1, complete_df], ignore_index=True)
+    
+    del day, complete_df, complete_df_day1
 
 #%%
 '''

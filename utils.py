@@ -993,7 +993,12 @@ def comp_groupdata(groupdata):
     
     return newgroupdata
 
-def init_agent(model, group, num_agents=1, params = None, Q_init = None):
+def init_agent(model, 
+               group,
+               num_agents=1, 
+               params = None, 
+               Q_init = None, 
+               seq_init = None):
     '''
     
     Parameters
@@ -1047,18 +1052,19 @@ def init_agent(model, group, num_agents=1, params = None, Q_init = None):
                     params[key] = torch.tensor(params[key])
 
 
+    "Set new agent to corresponding model class as determined by positional argument 'model'"
     import importlib
     model_module = importlib.import_module("models_torch")
     model_class = getattr(model_module, model)
     
     if params is None:
-        newagent = model_class(Q_init = Q_init, num_agents = num_agents)
+        newagent = model_class(Q_init = Q_init, num_agents = num_agents, seq_init = seq_init)
         
     else:
         for key in params.keys():
             assert params[key].ndim == 2
             assert params[key].shape[-1] == num_agents
-        newagent = model_class(Q_init = Q_init, param_dict = params)
+        newagent = model_class(Q_init = Q_init, param_dict = params, seq_init = seq_init)
         
     return newagent
 
@@ -1068,7 +1074,8 @@ def simulate_data(model,
                   day,
                   params = None,
                   plotres = True,
-                  Q_init = None):
+                  Q_init = None,
+                  seq_init = None):
     '''
     Simulates data and plots results.
     
@@ -1178,7 +1185,8 @@ def simulate_data(model,
                           group, 
                           num_agents = num_agents,
                           params = params,
-                          Q_init = Q_init)
+                          Q_init = Q_init,
+                          seq_init = seq_init)
     
     if params == None:
         params_sim = {}
@@ -2061,13 +2069,26 @@ def compute_hpcf(expdata_df):
     df_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
     
-    df_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+    "-> Just for safety."
+    df_rand2 = pd.DataFrame(df[(df['blocktype'] == 1) & (df['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                            'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_rand2.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+
+    assert df_rand2.equals(df_rand)
+
+    "Sequential"
+    df_seq = pd.DataFrame(df[(df['jokertypes'] == 1) | (df['jokertypes'] == 2)].loc[:, ['ID', 
+                                                                                        'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_seq.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
+    
+    "-> Just for safety."
+    df_seq2 = pd.DataFrame(df[(df['blocktype'] == 0) & (df['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                           'choices_GD']].groupby(['ID'], as_index = False).mean())
+    df_seq2.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
+    
+    assert df_seq2.equals(df_seq2)
     
     "Congruent"
-    df_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_cong.rename(columns = {'choices_GD': 'hpcf_cong'}, inplace = True)
-    
     df_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     df_cong.rename(columns = {'choices_GD': 'hpcf_cong'}, inplace = True)
     
@@ -2076,11 +2097,9 @@ def compute_hpcf(expdata_df):
     df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
     
     
-    df_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
-    
     hpcf_df = pd.merge(hpcf_df, hpcf, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, df_seq, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_cong, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_inc, on = 'ID')
     
@@ -2142,6 +2161,12 @@ def compute_RT(expdata_df):
     RT_stt_rand = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt_rand.rename(columns={'RT':'RT_stt_rand'}, inplace = True)
     
+    RT_dtt_seq = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype']==0) & (RT_cond_df['trialsequence']>10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_dtt_seq.rename(columns={'RT':'RT_dtt_seq'}, inplace = True)
+    
+    RT_dtt_rand = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype']==1) & (RT_cond_df['trialsequence']>10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_dtt_rand.rename(columns={'RT':'RT_dtt_rand'}, inplace = True)
+    
     RT_stt = pd.DataFrame(RT_cond_df[(RT_cond_df['trialsequence']<10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_stt.rename(columns={'RT':'RT_stt'}, inplace = True)
 
@@ -2163,6 +2188,8 @@ def compute_RT(expdata_df):
     
     RT_df = pd.merge(RT_df, RT_stt_seq, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt_rand, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_dtt_seq, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_dtt_rand, on = 'ID')
     RT_df = pd.merge(RT_df, RT_stt, on = 'ID')
     RT_df = pd.merge(RT_df, RT_dtt, on = 'ID')
     
@@ -2171,6 +2198,7 @@ def compute_RT(expdata_df):
     RT_df = pd.merge(RT_df, RT_randomdtt, on = 'ID')
     
     RT_df['RT_diff_stt'] = RT_df['RT_stt_rand'] - RT_df['RT_stt_seq']
+    RT_df['RT_diff_dtt'] = RT_df['RT_dtt_rand'] - RT_df['RT_dtt_seq']
     
     return RT_df
 

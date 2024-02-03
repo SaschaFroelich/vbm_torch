@@ -29,7 +29,12 @@ class model_master():
     # trials = 480*num_blocks
     BAD_CHOICE = -2    
 
-    def __init__(self, Q_init, num_agents = None, param_dict = None, k=4.):
+    def __init__(self, 
+                 Q_init, 
+                 num_agents = None, 
+                 param_dict = None, 
+                 k=4.,
+                 seq_init = None):
         '''
         
         Parameters
@@ -110,8 +115,12 @@ class model_master():
         Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]
         blocktypes: 0/1 : sequential/ random
         '''
-        self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6))
-        
+        if seq_init == None:
+            self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6))
+            
+        else:
+            self.init_seq_counter = seq_init
+            
         self.seq_counter = self.init_seq_counter.clone().detach()
         self.specific_init()
         
@@ -910,7 +919,6 @@ class Repbias_nolr(model_master):
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA)
-            
             self.V.append(self.compute_V(theta_rep, theta_Q))
             
         else:
