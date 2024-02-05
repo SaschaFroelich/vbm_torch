@@ -1277,8 +1277,34 @@ exploiters_df_day2 = complete_df[expl_condition_day2]
 '''
     DDM
 '''
-ddm_params = ['alpha', '']
+ddm_params = ['alpha_mu', 'b_mu', 'tau_mu', 'v_mu.1', 'v_mu.2', 'v_mu.3']
 ddm_day1 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata.csv')
+ddm_day2 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day2.csv')
+#%%
+fig, ax = plt.subplots(2, len(ddm_params), figsize=(15, 7))
 
-for col in ddm_day1.columns:
-    print(col)
+for day in [1,2]:
+    paridx = 0
+    
+    if day == 1:
+        for col in ddm_day1.columns:
+            if 'mu' in col:
+                if col == ddm_params[paridx]:
+                    sns.kdeplot(ddm_day1[col], ax = ax[day-1, paridx])
+                    ax[0,paridx].set_ylabel('')
+                    
+                    
+                    paridx += 1
+                    
+                    
+    elif day == 2:
+        for col in ddm_day2.columns:
+            if 'mu' in col:
+                if col == ddm_params[paridx]:
+                    sns.kdeplot(ddm_day2[col], ax = ax[day-1, paridx])
+                    ax[1,paridx].set_ylabel('')
+                    ax[day-1, paridx].sharex(ax[day-2, paridx])
+                    paridx += 1
+        
+# plt.ylabel('')
+plt.show()
