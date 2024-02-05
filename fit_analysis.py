@@ -31,22 +31,27 @@ import itertools
 
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
 Q_init = extra_storage[0]
-param_names = params_df.iloc[:, 0:-3].columns
+if len(extra_storage) >= 10:
+    param_names = extra_storage[9]
+    if extra_storage[11] >= 1e-03:
+        raise Exception("rhalt too large for IC computation.")
+else:
+    param_names = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
+    # param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
 day = extra_storage[2]
-seq_counter_day2 = extra_storage[6]
 
 print(f"Preceding model is {extra_storage[3]}.")
-assert len(param_names) == num_params
+# assert len(param_names) == num_params
 
 # blocks = extra_storage[2]
 
 if sociopsy_df is None:
     "Experimental data"
-    experimental_data = 1
+    experimental_data = 0
     
 else:
     "Simulated data"
-    experimental_data = 0
+    experimental_data = 1
 
 # _, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
 # expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
@@ -54,7 +59,7 @@ else:
 if 'ID_x' in post_sample_df.columns:
     raise Exception("NONONONONO")
 
-if experimental_data:
+if 'handedness' in post_sample_df.columns:
     inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                        'ag_idx', 
                                                        'group', 
@@ -135,7 +140,7 @@ anal.violin(inf_mean_df.loc[:, [*param_names]], model)
 
 complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
 
-if 'ID' in inf_mean_df.columns:
+if 'RT' in complete_df.columns:
     anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points']], model = 'sociopsy')
     
 else:
@@ -167,16 +172,17 @@ if 0:
     Simulate from means
 '''
 if day == 1:
-    groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+    groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
                                                                             num_agents,
                                                                             group = list(inf_mean_df['group']),
                                                                             day = day,
                                                                             params = inf_mean_df.loc[:, [*param_names]])
     
-    utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+    utils.plot_grouplevel(expdata_df, sim_group_behav_df, plot_single = False)
     
 elif day == 2:
-    groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+    seq_counter_day2 = extra_storage[6]
+    groupdata_dict_day2, sim_group_behav_df_day2, params_sim_df_day2, _ = utils.simulate_data(model, 
                                                                             num_agents,
                                                                             group = list(inf_mean_df['group']),
                                                                             day = day,
@@ -184,15 +190,28 @@ elif day == 2:
                                                                             seq_init = seq_counter_day2,
                                                                             params = inf_mean_df.loc[:, [*param_names]])
     
-    utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+    utils.plot_grouplevel(expdata_df, sim_group_behav_df_day2, plot_single = False)
+    sim_group_behav_df_day2['day'] = 2
 
 if day == 2 and len(extra_storage) > 6:
-    print("Creating and appending dataframe for day 1.")
+    print("\n\nCreating and appending dataframe for day 1.")
     filename_day1 = extra_storage[7]
-    post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')
+    
+    if len(extra_storage) >= 10:
+        if extra_storage[10] == 'recovery':
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
+        elif extra_storage[10] == 'behav_fit':
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')    
+        else:
+            raise Exception('Error')
+        
+    else:
+        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')
+        
+    post_sample_df_day1['day'] = 1
     param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
     
-    if experimental_data:
+    if 'handedness' in post_sample_df_day1.columns:
         inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
                                                            'ag_idx', 
                                                            'group', 
@@ -222,7 +241,40 @@ if day == 2 and len(extra_storage) > 6:
     
     complete_df_all = pd.concat([complete_df_day1, complete_df], ignore_index=True)
     
+    post_sample_df['day'] = 2
+    post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df], ignore_index=True)
+    
+    groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = utils.simulate_data(model, 
+                                                                            num_agents,
+                                                                            group = list(inf_mean_df['group']),
+                                                                            day = 1,
+                                                                            params = inf_mean_df.loc[:, [*param_names]])
+    
+    sim_group_behav_df_day1['day'] = 1
+    
+    sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
+    
     del day, complete_df, complete_df_day1
+    del post_sample_df_day1, post_sample_df
+
+#%%
+'''
+    Plot behaviour both days        
+'''
+
+# HPCF_DF = complete_df_all.loc[:, ['hpcf_cong', 'hpcf_incong',
+#                                   'hpcf_seq', 'hpcf_rand', 'day', 'ID']]
+
+utils.plot_hpcf(complete_df_all, title='Experiment')
+
+hpcf_day1 = utils.compute_hpcf(sim_group_behav_df_day1)
+hpcf_day1['day'] = 1
+hpcf_day2 = utils.compute_hpcf(sim_group_behav_df_day2)
+hpcf_day2['day'] = 2
+
+hpcf_df_all = pd.concat((hpcf_day1, hpcf_day2), ignore_index = True)
+
+utils.plot_hpcf(hpcf_df_all, title='Model')
 
 #%%
 '''
@@ -291,17 +343,18 @@ threshold = 0
 BF = 5
 inf_mean_df_nozero = inf_mean_df.copy()
 "Bayesian Approach"
-for param in post_sample_df.columns:
+for param in param_names:
     if param not in ['group', 'model', 'ag_idx', 'ID', 'handedness']:
     # if param != 'group' and param != 'model' and param != 'ag_idx' and param != 'ID' and param !=:
         print("----- Testing parameter %s"%param)
-        for ag_idx in post_sample_df['ag_idx'].unique():
-            lt0 = (np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]) <= 0).sum()
-            gt0 = (np.array(post_sample_df[post_sample_df['ag_idx'] == ag_idx][param]) > 0).sum()
-            
-            if gt0/lt0 <= BF and lt0/gt0 <= BF:
-                print(f"No evidence that {param} is different from 0 for agent {ag_idx}")
-                inf_mean_df_nozero[inf_mean_df_nozero['ag_idx'] == ag_idx] = np.nan
+        for ag_idx in post_sample_df_all['ag_idx'].unique():
+            for day in [1,2]:
+                lt0 = (np.array(post_sample_df_all[(post_sample_df_all['ag_idx'] == ag_idx) & (post_sample_df_all['day'] == day)][param]) <= 0).sum()
+                gt0 = (np.array(post_sample_df_all[(post_sample_df_all['ag_idx'] == ag_idx) & (post_sample_df_all['day'] == day)][param]) > 0).sum()
+                
+                if gt0/lt0 <= BF and lt0/gt0 <= BF:
+                    print(f"No evidence that {param} is different from 0 for agent {ag_idx} for day {day}")
+                    inf_mean_df_nozero[inf_mean_df_nozero['ag_idx'] == ag_idx] = np.nan
 
 anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
 
@@ -331,7 +384,6 @@ linmodel = LinearRegression()
 linmodel.fit(x, y)
 print(f"slope: {linmodel.coef_}\n")
 
-
 #%%
 '''
     Differences day 1 & day 2
@@ -339,15 +391,20 @@ print(f"slope: {linmodel.coef_}\n")
 inf_mean_df['Q/R_day1'] = inf_mean_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
 inf_mean_df['Q/R_day2'] = inf_mean_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
 
-post_sample_df['Q/R_day1'] = post_sample_df.apply(lambda row: row['theta_Q_day1']/row['theta_rep_day1'], axis = 1)
-post_sample_df['Q/R_day2'] = post_sample_df.apply(lambda row: row['theta_Q_day2']/row['theta_rep_day2'], axis = 1)
+post_sample_df_all['Q/R'] = post_sample_df_all.apply(lambda row: row['theta_Q']/row['theta_rep'], axis = 1)
+param_names = list(param_names)
+param_names.append('Q/R')
 
-diffs_df = anal.daydiff(inf_mean_df)
-diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
+# diffs_df = anal.daydiff(inf_mean_df)
+# diffs_df = pd.merge(diffs_df, sociopsy_df[sociopsy_df['ID'].isin(diffs_df['ID'])], on = 'ID')
 
 # anal.violin(inf_mean_df, model)
 
-diffs_df = anal.daydiff(post_sample_df, BF = 5)
+diffs_df, clean_means_df = anal.daydiffBF(post_sample_df_all, BF = 5, parameter_names = list(param_names))
+utils.lineplot_daydiffs(clean_means_df)
+utils.scatterplot_daydiffs(clean_means_df)
+
+post_sample_df_all['daydiffBF'] = post_sample_df_all[param].apply(lambda row: diffs_df[diffs_df['parameter'] == row[]]['BF'])
 
 anal.daydiff(post_sample_df[post_sample_df['group']==0], BF = 3.2)
 anal.daydiff(post_sample_df[post_sample_df['group']==1], BF = 3.2)
@@ -375,8 +432,7 @@ pca_parameters = ['ag_idx', 'age',
 pcomps = anal.perform_PCA(complete_df.loc[:, [*pca_parameters]], 4, correctfor='age')
 
 "----- On within-subject correlations"
-corr_df = anal.within_subject_corr(post_sample_df, ['theta_Q_day1', 'theta_Q_day2', 
-                                                    'theta_rep_day1', 'theta_rep_day2'])
+corr_df = anal.within_subject_corr(post_sample_df_all, ['theta_Q', 'theta_rep'], ['theta_conflict', 'theta_conflict'], day = 2)
 
 corr_df = pd.merge(corr_df, complete_df.loc[:, ['ID', 'age']], on ='ID')
 
@@ -782,19 +838,19 @@ utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'] == 35], plot_single = Fals
     Simulate only from means
 '''
 
-groupdata_dict, group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
                                                                         num_agents,
                                                                         group = list(inf_mean_df['group']),
                                                                         day = day,
                                                                         params = inf_mean_df.loc[:, [*param_names]])
 
-utils.plot_grouplevel(expdata_df, group_behav_df, plot_single = False)
+utils.plot_grouplevel(expdata_df, sim_group_behav_df, plot_single = False)
 # utils.plot_grouplevel(expdata_df, plot_single = True)
 
 
 #%%
 
-utils.plot_grouplevel(group_behav_df, plot_single = False)
+utils.plot_grouplevel(sim_group_behav_df, plot_single = False)
 
 # df_temp = expdata_df[expdata_df['choices_GD']>=0]
 # df_temp = df_temp[df_temp['trialsequence']>10]
@@ -848,17 +904,17 @@ newdf['labels'] = kmeans.labels_
 newdf0 = newdf[newdf['labels'] == 0]
 newdf1 = newdf[newdf['labels'] == 1]
 
-_, group_behav_df0, _ = utils.simulate_data('B', 
+_, sim_group_behav_df0, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf1)
 
-_, group_behav_df1, _ = utils.simulate_data('B', 
+_, sim_group_behav_df1, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf1['group']),
                                                 params = newdf1)
 
-utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
+utils.plot_grouplevel(sim_group_behav_df0, sim_group_behav_df1, plot_single = False)
 
 '''
 From experimental data
@@ -886,17 +942,17 @@ newdf['labels'] = kmeans.labels_
 newdf0 = newdf[newdf['labels'] == 0]
 newdf1 = newdf[newdf['labels'] == 0]
 
-_, group_behav_df0, _ = utils.simulate_data('B', 
+_, sim_group_behav_df0, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf0)
 
-_, group_behav_df1, _ = utils.simulate_data('B', 
+_, sim_group_behav_df1, _ = utils.simulate_data('B', 
                                                 len(newdf0),
                                                 group = list(newdf0['group']),
                                                 params = newdf0)
 
-utils.plot_grouplevel(group_behav_df0, group_behav_df1, plot_single = False)
+utils.plot_grouplevel(sim_group_behav_df0, sim_group_behav_df1, plot_single = False)
 
 #%%
 '''

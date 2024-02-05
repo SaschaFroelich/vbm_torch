@@ -10,6 +10,9 @@ Parameter Recovery
 @author: sascha
 """
 
+from IPython import get_ipython
+get_ipython().run_line_magic("reset", "-f")
+
 import utils
 import inferencemodels
 from datetime import datetime
@@ -53,10 +56,10 @@ Modelle:
 post_pred = 0
 model_day1 = 'Repbias_Conflict_lr'
 models_day2 = ['Repbias_Conflict_lr', 'Repbias_Conflict_nolr']
-num_inf_steps = 2
-halting_rtol = 1e-02 # for MLE estimation
+num_inf_steps = 3_000
+halting_rtol = 1e-06 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 2
+posterior_pred_samples = 5_000
 
 #%%
 '''
@@ -85,7 +88,10 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
     Fit day 1
 '''
 # import time
-# time.sleep(21*3600)
+# waithrs = 12
+# timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# print(f"Waiting for {waithrs} hours, starting at {timestamp}.")
+# time.sleep(waithrs*3600)
 
 '''
     Inference
@@ -119,7 +125,8 @@ ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
 BIC, AIC = infer.compute_IC()
 
-"----- Q_init for next day"
+"----- Q_init & seqcounter for next day"
+seq_counter_day2 = infer.agent.seq_counter.detach()
 param_names = agent.param_names
 inf_mean_df = firstlevel_df.loc[:, [*param_names, 
                       'ag_idx', 
@@ -144,18 +151,25 @@ Q_init_day2 = torch.tensor(Q_init_day2)
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day1,
                  agent.Q[-1].detach(),
-                 '',
+                 1, # day
                  'no preceding model',
                  max_log_like,
-                 mle_locs)
+                 mle_locs,
+                 '',
+                 '',
+                 secondlevel_df,
+                 param_names,
+                 'recovery',
+                 halting_rtol)
 
+filename_day1 = f'recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents'
 pickle.dump( (firstlevel_df, 
               group_behav_df_day1,
               (infer.loss, BIC, AIC), 
               params_sim_df_day1, 
               agent_elbo_tuple, 
               extra_storage), 
-            open(f"parameter_recovery/recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
+            open(f"parameter_recovery/{filename_day1}.p", "wb" ) )
 
 '''
     Fit day 2
@@ -172,12 +186,14 @@ for model_day2 in models_day2:
                                                                           num_agents,
                                                                           group = group,
                                                                           day = day,
-                                                                          Q_init = Q_init_day2.detach())
+                                                                          Q_init = Q_init_day2.detach(),
+                                                                          seq_init = seq_counter_day2)
     
     agent = utils.init_agent(model_day2, 
                              group, 
                              num_agents = num_agents,
-                             Q_init = Q_init_day2.detach())
+                             Q_init = Q_init_day2.detach(),
+                             seq_init = seq_counter_day2)
     
     print("===== Starting inference of day 2 =====")
     "----- Start Inference"
@@ -210,10 +226,16 @@ for model_day2 in models_day2:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     extra_storage = (Q_init_day2,  # initial Q-values
                      agent.Q[-1].detach(), # final Q-values
-                     '', # blocks
+                     2, # day
                      model_day1, # preceding model
                      max_log_like,
-                     mle_locs) 
+                     mle_locs,
+                     seq_counter_day2, # seq counter day 2
+                     filename_day1, # filename day 1
+                     secondlevel_df,
+                     param_names,
+                     'recovery',
+                     halting_rtol) 
     
     pickle.dump( (firstlevel_df, 
                   group_behav_df_day2, 
