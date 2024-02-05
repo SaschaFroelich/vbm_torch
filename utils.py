@@ -108,7 +108,7 @@ def load_matfiles(matfile_dir,
         torch.squeeze(torch.tensor(seq_no_jokers)).tolist(), \
             jokertypes
 
-def get_groupdata(data_dir, getall = False):
+def get_groupdata(data_dir, getall = False, RTAST = False):
     '''
 
     Parameters
@@ -145,84 +145,90 @@ def get_groupdata(data_dir, getall = False):
     group = []
     'Exclude because of errors'
     
-    include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
-           '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
-           '6286672d0165aad8f1386c27', '55cca8f81676ab000ff06ef1',
-           '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
-           '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
-           '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
-           '63af557b3d4f219c3226b7d6', '5eff5f05b92981000a2aed73',
-           '5c6e8dd877955b0001ff0c58', '5d8b66f5d189bd001a378273',
-           '62db2644ab0a3a353c0dcb54', '6329b1add3dcd53cb9c9cab8',
-           '5c321ebf6558270001bd79aa', '5d49d17b3dad1f0001e2aba1',
-           '5eadaff848b26f4483ae62d9', '60a3f8075b013de7b5518e96',
-           '5eec9ee7d900510326d78fc8', '5d8a29c082fec30001d9c24a',
-           '617406fbfced12169896d158', '5e66c77e8ebdaf4466e26326',
-           '57deda2591b7fc0001493e95', '5982eef79dfc3e00011d81e0',
-           '57dd186e6598aa0001992616', '595e7974af78da0001a21c3a',
-           '5a9ed5046475f90001a0189e', '615739949cf5767509a7e29a',
-           '5f16fde210d37701904c9dc2', '5dc5da21d999de45a504651b',
-           '5d0245966e208b0017301561', '63d79fcd741f9cfb2f87152f',
-           '59dd90f6e75b450001a68dac', '63174af7d57182f9bf90c094',
-           '5eaadc0a7adeb404eea9c3c0', '62c97799bd8ab72a531abde0',
-           '60f816ff1fa74fcfab532378', '6500615b226d81ec5db464d7',
-           '5c4b987538878c0001c7883b', '5b2a72f7c293b90001732b89',
-           '57d5ab3a722df500017f3622', '5db4ef4a2986a3000be1f886',
-           '57c4761195a3ea00016e5992', '5db32244dbe39d000be72fb0',
-           '5e850b0e390e520ec806b084', '6116b022b7ef87ef5828748b',
-           '596f961cfe061d00011e3e03', '6044ca22bc6235555362d5bb',
-           '58aca85e0da7f10001de92d4', '65389f0b0f181197c4218f6d',
-           '654abe303c4940ec0502538e', '60e2577f8c52db9d1fb5ffac',
-           '62e02b26e879244a99e852fa', '56f699e876348f000c883bba',
-           '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
-    
-    exclude_errors = [
-                  '5e07c976f6191f137214e91f' # (Grp 1)
-                  ]
-    
-    'Exclude because of execution time'
-    exclude_time = [# Grp 0
-                  '604fa685e33606f9a0ee8189',
-                  # Grp 1
-                '63ef938aea545fb9bd19a591', '56d8df02d13f6b000e542eef',
-                '601f08cba1191642cadf59c1', '6151f20d06757e43aa1f54f9', '5f48f497fae2763d537d2e6b',
-                '63e5eb956eab1f2740ac6289',
-                # Grp 2
-                '62cbed33d29c28e6be511bde', '5a54d42476d1c60001aacd6c', 
-                '59e7232f24d7bf00012f112e',
-                # Grp 3
-                '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492',
-                '5ea00d4b1286ee0008405450']
-    
-    exclude_random = []
-    exclude_random.extend(list(np.random.choice(range(19), size = 2, replace = False))) # Grp 0
-    # exclude_random.extend(list(np.random.choice(range(19, 41), size = 1, replace = False))) # Grp 1
-    exclude_random.extend(list(np.random.choice(range(41, 61), size = 2, replace = False))) # Grp 2
-    
-    exclude_random.sort()
-    print(exclude_random)
+    if not RTAST:
+        include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
+               '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
+               '6286672d0165aad8f1386c27', '55cca8f81676ab000ff06ef1',
+               '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
+               '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
+               '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
+               '63af557b3d4f219c3226b7d6', '5eff5f05b92981000a2aed73',
+               '5c6e8dd877955b0001ff0c58', '5d8b66f5d189bd001a378273',
+               '62db2644ab0a3a353c0dcb54', '6329b1add3dcd53cb9c9cab8',
+               '5c321ebf6558270001bd79aa', '5d49d17b3dad1f0001e2aba1',
+               '5eadaff848b26f4483ae62d9', '60a3f8075b013de7b5518e96',
+               '5eec9ee7d900510326d78fc8', '5d8a29c082fec30001d9c24a',
+               '617406fbfced12169896d158', '5e66c77e8ebdaf4466e26326',
+               '57deda2591b7fc0001493e95', '5982eef79dfc3e00011d81e0',
+               '57dd186e6598aa0001992616', '595e7974af78da0001a21c3a',
+               '5a9ed5046475f90001a0189e', '615739949cf5767509a7e29a',
+               '5f16fde210d37701904c9dc2', '5dc5da21d999de45a504651b',
+               '5d0245966e208b0017301561', '63d79fcd741f9cfb2f87152f',
+               '59dd90f6e75b450001a68dac', '63174af7d57182f9bf90c094',
+               '5eaadc0a7adeb404eea9c3c0', '62c97799bd8ab72a531abde0',
+               '60f816ff1fa74fcfab532378', '6500615b226d81ec5db464d7',
+               '5c4b987538878c0001c7883b', '5b2a72f7c293b90001732b89',
+               '57d5ab3a722df500017f3622', '5db4ef4a2986a3000be1f886',
+               '57c4761195a3ea00016e5992', '5db32244dbe39d000be72fb0',
+               '5e850b0e390e520ec806b084', '6116b022b7ef87ef5828748b',
+               '596f961cfe061d00011e3e03', '6044ca22bc6235555362d5bb',
+               '58aca85e0da7f10001de92d4', '65389f0b0f181197c4218f6d',
+               '654abe303c4940ec0502538e', '60e2577f8c52db9d1fb5ffac',
+               '62e02b26e879244a99e852fa', '56f699e876348f000c883bba',
+               '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
+        
+        exclude_errors = [
+                      '5e07c976f6191f137214e91f' # (Grp 1)
+                      ]
+        
+        'Exclude because of execution time'
+        exclude_time = [# Grp 0
+                      '604fa685e33606f9a0ee8189',
+                      # Grp 1
+                    '63ef938aea545fb9bd19a591', '56d8df02d13f6b000e542eef',
+                    '601f08cba1191642cadf59c1', '6151f20d06757e43aa1f54f9', '5f48f497fae2763d537d2e6b',
+                    '63e5eb956eab1f2740ac6289',
+                    # Grp 2
+                    '62cbed33d29c28e6be511bde', '5a54d42476d1c60001aacd6c', 
+                    '59e7232f24d7bf00012f112e',
+                    # Grp 3
+                    '5eebe3d7b1914c17e6208284', '6329c510ea44255e948f8492',
+                    '5ea00d4b1286ee0008405450']
+        
+        exclude_random = []
+        exclude_random.extend(list(np.random.choice(range(19), size = 2, replace = False))) # Grp 0
+        # exclude_random.extend(list(np.random.choice(range(19, 41), size = 1, replace = False))) # Grp 1
+        exclude_random.extend(list(np.random.choice(range(41, 61), size = 2, replace = False))) # Grp 2
+        
+        exclude_random.sort()
+        print(exclude_random)
     
     IDs_included = []
+
+    from os.path import exists
+    sociopsy_dir = data_dir + 'sociopsy_data.csv'
+    file_exists = exists(sociopsy_dir)
     
-    'right/left/ambidextrous: 0/1/2'
-    hand = []
-    'male/female : 0/1'
-    gender = []
-    age = []
-    
-    q_sometimes_easier = []
-    q_notice_a_sequence = []
-    q_sequence_repro = []
-    q_sequence_repro_with_help = []
-    
-    sociopsy_df = pd.read_csv(data_dir + 'sociopsy_data.csv')
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded', 'handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded', 'handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous', 'handedness'] = 2
-    
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'female', 'handedness'] = 0
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'male', 'handedness'] = 1
-    sociopsy_df.loc[sociopsy_df['handedness'] == 'other', 'handedness'] = 2
+    if file_exists:
+        'right/left/ambidextrous: 0/1/2'
+        hand = []
+        'male/female : 0/1'
+        gender = []
+        age = []
+        
+        q_sometimes_easier = []
+        q_notice_a_sequence = []
+        q_sequence_repro = []
+        q_sequence_repro_with_help = []
+        
+        sociopsy_df = pd.read_csv(sociopsy_dir)
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'righthanded', 'handedness'] = 0
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'lefthanded', 'handedness'] = 1
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'ambidextrous', 'handedness'] = 2
+        
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'female', 'handedness'] = 0
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'male', 'handedness'] = 1
+        sociopsy_df.loc[sociopsy_df['handedness'] == 'other', 'handedness'] = 2
     
     pb = -1
     for grp in range(4):
@@ -246,43 +252,55 @@ def get_groupdata(data_dir, getall = False):
                 groupdata.append(data)
                 group.append(grp)
                 IDs_included.append(ID)
-                hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['handedness'])
-                gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['gender'])
-                age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['age'])
-                
-                q_sometimes_easier.append(participant_day2['q1'][0,1][0])
-                q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
-                
-            else:
-                # if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
-                if ID in include_IDs:
-                    groupdata.append(data)
-                    group.append(grp)
-                    IDs_included.append(ID)
+                if file_exists:
                     hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['handedness'])
                     gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['gender'])
                     age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['age'])
                     
                     q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                     q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
-                    # q_sequence_repro.append(participant_day2['q3'][0,1][0])
-                    # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
-    
-    q_sometimes_easier = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
-    q_notice_a_sequence  = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_notice_a_sequence]
+                
+            else:
+                # if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
+                if not RTAST:
+                    if ID in include_IDs:
+                        groupdata.append(data)
+                        group.append(grp)
+                        IDs_included.append(ID)
+                        
+                        if file_exists:
+                            hand.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['handedness'])
+                            gender.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['gender'])
+                            age.append(sociopsy_df[sociopsy_df['ID'] == ID].iloc[0]['age'])
+                            
+                            q_sometimes_easier.append(participant_day2['q1'][0,1][0])
+                            q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
+                            # q_sequence_repro.append(participant_day2['q3'][0,1][0])
+                            # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
+                            
+                else:
+                    groupdata.append(data)
+                    group.append(grp)
+                    IDs_included.append(ID)
+                    
+        
+    if file_exists:
+        q_sometimes_easier = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
+        q_notice_a_sequence  = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_notice_a_sequence]
     
     newgroupdata = comp_groupdata(groupdata)
     num_trials = len(newgroupdata['trialsequence'])
     num_agents = len(newgroupdata['trialsequence'][0])
     newgroupdata['group'] = [group]*num_trials
-    newgroupdata['handedness'] = [hand]*num_trials
-    newgroupdata['age'] = [age]*num_trials
-    newgroupdata['gender'] = [gender]*num_trials
     
-    newgroupdata['q_sometimes_easier'] = [q_sometimes_easier]*num_trials
-    newgroupdata['q_notice_a_sequence'] = [q_notice_a_sequence]*num_trials
-    # newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
-    # newgroupdata['q_sequence_repro_with_help'] = [q_sequence_repro_with_help]*num_trials
+    if file_exists:
+        newgroupdata['handedness'] = [hand]*num_trials
+        newgroupdata['age'] = [age]*num_trials
+        newgroupdata['gender'] = [gender]*num_trials
+        newgroupdata['q_sometimes_easier'] = [q_sometimes_easier]*num_trials
+        newgroupdata['q_notice_a_sequence'] = [q_notice_a_sequence]*num_trials
+        # newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
+        # newgroupdata['q_sequence_repro_with_help'] = [q_sequence_repro_with_help]*num_trials
     
     newgroupdata['ID'] = [IDs_included]*num_trials
     newgroupdata['ag_idx'] = [torch.arange(num_agents).tolist()]*num_trials
@@ -450,7 +468,7 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
         ID = file_day1.split("/")[-1][4:9] # NicDB
     else:
         ID = file_day1.split("/")[-1][4:28] # Prolific ID
-        # ID = file_day1.split("/")[-1][4:10] # PBIDXX
+        ID = file_day1.split("/")[-1][4:10] # PBIDXX for RTAST
 
 
     # print(data_dir)
@@ -1110,7 +1128,7 @@ def simulate_data(model,
     Returns
     -------
     data : dict of nested lists.
-        Needed for inference.
+        Simulated data. Needed for inference.
         Keys: 
             choices : list of len (num_trials). Each list element a list of len (num_agents).
             choices_GD : list
@@ -1123,7 +1141,7 @@ def simulate_data(model,
             ag_idx : 
                 
                 
-    group_behav_df: DataFrame
+    group_behav_df: DataFrame with simulated data.
             
     params_sim : torch tensor, shape [num_params, num_agents]
         Contains the parameter values with which the simulations were performed.
@@ -1934,7 +1952,7 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     '''
         Within-subject correlations
     '''
-    corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
+    # corr_df = anal.within_subject_corr(post_sample_df, [*param_names])
 
     '''
         HPCF
@@ -1948,9 +1966,9 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     '''
     print("\nMerging Dataframes.")
     df1 = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], points_df, on = 'ID')
-    df2 = pd.merge(df1, corr_df, on = 'ID')
-    df3 = pd.merge(df2, hpcf_df, on = 'ID')
-    complete_df = pd.merge(df3, inf_mean_df.drop(['group'], axis=1), on = 'ID')
+    # df2 = pd.merge(df1, corr_df, on = 'ID')
+    df2 = pd.merge(df1, hpcf_df, on = 'ID')
+    complete_df = pd.merge(df2, inf_mean_df.drop(['group'], axis=1), on = 'ID')
     
     if sociopsy_df is not None:
         '''
@@ -1981,9 +1999,11 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
         complete_df = pd.merge(complete_df, RT_df, on = 'ID')
         complete_df = pd.merge(complete_df, notice_seq_df, on = 'ID')
         
-    firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
-    complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
-    complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
+        
+    "Does not work with simulated data"
+    # firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
+    # complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
+    # complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
     
     assert len(complete_df) == len(inf_mean_df)
     complete_df = complete_df.sort_values(by=['ag_idx'])
@@ -2387,4 +2407,151 @@ def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method
         #     plt.savefig(f"Partial_Spearman_Correlation_Day{day}.png", dpi=300)
         # else:
         #     plt.savefig(f"Spearman_Correlation_Day{day}.png", dpi=300)
+    plt.show()
+    
+    
+def plot_hpcf(df, title=None):
+    hpcf = list(df['hpcf_cong'])
+    hpcf.extend(list(df['hpcf_incong']))
+    hpcf.extend(list(df['hpcf_seq']))
+    hpcf.extend(list(df['hpcf_rand']))
+    
+    DTTType = [1]*len(df['hpcf_cong'])
+    DTTType.extend([2]*len(df['hpcf_incong']))
+    DTTType.extend([3]*len(df['hpcf_seq']))
+    DTTType.extend([4]*len(df['hpcf_rand']))
+    
+    dayseq = list(df['day'])
+    dayseq.extend(list(df['day']))
+    dayseq.extend(list(df['day']))
+    dayseq.extend(list(df['day']))
+    
+    IDseq = list(df['ID'])
+    IDseq.extend(list(df['ID']))
+    IDseq.extend(list(df['ID']))
+    IDseq.extend(list(df['ID']))
+    
+    HPCF_DF = pd.DataFrame({'HPCF': hpcf, 'Day': dayseq, 'ID': IDseq, 'DTTType': DTTType})
+    
+    fig, ax = plt.subplots()
+    
+    sns.barplot(data = HPCF_DF, x = 'Day', y = 'HPCF', hue='DTTType')
+    
+    if title is not None:
+        plt.title(title)
+    
+    plt.ylim([0.4, 1])
+    
+    plt.show()
+    
+    
+    
+def lineplot_daydiffs(df):
+    """
+        Plot Day 2 - Day 1 with connecting lines
+    """
+    
+    parameter_names = df['parameter'].unique()
+    num_pars = len(parameter_names)
+    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15, 7))
+    num_plot_cols = 3
+    num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
+                    (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
+    gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
+    param_idx = 0
+    for par in parameter_names:
+        
+        param_idx += 1
+        plot_col_idx = param_idx % num_plot_cols
+        plot_row_idx = (param_idx // num_plot_cols)
+        
+        # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
+        t_statistic, p_value = scipy.stats.ttest_rel(df[(df['parameter'] == par) & (df['day'] == 1)].sort_values(by='ag_idx')['mean'], 
+                                                    df[(df['parameter'] == par) & (df['day'] == 2)].sort_values(by='ag_idx')['mean'])
+        
+        if t_statistic > 0:
+            print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+
+        else:
+            print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+        
+        for name, group in df[df['parameter'] == par].groupby('ag_idx'):
+            assert len(group) == 2
+            x = np.arange(len(group))
+            y = group.sort_values(by='day')['mean']
+            slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
+            color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
+
+            if num_plot_rows > 1:
+                ax_idxs = [plot_row_idx, plot_col_idx]
+                
+            else:
+                ax_idxs = [plot_col_idx]
+            
+            "Plot Line"
+            group.plot(x='day', 
+                       y='mean', 
+                       kind = 'line', 
+                       ax = ax[*ax_idxs], 
+                       color = color, 
+                       legend = False)
+            
+            "Plot dots"
+            group.plot(x='day', 
+                        y='mean', 
+                         kind='scatter', 
+                         ax=ax[*ax_idxs], 
+                         color='black', 
+                         legend=False)
+            
+            ax[*ax_idxs].set_xlabel(par)
+                
+    plt.savefig('/home/sascha/Downloads/daydiff.svg')
+    plt.show()
+    
+def scatterplot_daydiffs(df):
+
+    num_pars = df['parameter'].unique()
+    
+    """
+        Plot Day 2 - Day 1 as scatterplots
+    """
+    parameter_names = df['parameter'].unique()
+    num_pars = len(parameter_names)
+    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,7))
+    num_plot_cols = 3
+    num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
+                    (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
+        
+    gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
+    param_idx = 0
+    
+    for par in parameter_names:
+            mean_day1 = np.array(df[(df['parameter']==par) & (df['day']==1)].sort_values(by='ag_idx')['mean'])
+            mean_day2 = np.array(df[(df['parameter']==par) & (df['day']==2)].sort_values(by='ag_idx')['mean'])
+            difference = mean_day2-mean_day1
+            
+            param_idx += 1
+            plot_col_idx = param_idx % num_plot_cols
+            plot_row_idx = (param_idx // num_plot_cols)
+            
+            # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
+            
+            if num_plot_rows > 1:
+                ax_idxs = [plot_row_idx, plot_col_idx]
+                
+            else:
+                ax_idxs = [plot_col_idx]
+            
+            # df['difference'] = -df[(df['parameter']==par) & (df['day']==1)]
+            # dfgh
+            ax[*ax_idxs].scatter(mean_day1, difference)
+            # sns.scatterplot(data = df, x=par, y='difference', ax =ax[*ax_idxs])
+            ax[*ax_idxs].axhline(0, color='k')
+            r,p = scipy.stats.pearsonr(mean_day1, difference)
+            # dfgh
+            ax[*ax_idxs].text(mean_day1.min(), difference.min(), "Pearson r=%.4f, p=%.4f"%(r,p))
+            ax[*ax_idxs].set_xlabel(par)
+              
+    # plt.savefig('/home/sascha/Downloads/daydiffscatter.svg')
     plt.show()

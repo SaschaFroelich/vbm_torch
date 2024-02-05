@@ -15,11 +15,13 @@ import glob
 
 import numpy as np
 
-import models_torch_paper as models
+import models_torch as models
 import utils
 
-def get_ddm_data(k=4, save = 0):
+def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
     '''
+    
+    
     Parameters
     ----------
     k : int
@@ -30,14 +32,14 @@ def get_ddm_data(k=4, save = 0):
 
     Returns
     -------
-    df_all : TYPE
-        DESCRIPTION.
+    df_all : DataFrame
+        1-indexed.
 
     '''
 
     print("Computing repvalues for DDM.")
     
-    _, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+    _, expdata_df = pickle.load(open(f"{preproc_file}", "rb" ))
     
     df_all = pd.DataFrame()
     
@@ -81,7 +83,7 @@ def get_ddm_data(k=4, save = 0):
                 ppchoice = -1
                 pchoice = -1
                 choice = -1
-        
+
             "----- Update repetition values rep -----"
             seqs_sum = seq_counter[blocktype, 
                                         ppchoice, 
@@ -96,17 +98,17 @@ def get_ddm_data(k=4, save = 0):
                                         0:4] / seqs_sum[..., None]
     
             repvals.append(list(new_rows))
-            
+
             pppchoice = ppchoice
             ppchoice = pchoice 
             pchoice = choice
     
         agent_data["repvals"] = repvals[0: -1]
-        
+
         df = pd.DataFrame(data=agent_data)
         # df['trialsequence'] = df['trialsequence'].map(lambda x: x[0])
         # df['trialsequence_no_jokers'] = df['trialsequence_no_jokers'].map(lambda x: x[0])
-        
+
         df = df.drop(labels=df.loc[df["trialsequence"]==-1].index, axis = 0)
         
         # "Add participant index PB"
@@ -130,7 +132,9 @@ def get_ddm_data(k=4, save = 0):
 
         df_all = pd.concat((df_all, df))
     
-    df_all["day"] = df["blockidx"].map(lambda x: 1 if x <= 6 else 2)
+    df_all["day"] = df_all["blockidx"].map(lambda x: 1 if x <= 6 else 2)
+    "1-indexing for R"
+    df_all['ag_idx'] = df_all['ag_idx'].map(lambda x: x+1)
     
     if save:
         print("Saving to file.")

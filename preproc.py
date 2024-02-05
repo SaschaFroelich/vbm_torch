@@ -40,3 +40,22 @@ pickle.dump((exp_behav_dict_day2, expdata_df[expdata_df['blockidx'] > 5]), open(
 exp_behav_dict, expdata_df = utils.get_old_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/published/Data/', getall = True, oldpub = True)
 
 pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_old_published_all.p", "wb" ) )
+
+#%% RT AST
+
+exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/proni/AST/AST2/AST2RT_Online/data/', getall = False, RTAST = True)
+pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_RTAST.p", "wb" ) )
+
+"Day 1"
+exp_behav_dict_day1= {}
+for key in exp_behav_dict.keys():   
+    exp_behav_dict_day1[key] = exp_behav_dict[key][0:2886]
+
+pickle.dump((exp_behav_dict_day1, expdata_df[expdata_df['blockidx'] <= 5]), open("behav_data/preproc_data_RTAST_day1.p", "wb" ) )
+
+"Day 2"
+exp_behav_dict_day2= {}
+for key in exp_behav_dict.keys():   
+    exp_behav_dict_day2[key] = exp_behav_dict[key][2886:]
+
+pickle.dump((exp_behav_dict_day2, expdata_df[expdata_df['blockidx'] > 5]), open("behav_data/preproc_data_RTAST_day2.p", "wb" ) )

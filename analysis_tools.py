@@ -234,7 +234,7 @@ def param_corr(df, method = 'pearson'):
         ax.annotate(corr_text, [.5, .5,],  xycoords="axes fraction",
                     ha='center', va='center', fontsize=font_size)
     
-        
+
     g = sns.PairGrid(df)
     g.map(sns.scatterplot)
     
@@ -250,8 +250,12 @@ def param_corr(df, method = 'pearson'):
     # r,p = scipy.stats.pearsonr(df_inf["omega"], df_inf["Decision Temp"])
     
     
-def within_subject_corr(df, param_names):
+def within_subject_corr(df, param_names1, param_names2, day=None):
     '''
+
+    param_names1[i] is correlated with param_names2[i]
+
+    assert len(param_names1) == len(param_names2)
 
     Parameters
     ----------
@@ -260,8 +264,11 @@ def within_subject_corr(df, param_names):
             Parameters
             ag_idx
             
-    param_names : list
-        list of parameter names for pairwise correlation.
+    param_names1 : list
+        list of parameter names for correlation.
+        
+    param_names2 : list
+        list of parameter names for correlation.
     
     Returns
     -------
@@ -271,29 +278,26 @@ def within_subject_corr(df, param_names):
 
     '''
     
-    num_params = len(param_names)
+    assert len(param_names1) == len(param_names2)
     
-    df = df.loc[:, ['ID', 'ag_idx', *param_names]]
-    identifier = 'ID'
-
+    num_params = len(param_names1)
     
     corr_dict = {}
-    corr_dict['ID'] = []
-    for param1_idx in range(num_params):
-        for param2_idx in range(param1_idx+1, num_params):
-            corr_dict[param_names[param1_idx]+'_vs_' + param_names[param2_idx]] = []
+    corr_dict['ag_idx'] = []
     
-    for ag_idx in np.sort(df['ag_idx'].unique()):
-        df_ag = df[df['ag_idx'] == ag_idx]
-        corr_dict['ID'].append(df_ag[identifier].unique()[0])
+    'Create dict keys'
+    for i in range(num_params):
+        corr_dict[param_names1[i] + '_vs_' + param_names2[i]] = []
         
-        for param1_idx in range(num_params):
-            for param2_idx in range(param1_idx+1, num_params):
-                assert len(df_ag[identifier].unique()) == 1
-                corr_dict[param_names[param1_idx] + '_vs_' + param_names[param2_idx]].append(\
-                           df_ag.loc[:, param_names[param1_idx]].corr(df_ag.loc[:, param_names[param2_idx]]))
-
-
+    'Compute corrs'
+    for agidx in df['ag_idx'].unique():
+        corr_dict['ag_idx'].append(agidx)
+        
+        for i in range(num_params):
+            mask = (df['ag_idx'] == agidx) & (df['day'] == day)
+            r_value = df[mask].loc[:, param_names1[i]].corr(df[mask].loc[:, param_names2[i]])
+            corr_dict[param_names1[i] + '_vs_' + param_names2[i]].append(r_value)
+        
     corr_df = pd.DataFrame(data = corr_dict)
 
     return corr_df
@@ -591,8 +595,9 @@ def compute_errors(df, identifier = 'ID'):
         mask = (df['trialsequence'] > 10) & (df[identifier] == ID)
         ER_dtt.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
         
-        ER_notimeouterrors_dtt.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
-        ER_timeouts_dtt.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
+        if 'correct' in df.columns:
+            ER_notimeouterrors_dtt.append(len(df[mask & (df['correct'] != 1) & (df['correct'] != 2)]) / len(df[mask]))
+            ER_timeouts_dtt.append(len(df[mask & (df['correct'] == 2)]) / len(df[mask]))
         
         "Random"
         mask = (df['trialsequence'] > 10) & (df[identifier] == ID) & (df['jokertypes'] == 0)
@@ -641,7 +646,7 @@ def compute_errors(df, identifier = 'ID'):
     er_df['ER_diff_stt'] = er_df['ER_stt_rand'] - er_df['ER_stt_seq']
     return er_df
     
-def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
+def daydiffBF(df, parameter_names, hdi_prob = None, threshold = 0, BF = None):
     '''
 
     Parameters
@@ -657,7 +662,10 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
 
     Returns
     -------
-    diffs_df : DataFrame
+    diffs_df : DataFrame containing BF that parameter is larger on day 2.
+    
+    clean_means_df : DF containing only parameters for participants where parameter is
+                    different from day 1 (according to Bayes Factor).
 
     '''
     
@@ -673,185 +681,94 @@ def daydiff(df, hdi_prob = None, threshold = 0, BF = None):
         
     df = df.copy()
     
-    if 'ID' in df.columns:
-        df_temp = df.drop(['ag_idx', 'model', 'group', 'ID', 'handedness'], axis = 1)
-        
-    else:
-        "For compatibility with recov data"
-        df_temp = df.drop(['ag_idx', 'model', 'group'], axis = 1)
-
-    parameter_names = df_temp.columns
-    del df_temp
-    from_posterior = 0
-    
     if len(df[df['ag_idx']==df['ag_idx'].unique()[0]][parameter_names[0]]) > 1:
         print("Evaluating posterior samples.")
         'df contains posterior distros for each agents.'
-        from_posterior = 1
         
         diff_dict = {}
+        # diff_dict[param] = []
+        diff_dict['ag_idx'] = []
+        # diff_dict['day'] = []
+        diff_dict['BF'] = []
+        diff_dict['parameter'] = []
+        
         for param in parameter_names:
-            # ipdb.set_trace()
-            if 'day1' in param:
-                diff_dict[param] = []
-                diff_dict[param[0:-4]+'day2'] = []
-                diff_dict['ag_idx'] = []
-                for ag_idx in df['ag_idx'].unique():
-                    df_ag = df[df['ag_idx'] == ag_idx]
-                    # t_statistic, p_value = stats.ttest_ind(df_ag[param], df_ag[param[0:-4] + 'day2'])
-                    difference_distro = np.array(df_ag[param[0:-4] + 'day2']-df_ag[param])
+
+            for ag_idx in df['ag_idx'].unique():
+                df_ag = df[df['ag_idx'] == ag_idx]
+                # t_statistic, p_value = stats.ttest_ind(df_ag[param], df_ag[param[0:-4] + 'day2'])
+                difference_distro = np.array(df_ag[df_ag['day'] == 2][param]) - np.array(df_ag[df_ag['day'] == 1][param])
+                
+                if hdi_prob is not None:
+                    raise Exception("Not implemented.")
+                    # lower, higher = az.hdi(difference_distro, 
+                    #                        hdi_prob = hdi_prob)
                     
-                    if hdi_prob is not None:
-                    
-                        lower, higher = az.hdi(difference_distro, 
-                                               hdi_prob = hdi_prob)
+                    # if lower < threshold and higher > threshold:
+                    #     print(f"threshold is in {hdi_prob*100}% HDI of parameter {param[0:-5]} for agent {ag_idx} --> Excluding agent")
                         
-                        if lower < threshold and higher > threshold:
-                            print(f"threshold is in {hdi_prob*100}% HDI of parameter {param[0:-5]} for agent {ag_idx} --> Excluding agent")
-                            
-                        else:
-                            diff_dict['ag_idx'].append(ag_idx)
-                            diff_dict[param].append(df_ag[param].mean())
-                            diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
-                            
-                    elif BF is not None:
-                        
-                        BayesF = (difference_distro > 0).sum() / (difference_distro <= 0).sum()
-                        
-                        if BayesF < BF and BayesF > 1/BF:
-                            print(f"Bayes Factor for day differences for parameter {param[0:-5]} is %.4f for {ag_idx} --> Excluding agent"%BayesF)
-                        
-                        elif BayesF >= BF or BayesF <= 1/BF:
-                            diff_dict['ag_idx'].append(ag_idx)
-                            diff_dict[param].append(df_ag[param].mean())
-                            diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
-                    
-                        else:
-                            raise Exception("Iznogood.")
-                    
-                    # if p_value < sign_level:
+                    # else:
                     #     diff_dict['ag_idx'].append(ag_idx)
                     #     diff_dict[param].append(df_ag[param].mean())
                     #     diff_dict[param[0:-4]+'day2'].append(df_ag[param[0:-4] + 'day2'].mean())
                         
+                elif BF is not None:
+                    
+                    BayesF = (difference_distro > 0).sum() / (difference_distro <= 0).sum()
+                    
+                    diff_dict['ag_idx'].append(ag_idx)
+                    diff_dict['parameter'].append(param)
+                    diff_dict['BF'].append(BayesF)
+                    
+                    if BayesF < BF and BayesF > 1/BF:
+                        print(f"Bayes Factor for day differences for parameter {param} is %.4f for {ag_idx} --> Exclude agent"%BayesF)
+                    
+                    # elif BayesF >= BF or BayesF <= 1/BF:
+                    #     diff_dict['ag_idx'].append(ag_idx)
+                    #     diff_dict[param].append(df_ag[df_ag['day'] == 1][param].mean())
+                    #     diff_dict['day'].append(1)
+                    #     diff_dict[param].append(df_ag[df_ag['day'] == 2][param].mean())
+                    #     diff_dict['day'].append(2)
+                
                     # else:
-                    #     print("Excluding agent %d for parameter %s (p-value %.4f)"%(ag_idx, param[0:-5], p_value))
+                    #     raise Exception("Iznogood.")
         
     else:
         print("No posterior samples provided.")
         
-    diffs_df = pd.DataFrame() # Will contain the differences for each participant
-        
-    num_pars = 0
-    for par in parameter_names:
-        if 'day1' in par:
-            diffs_df[par[0:-1] + '2-' + par] = df[par[0:-1] + '2']-df[par]
-            num_pars += 1
+    diffs_df = pd.DataFrame(diff_dict)
+    clean_diff_df = diffs_df[(diffs_df['BF'] > BF) | (diffs_df['BF'] < 1/BF)]
+    clean_diff_df = clean_diff_df.reset_index(drop=False)
     
-    if num_pars > 0:
-        diffs_df['ag_idx'] = df['ag_idx']
-        if 'ID' in df.columns:
-            diffs_df['ID'] = df['ID']
-        
-        """
-            Plot Day 2 - Day 1 with connecting lines
-        """
-        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,5))
-        num_plot_cols = 3
-        num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
-                        (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
-        gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
-        param_idx = 0
-        for par in parameter_names:
-            if 'day1' in par:
-                if from_posterior:
-                    del df
-                    print("Check ag_idx!!!!")
-                    df = pd.DataFrame({par : diff_dict[par], 
-                                       par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
-                                       'ag_idx' : range(len(diff_dict[par]))})
-                
-                param_idx += 1
-                plot_col_idx = param_idx % num_plot_cols
-                plot_row_idx = (param_idx // num_plot_cols)
-                
-                df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
-                t_statistic, p_value = scipy.stats.ttest_rel(df[par], df[par[0:-4]+'day2'])
-                if t_statistic > 0:
-                    print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
-
-                else:
-                    print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
-                
-                for name, group in df_plot.groupby('ag_idx'):
-                    x = np.arange(len(group))
-                    y = group['value']
-                    slope = np.polyfit(x, y, 1)[0]  # Calculate the slope
-                    color = 'g' if slope >= 0 else 'r'  # Choose color based on slope
-
-                    if num_plot_rows > 1:
-                        ax_idxs = [plot_row_idx, plot_col_idx]
-                        
-                    else:
-                        ax_idxs = [plot_col_idx]
-                    
-                    group.plot('variable', 
-                               'value', 
-                               kind = 'line', 
-                               ax = ax[*ax_idxs], 
-                               color = color, 
-                               legend = False)
-                    
-                    df_plot.plot('variable', 
-                                 'value', 
-                                 kind='scatter', 
-                                 ax=ax[*ax_idxs], 
-                                 color='black', 
-                                 legend=False)
-                    
-        plt.savefig('/home/sascha/Downloads/daydiff.svg')
-        plt.show()
-        
-        """
-            Plot Day 2 - Day 1 as scatterplots
-        """
-        fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15,8))
-        gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
-        param_idx = 0
-        for par in parameter_names:
-            if 'day1' in par:
-                if from_posterior:
-                    del df
-                    print("Check ag_idx!!!!")
-                    df = pd.DataFrame({par : diff_dict[par], 
-                                       par[0:-4]+'day2' : diff_dict[par[0:-4]+'day2'],
-                                       'ag_idx' : range(len(diff_dict[par]))})
-                
-                param_idx += 1
-                plot_col_idx = param_idx % num_plot_cols
-                plot_row_idx = (param_idx // num_plot_cols)
-                
-                # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
-                
-                if num_plot_rows > 1:
-                    ax_idxs = [plot_row_idx, plot_col_idx]
-                    
-                else:
-                    ax_idxs = [plot_col_idx]
-                
-                df['difference'] = df[par[0:-4]+'day2']-df[par]
-                sns.regplot(data = df, x=par, y='difference', color='green', ax = ax[*ax_idxs])
-                # sns.scatterplot(data = df, x=par, y='difference', ax =ax[*ax_idxs])
-                ax[*ax_idxs].axhline(0, color='k')
-                r,p = scipy.stats.pearsonr(df[par], df['difference'])
-                # dfgh
-                ax[*ax_idxs].text(df[par].min(), df['difference'].min(), "Pearson r=%.4f, p=%.4f"%(r,p))
-                  
-        plt.savefig('/home/sascha/Downloads/daydiffscatter.svg')
-        plt.show()
-        
-        return diffs_df
+    pname = []
+    mean = []
+    day = []
+    ag_idx = []
+    # IDs = []
     
+    for rowidx in range(len(clean_diff_df)):
+        paramname = clean_diff_df.loc[rowidx, 'parameter']
+        agidx = clean_diff_df.loc[rowidx, 'ag_idx']
+        # IDs = clean_diff_df.loc[rowidx, 'ID']
+        
+        mean.append(df[(df['ag_idx'] == agidx) & (df['day'] == 1)][paramname].mean())
+        pname.append(paramname)
+        day.append(1)
+        ag_idx.append(agidx)
+        
+        mean.append(df[(df['ag_idx'] == agidx) & (df['day'] == 2)][paramname].mean())
+        pname.append(paramname)
+        day.append(2)
+        ag_idx.append(agidx)
+        
+    clean_means_df = pd.DataFrame({'ag_idx': ag_idx,
+                                   # 'ID': IDs,
+                                    'parameter': pname, 
+                                   'mean': mean, 
+                                   'day': day})
+    
+    
+    return diffs_df, clean_means_df
     
 def perform_PCA(df, num_components, plot = False, correctfor = None):
     '''
