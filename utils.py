@@ -1016,7 +1016,8 @@ def init_agent(model,
                num_agents=1, 
                params = None, 
                Q_init = None, 
-               seq_init = None):
+               seq_init = None,
+               errorrates = None):
     '''
     
     Parameters
@@ -1047,6 +1048,9 @@ def init_agent(model,
 
     '''
     
+    if params is not None:
+        assert errorrates is not None
+    
     if Q_init is None:
         print("Setting Q_init.")
         Qs = torch.tensor([[0.2, 0., 0., 0.2],
@@ -1076,13 +1080,19 @@ def init_agent(model,
     model_class = getattr(model_module, model)
     
     if params is None:
-        newagent = model_class(Q_init = Q_init, num_agents = num_agents, seq_init = seq_init)
+        newagent = model_class(Q_init = Q_init, 
+                               num_agents = num_agents, 
+                               seq_init = seq_init,
+                               errorrates = errorrates)
         
     else:
         for key in params.keys():
             assert params[key].ndim == 2
             assert params[key].shape[-1] == num_agents
-        newagent = model_class(Q_init = Q_init, param_dict = params, seq_init = seq_init)
+        newagent = model_class(Q_init = Q_init, 
+                               param_dict = params, 
+                               seq_init = seq_init,
+                               errorrates = errorrates)
         
     return newagent
 
@@ -1093,7 +1103,8 @@ def simulate_data(model,
                   params = None,
                   plotres = True,
                   Q_init = None,
-                  seq_init = None):
+                  seq_init = None,
+                  errorrates = None):
     '''
     Simulates data and plots results.
     
@@ -1151,6 +1162,9 @@ def simulate_data(model,
 
     '''
     
+    if params is not None:
+        assert errorrates is not None
+    
     import env 
     start = time.time()
     print("Simulating %d agents."%num_agents)
@@ -1204,7 +1218,8 @@ def simulate_data(model,
                           num_agents = num_agents,
                           params = params,
                           Q_init = Q_init,
-                          seq_init = seq_init)
+                          seq_init = seq_init,
+                          errorrates = errorrates)
     
     if params == None:
         params_sim = {}
@@ -2015,8 +2030,9 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     return complete_df
 
 def compute_points(df, identifier = 'ID'):
-    expdata_df = df[df['outcomes'] != -1]
-    expdata_df = expdata_df[expdata_df['outcomes'] != -2]
+    print("Outcomes are not registered as -2 in simulated trials.")
+    expdata_df = df[df['choices'] != -1]
+    expdata_df = expdata_df[expdata_df['choices'] != -2]
     
     "Total"
     points = expdata_df.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()

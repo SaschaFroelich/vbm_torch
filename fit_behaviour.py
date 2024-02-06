@@ -33,9 +33,9 @@ post_pred = 0
 
 model_day1 = 'Repbias_Conflict_lr'
 models_day2 = ['Repbias_Conflict_lr', 'Repbias_Conflict_nolr']
-num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-07 # for MLE estimation
-posterior_pred_samples_day1 = 5_000
+num_inf_steps_day1 = 1
+halting_rtol_day1 = 1e-02 # for MLE estimation
+posterior_pred_samples_day1 = 1
 
 num_inf_steps_day2 = num_inf_steps_day1
 halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
@@ -45,8 +45,16 @@ posterior_pred_samples_day2 = posterior_pred_samples_day1
 
 "Day 1"
 exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
+
 num_agents = len(expdata_df_day1['ag_idx'].unique())
 group = exp_behav_dict_day1['group'][0]
+
+error_df_day1 = anal.compute_errors(expdata_df_day1)
+er_day1 = torch.zeros((4, num_agents))
+er_day1[0, :] = torch.tensor(error_df_day1['ER_stt']) # stt
+er_day1[1, :] = torch.tensor(error_df_day1['ER_randomdtt']) # random
+er_day1[2, :] = torch.tensor(error_df_day1['ER_congruent']) # congruent
+er_day1[3, :] = torch.tensor(error_df_day1['ER_incongruent']) # incongruent
 
 "Make sure same number of participants in each group"
 group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
@@ -119,7 +127,8 @@ _, _, _, sim_agent = utils.simulate_data(model_day1,
                                         num_agents,
                                         group = group,
                                         day = 1,
-                                        params = inf_mean_df.loc[:, [*param_names_day1]])
+                                        params = inf_mean_df.loc[:, [*param_names_day1]],
+                                        errorrates = er_day1)
 
 assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
 Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)

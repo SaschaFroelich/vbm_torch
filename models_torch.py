@@ -34,7 +34,8 @@ class model_master():
                  num_agents = None, 
                  param_dict = None, 
                  k=4.,
-                 seq_init = None):
+                 seq_init = None,
+                 errorrates = None):
         '''
         
         Parameters
@@ -67,6 +68,8 @@ class model_master():
         None.
 
         '''
+        if param_dict is not None:
+            assert errorrates is not None
         
         assert not ((num_agents is None) and (param_dict is None)), "Either num_agents or param_dict must be set."
         
@@ -95,8 +98,28 @@ class model_master():
                 assert self.param_dict[key].shape[0] == self.num_particles and \
                     self.param_dict[key].shape[1] == self.num_agents
         
-        self.errorrates_stt = torch.rand(self.num_agents)*0.1
-        self.errorrates_dtt = torch.rand(self.num_agents)*0.2
+        
+        if errorrates is not None:
+            assert errorrates.ndim == 2
+            assert errorrates.shape[0] == 4
+            assert errorrates.shape[1] == self.num_agents
+            
+            self.errorrates = errorrates
+            
+        else:
+            '''
+                rows
+                    0 : STT
+                    1 : Random
+                    2 : Congruent
+                    3 : incongruent
+            '''
+            self.errorrates = torch.rand((4, self.num_agents))
+            self.errorrates[0, :] = self.errorrates[0, :]*0.1
+            self.errorrates[1, :] = self.errorrates[1, :]*0.2 # random
+            self.errorrates[2, :] = self.errorrates[2, :]*0.2 # congruent 
+            self.errorrates[3, :] = self.errorrates[3, :]*0.2 # incongruent
+        
         
         "K"
         self.k = torch.tensor([k])
@@ -220,7 +243,7 @@ class model_master():
         
         return option1_python, option2_python
     
-    def choose_action(self, trial, **kwargs):
+    def choose_action(self, trial, blocktype, jokertype, **kwargs):
         '''
         Only execute for num_particles == 1.
         
@@ -228,6 +251,8 @@ class model_master():
         ----------
         trial : tensor with shape (num_agents) 
             Contains stimulus trial. 1-indexed.
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
             
         kwargs
             blocktype : torch.tensor with shape [num_agents]
@@ -246,22 +271,30 @@ class model_master():
         
         "New Code"
         "STT"
+        'cond_stt is 1 when an error is performed'
         choice_python_stt = torch.where(trial < 10, trial-1, trial)
-        cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_stt) 
-        choice_python_stt = cond_stt * self.BAD_CHOICE + ~cond_stt * choice_python_stt
+        cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[0, :]).type(torch.int)
+        choice_python_stt = cond_stt * self.BAD_CHOICE + (1-cond_stt) * choice_python_stt
         
         "DTT"
         if torch.any(trial>10):
             option1, option2 = self.find_resp_options(trial)
             "[0, :] to choose 0th particle"
             choice_sample = torch.distributions.categorical.Categorical(probs=
-                                                                        self.compute_probs(trial,
-                                                                       **kwargs)).sample()[0, :]
+                                                                        self.compute_probs(trial = trial,
+                                                                                           blocktype = blocktype,
+                                                                                           jokertype = jokertype,
+                                                                                           **kwargs)).sample()[0, :]
 
             choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
             
-            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
-            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + ~cond_dtt * choice_python_dtt
+            "cond_dtt is 1 if an error was performed"
+            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[1, :]) * (jokertype == 0).type(torch.int) + \
+                        torch.squeeze(torch.rand(self.num_agents) < self.errorrates[2, :]) * (jokertype == 1).type(torch.int) + \
+                        torch.squeeze(torch.rand(self.num_agents) < self.errorrates[3, :]) * (jokertype == 2).type(torch.int)
+            
+            # cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
+            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + (1-cond_dtt) * choice_python_dtt
             
             "Combine choices"
             choice_python = torch.where(trial < 10, 
@@ -721,7 +754,7 @@ class Repbias_lr(model_master):
             self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
             self.Q.append(self.Q[-1])
             
-            self.V.append(self.compute_V(theta_rep, theta_Q))
+            self.V.append(self.compute_V())
             
         else:
             "----- Update GD-values -----"
@@ -761,7 +794,7 @@ class Repbias_lr(model_master):
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
-            self.V.append(self.compute_V(theta_rep, theta_Q))
+            self.V.append(self.compute_V())
 
             if len(self.Q) > 20:
                 "Free up some memory space"
@@ -873,7 +906,7 @@ class Repbias_nolr(model_master):
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA)
-            self.V.append(self.compute_V(theta_rep, theta_Q))
+            self.V.append(self.compute_V())
             
         else:
             
@@ -903,7 +936,7 @@ class Repbias_nolr(model_master):
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
-            self.V.append(self.compute_V(theta_rep, theta_Q))
+            self.V.append(self.compute_V())
 
             if len(self.V) > 20:
                 "Free up some memory space"
@@ -1326,7 +1359,10 @@ class Repbias_CongConflict_lr(Repbias_lr):
                             (-1*1 -1)/-2 = 1
         '''
         incong_bool = ((torch.sign(DeltaQ).type(torch.int) * torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
-        cong_bool = ~incong_bool
+        
+        assert torch.all(incong_bool > -1) and torch.all(incong_bool < 2)
+        
+        cong_bool = 1-incong_bool
         conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
         
         '''
@@ -1416,7 +1452,9 @@ class Repbias_CongConflict_nolr(Repbias_nolr):
                             (-1*1 -1)/-2 = 1
         '''
         incong_bool = ((torch.sign(DeltaQ).type(torch.int) * torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
-        cong_bool = ~incong_bool
+        assert torch.all(incong_bool > -1) and torch.all(incong_bool < 2)
+        
+        cong_bool = 1-incong_bool
         conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
         
         '''
@@ -2314,7 +2352,8 @@ class Bullshitmodel(Repbias_lr):
         "STT"
         choice_python_stt = torch.where(trial < 10, trial-1, trial)
         cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_stt) 
-        choice_python_stt = cond_stt * self.BAD_CHOICE + ~cond_stt * choice_python_stt
+        dfgh
+        choice_python_stt = cond_stt * self.BAD_CHOICE + (1-cond_stt) * choice_python_stt
         
         "DTT"
         if torch.any(trial>10):
@@ -2327,11 +2366,11 @@ class Bullshitmodel(Repbias_lr):
             choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
             
             cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
-            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + ~cond_dtt * choice_python_dtt
+            dfgh
+            choice_python_dtt =  cond_dtt * self.BAD_CHOICE + (1-cond_dtt) * choice_python_dtt
             
             "Combine choices"
             choice_python = torch.where(trial < 10, choice_python_stt, choice_python_dtt)
-            
             # assert choice_python.ndim == 1
             return choice_python.clone().detach()
         

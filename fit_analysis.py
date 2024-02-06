@@ -37,10 +37,10 @@ if len(extra_storage) >= 10:
         raise Exception("rhalt too large for IC computation.")
 else:
     param_names = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
-    param_names = ['theta_Q', 'theta_rep', 'theta_conflict'] # Conflict nolr
-    param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+    # param_names = ['theta_Q', 'theta_rep', 'theta_conflict'] # Conflict nolr
+    # param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
     # param_names = ['theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
-    param_names = ['lr', 'theta_Q', 'theta_rep'] # Repbias nolr
+    # param_names = ['lr', 'theta_Q', 'theta_rep'] # Repbias nolr
 
 day = extra_storage[2]
 
@@ -175,12 +175,25 @@ if 0:
 '''
     Simulate from means
 '''
+'''
+er:
+    0 : STT
+    1 : Random
+    2 : Congruent
+    3 : incongruent
+'''
+er = torch.zeros((4, num_agents))
+er[0, :] = torch.tensor(complete_df['ER_stt']) # stt
+er[1, :] = torch.tensor(complete_df['ER_randomdtt']) # random
+er[2, :] = torch.tensor(complete_df['ER_congruent']) # congruent
+er[3, :] = torch.tensor(complete_df['ER_incongruent']) # incongruent
 if day == 1:
     groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
                                                                             num_agents,
                                                                             group = list(inf_mean_df['group']),
                                                                             day = day,
-                                                                            params = inf_mean_df.loc[:, [*param_names]])
+                                                                            params = inf_mean_df.loc[:, [*param_names]],
+                                                                            errorrates = er)
     
     utils.plot_grouplevel(expdata_df, sim_group_behav_df, plot_single = False)
     
@@ -192,7 +205,8 @@ elif day == 2:
                                                                             day = day,
                                                                             Q_init = Q_init,
                                                                             seq_init = seq_counter_day2,
-                                                                            params = inf_mean_df.loc[:, [*param_names]])
+                                                                            params = inf_mean_df.loc[:, [*param_names]],
+                                                                            errorrates = er)
     
     utils.plot_grouplevel(expdata_df, sim_group_behav_df_day2, plot_single = False)
     sim_group_behav_df_day2['day'] = 2
@@ -222,8 +236,8 @@ if day == 2 and len(extra_storage) > 6:
             raise Exception("rhalt too large for IC computation.")
             
     else:
-        param_names_day1 = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
-        param_names_day1 = ['lr', 'theta_Q', 'theta_rep'] # Repbias
+        # param_names_day1 = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+        # param_names_day1 = ['lr', 'theta_Q', 'theta_rep'] # Repbias
         param_names_day1 = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
     
     if 'handedness' in post_sample_df_day1.columns:
@@ -259,11 +273,17 @@ if day == 2 and len(extra_storage) > 6:
     post_sample_df['day'] = 2
     post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df], ignore_index=True)
     
+    er = torch.zeros((4, num_agents))
+    er[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
+    er[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
+    er[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
+    er[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
     groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = utils.simulate_data(model_day1, 
                                                                             num_agents,
                                                                             group = list(inf_mean_df['group']),
                                                                             day = 1,
-                                                                            params = inf_mean_df_day1.loc[:, [*param_names_day1]])
+                                                                            params = inf_mean_df_day1.loc[:, [*param_names_day1]],
+                                                                            errorrates = er)
     
     sim_group_behav_df_day1['day'] = 1
     
