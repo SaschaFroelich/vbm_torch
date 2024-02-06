@@ -2116,7 +2116,6 @@ def compute_hpcf(expdata_df):
     df_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
     
-    
     hpcf_df = pd.merge(hpcf_df, hpcf, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_seq, on = 'ID')
@@ -2411,6 +2410,29 @@ def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method
     
     
 def plot_hpcf(df, title=None):
+    '''
+    
+
+    Parameters
+    ----------
+    df : DataFrame
+        Columns:
+            hpcf_cong
+            hpcf_incong
+            hpcf_Seq
+            hpcf_rand
+            day
+            ID
+        
+    title : TYPE, optional
+        DESCRIPTION. The default is None.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
     hpcf = list(df['hpcf_cong'])
     hpcf.extend(list(df['hpcf_incong']))
     hpcf.extend(list(df['hpcf_seq']))
@@ -2434,6 +2456,9 @@ def plot_hpcf(df, title=None):
     HPCF_DF = pd.DataFrame({'HPCF': hpcf, 'Day': dayseq, 'ID': IDseq, 'DTTType': DTTType})
     
     fig, ax = plt.subplots()
+    
+    rename_dtt = ['Cong', 'Incong', 'Fix', 'Rand']
+    HPCF_DF['DTTType'] = HPCF_DF['DTTType'].map(lambda x: rename_dtt[x-1])
     
     sns.barplot(data = HPCF_DF, x = 'Day', y = 'HPCF', hue='DTTType')
     

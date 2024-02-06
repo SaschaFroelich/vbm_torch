@@ -1103,7 +1103,7 @@ RT_df.to_csv('RT_rmanova.csv')
 
 #%%
 '''
-    (Partial) Spearman Correlation
+    (Partial) Correlation
 '''
 
 day = 2
@@ -1248,7 +1248,7 @@ elif day == 2:
     #            'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
     #           'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
 
-r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'spearman')
+r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'pearson')
 
 utils.plot_corr_network(r_matrix,
                          p_matrix,
@@ -1257,7 +1257,7 @@ utils.plot_corr_network(r_matrix,
                          method = 'p',
                          correctp = False,
                          title=f'Day {day}',
-                         saveas=f'Spearman R Day {day}')
+                         saveas=f'Pearson_R_Day{day}')
 
 #%%
 '''

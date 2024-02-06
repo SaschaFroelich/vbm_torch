@@ -28,13 +28,13 @@ Modelle:
     OnlyQ_lr
 '''
 
-waithrs = 2
+waithrs = 0
 post_pred = 0
 
-model_day1 = 'Repbias_Interaction_lr'
-models_day2 = ['Repbias_Interaction_lr Repbias_Interaction_nolr']
+model_day1 = 'Repbias_Conflict_lr'
+models_day2 = ['Repbias_Conflict_lr', 'Repbias_Conflict_nolr']
 num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-06 # for MLE estimation
+halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 5_000
 
 num_inf_steps_day2 = num_inf_steps_day1
@@ -107,8 +107,8 @@ BIC, AIC = infer.compute_IC()
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
 
-param_names = agent.param_names
-inf_mean_df = firstlevel_df.loc[:, [*param_names, 
+param_names_day1 = agent.param_names
+inf_mean_df = firstlevel_df.loc[:, [*param_names_day1, 
                       'ag_idx', 
                       'ID']].groupby(['ag_idx', 
                                       'ID'], as_index = False).mean()
@@ -119,7 +119,7 @@ _, _, _, sim_agent = utils.simulate_data(model_day1,
                                         num_agents,
                                         group = group,
                                         day = 1,
-                                        params = inf_mean_df.loc[:, [*param_names]])
+                                        params = inf_mean_df.loc[:, [*param_names_day1]])
 
 assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
 Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
@@ -147,7 +147,7 @@ extra_storage = (Q_init_day1,
                  '',
                  '',
                  secondlevel_df,
-                 param_names,
+                 param_names_day1,
                  'behav_fit',
                  halting_rtol_day1)
 
@@ -172,7 +172,7 @@ for model_day2 in models_day2:
                              num_agents = num_agents,
                              Q_init = Q_init_day2.detach(),
                              seq_init = seq_counter_day2)
-    
+    param_names_day2 = agent.param_names
     print("===== Starting inference for day 2 =====")
     "----- Start Inference"
     infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
@@ -215,7 +215,7 @@ for model_day2 in models_day2:
                      seq_counter_day2, # seq counter day 2
                      filename_day1, # filename day 1
                      secondlevel_df,
-                     param_names,
+                     param_names_day2,
                      'behav_fit',
                      halting_rtol_day2)
     

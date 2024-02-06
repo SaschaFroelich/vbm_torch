@@ -37,7 +37,11 @@ if len(extra_storage) >= 10:
         raise Exception("rhalt too large for IC computation.")
 else:
     param_names = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
-    # param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+    param_names = ['theta_Q', 'theta_rep', 'theta_conflict'] # Conflict nolr
+    param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+    # param_names = ['theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+    param_names = ['lr', 'theta_Q', 'theta_rep'] # Repbias nolr
+
 day = extra_storage[2]
 
 print(f"Preceding model is {extra_storage[3]}.")
@@ -200,8 +204,10 @@ if day == 2 and len(extra_storage) > 6:
     if len(extra_storage) >= 10:
         if extra_storage[10] == 'recovery':
             post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
+            
         elif extra_storage[10] == 'behav_fit':
             post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')    
+            
         else:
             raise Exception('Error')
         
@@ -209,7 +215,16 @@ if day == 2 and len(extra_storage) > 6:
         post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')
         
     post_sample_df_day1['day'] = 1
-    param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
+    # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
+    if len(extra_storage_day1) >= 10:
+        param_names_day1 = extra_storage_day1[9]
+        if extra_storage_day1[11] >= 1e-03:
+            raise Exception("rhalt too large for IC computation.")
+            
+    else:
+        param_names_day1 = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
+        param_names_day1 = ['lr', 'theta_Q', 'theta_rep'] # Repbias
+        param_names_day1 = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
     
     if 'handedness' in post_sample_df_day1.columns:
         inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
@@ -244,11 +259,11 @@ if day == 2 and len(extra_storage) > 6:
     post_sample_df['day'] = 2
     post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df], ignore_index=True)
     
-    groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = utils.simulate_data(model, 
+    groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = utils.simulate_data(model_day1, 
                                                                             num_agents,
                                                                             group = list(inf_mean_df['group']),
                                                                             day = 1,
-                                                                            params = inf_mean_df.loc[:, [*param_names]])
+                                                                            params = inf_mean_df_day1.loc[:, [*param_names_day1]])
     
     sim_group_behav_df_day1['day'] = 1
     
@@ -274,7 +289,7 @@ hpcf_day2['day'] = 2
 
 hpcf_df_all = pd.concat((hpcf_day1, hpcf_day2), ignore_index = True)
 
-utils.plot_hpcf(hpcf_df_all, title='Model')
+utils.plot_hpcf(hpcf_df_all, title=f'{model}')
 
 #%%
 '''
