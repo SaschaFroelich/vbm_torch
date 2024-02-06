@@ -95,7 +95,6 @@ class model_master():
                 assert self.param_dict[key].shape[0] == self.num_particles and \
                     self.param_dict[key].shape[1] == self.num_agents
         
-        
         self.errorrates_stt = torch.rand(self.num_agents)*0.1
         self.errorrates_dtt = torch.rand(self.num_agents)*0.2
         
@@ -275,6 +274,29 @@ class model_master():
         else:
             # assert choice_python_stt.ndim == 1
             return choice_python_stt.clone().detach()
+        
+        
+    def reset(self, locs):
+        self.param_dict = self.locs_to_pars(locs)
+        
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and rep"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA] # habitual values (repetition values)
+
+        "Compute V"        
+        self.V.append(self.compute_V())
+        
+        "Sequence Counter"
+        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
+        "-2 in seq_counter for errors"
+        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
+        self.seq_counter = self.init_seq_counter.clone().detach()
 
 class Vbm_lr(model_master):
     '''
@@ -289,8 +311,12 @@ class Vbm_lr(model_master):
     num_params = len(param_names)
     
     def specific_init(self):
-        self.V = [((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
-                   self.param_dict['omega'][..., None]*self.Q[-1])]
+        self.V = [self.compute_V()]
+
+    def compute_V(self):
+        
+        return ((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
+                   self.param_dict['omega'][..., None]*self.Q[-1])
 
     def locs_to_pars(self, locs):
         '''
@@ -434,29 +460,6 @@ class Vbm_lr(model_master):
             self.pppchoice = self.ppchoice
             self.ppchoice = self.pchoice
             self.pchoice = choices
-            
-    def reset(self, locs):
-        self.param_dict = self.locs_to_pars(locs)
-        
-        self.num_particles = locs.shape[0]
-        self.num_agents = locs.shape[1]
-        
-        "K"
-        # self.k = kwargs["k"]
-            
-        "Q and rep"
-        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
-        self.rep = [torch.ones(self.num_particles, self.num_agents, 4)*0.25] # habitual values (repetition values)
-        
-        "Compute V"        
-        self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + \
-                      self.param_dict['omega'][..., None]*self.Q[-1])
-        
-        "Sequence Counter"
-        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
-        "-2 in seq_counter for errors"
-        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
-        self.seq_counter = self.init_seq_counter.clone().detach()
         
 class Vbm_nolr(model_master):
     '''
@@ -471,8 +474,13 @@ class Vbm_nolr(model_master):
     num_params = len(param_names)
     
     def specific_init(self):
-        self.V = [((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
-                   self.param_dict['omega'][..., None]*self.Q[-1])]
+        self.V = [self.compute_V()]
+            
+            
+    def compute_V(self):
+        
+        return ((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
+                   self.param_dict['omega'][..., None]*self.Q[-1])
 
     def locs_to_pars(self, locs):
         '''
@@ -609,29 +617,6 @@ class Vbm_nolr(model_master):
             self.pppchoice = self.ppchoice
             self.ppchoice = self.pchoice
             self.pchoice = choices
-            
-    def reset(self, locs):
-        self.param_dict = self.locs_to_pars(locs)
-        
-        self.num_particles = locs.shape[0]
-        self.num_agents = locs.shape[1]
-        
-        "K"
-        # self.k = kwargs["k"]
-            
-        "Q and rep"
-        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
-        self.rep = [torch.ones(self.num_particles, self.num_agents, 4)*0.25] # habitual values (repetition values)
-        
-        "Compute V"        
-        self.V.append((1-self.param_dict['omega'])[..., None]*self.rep[-1] + \
-                      self.param_dict['omega'][..., None]*self.Q[-1])
-        
-        "Sequence Counter"
-        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
-        "-2 in seq_counter for errors"
-        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
-        self.seq_counter = self.init_seq_counter.clone().detach()
 
 class Repbias_lr(model_master):
     
@@ -643,13 +628,12 @@ class Repbias_lr(model_master):
     
     def specific_init(self):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
-        self.V = [self.compute_V(self.param_dict['theta_rep'], 
-                                 self.param_dict['theta_Q'])]
-    
-    def compute_V(self, theta_rep, theta_Q):
+        self.V = [self.compute_V()]
         
-        return theta_rep[..., None]*self.rep[-1] + \
-                theta_Q[..., None]*self.Q[-1]
+    def compute_V(self):
+        
+        return self.param_dict['theta_rep'][..., None]*self.rep[-1] + \
+                self.param_dict['theta_Q'][..., None]*self.Q[-1]
         
     def locs_to_pars(self, locs):
         param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
@@ -791,35 +775,6 @@ class Repbias_lr(model_master):
             self.ppchoice = self.pchoice
             self.pchoice = choices
 
-    def reset(self, locs):
-        
-        self.param_dict = self.locs_to_pars(locs)
-        
-        "Setup"
-        self.num_particles = locs.shape[0]
-        self.num_agents = locs.shape[1]
-        
-        "K"
-        # self.k = kwargs["k"]
-            
-        "Q and rep"
-        self.Q = [self.Q_init.broadcast_to(self.num_particles, 
-                                           self.num_agents, 
-                                           self.NA)] # Goal-Directed Q-Values
-        
-        self.rep = [torch.ones(self.num_particles, 
-                               self.num_agents, 
-                               self.NA)*1./self.NA] # habitual values (repetition values)
-        
-        "Compute V"
-        self.V.append(self.param_dict['theta_rep'][..., None]*self.rep[-1] +
-                      self.param_dict['theta_Q'][..., None]*self.Q[-1])
-        
-        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
-        "-2 in seq_counter for errors"
-        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
-        self.seq_counter = self.init_seq_counter.clone().detach()
-
 class Repbias_nolr(model_master):
     
     param_names = ['theta_Q',
@@ -829,13 +784,12 @@ class Repbias_nolr(model_master):
     
     def specific_init(self):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
-        self.V = [self.compute_V(self.param_dict['theta_rep'], 
-                                 self.param_dict['theta_Q'])]
+        self.V = [self.compute_V()]
     
-    def compute_V(self, theta_rep, theta_Q):
+    def compute_V(self):
         
-        return theta_rep[..., None]*self.rep[-1] + \
-                theta_Q[..., None]*self.Q[-1]
+        return self.param_dict['theta_rep'][..., None]*self.rep[-1] + \
+                self.param_dict['theta_Q'][..., None]*self.Q[-1]
         
     def locs_to_pars(self, locs):
         param_dict = {'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
@@ -961,35 +915,6 @@ class Repbias_nolr(model_master):
             self.pppchoice = self.ppchoice
             self.ppchoice = self.pchoice
             self.pchoice = choices
-
-    def reset(self, locs):
-        
-        self.param_dict = self.locs_to_pars(locs)
-        
-        "Setup"
-        self.num_particles = locs.shape[0]
-        self.num_agents = locs.shape[1]
-        
-        "K"
-        # self.k = kwargs["k"]
-            
-        "Q and rep"
-        self.Q = [self.Q_init.broadcast_to(self.num_particles, 
-                                           self.num_agents, 
-                                           self.NA)] # Goal-Directed Q-Values
-        
-        self.rep = [torch.ones(self.num_particles, 
-                               self.num_agents, 
-                               self.NA)*1./self.NA] # habitual values (repetition values)
-        
-        "Compute V"
-        self.V.append(self.param_dict['theta_rep'][..., None]*self.rep[-1] +
-                      self.param_dict['theta_Q'][..., None]*self.Q[-1])
-        
-        "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
-        "-2 in seq_counter for errors"
-        "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
-        self.seq_counter = self.init_seq_counter.clone().detach()
 
 class Repbias_Conflict_lr(Repbias_lr):
     
@@ -1548,8 +1473,7 @@ class OnlyQ_lr(model_master):
         day : int
             Day of experiment.
 
-        blocktype : torch.tensor with shape [num_agents]
-            0/1 : sequential/ random 
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
@@ -1694,6 +1618,8 @@ class OnlyQ_nolr(model_master):
 
         blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
@@ -1828,6 +1754,8 @@ class Q_seqimpact_lr(model_master):
 
         blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
@@ -1976,6 +1904,8 @@ class Q_seqimpact_nolr(model_master):
 
         blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
@@ -2117,6 +2047,8 @@ class Q_seqimpact_conflict_lr(model_master):
 
         blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
+
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
