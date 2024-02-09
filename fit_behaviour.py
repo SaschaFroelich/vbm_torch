@@ -21,21 +21,21 @@ import utils
 '''
 Modelle:
 
-    Vbm_lr
-    Repbias_lr
-    Repbias_Conflict
-    Repbias_CongConflict_lr
-    OnlyQ_lr
+    Vbm - 1 parameter 
+    Repbias - 2 parameters
+    Repbias_Conflict - 3 parameters
+    Repbias_Interaction - 3 parameters
+    OnlyQ - 3 parameters
 '''
 
 waithrs = 0
-post_pred = 0
+post_pred = 1
 
 model_day1 = 'Repbias_Conflict_lr'
-models_day2 = ['Repbias_Conflict_lr', 'Repbias_Conflict_nolr']
-num_inf_steps_day1 = 1
-halting_rtol_day1 = 1e-02 # for MLE estimation
-posterior_pred_samples_day1 = 1
+models_day2 = ['Repbias_Conflict_lr']
+num_inf_steps_day1 = 3_000
+halting_rtol_day1 = 1e-07 # for MLE estimation
+posterior_pred_samples_day1 = 2_000
 
 num_inf_steps_day2 = num_inf_steps_day1
 halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
@@ -96,11 +96,13 @@ agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_pa
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
-    firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples_day1)
-
+    firstlevel_df, secondlevel_df, predictive_choices, obs_mask = infer.posterior_predictives(n_samples = posterior_pred_samples_day1)
+    
 else:
     firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples_day1)
     secondlevel_df = None
+    predictive_choices = None
+    obs_mask = None
 
 firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['group'][0][x])
 firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
@@ -110,7 +112,7 @@ firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1[
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC = infer.compute_IC()
+BIC, AIC, WAIC, ll = infer.compute_IC()
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -147,18 +149,22 @@ params_sim_df['model']  = model_day1
 
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-extra_storage = (Q_init_day1,
-                 agent.Q[-1].detach(),
-                 1, # day
-                 'no preceding model',
-                 max_log_like,
-                 mle_locs,
-                 '',
-                 '',
-                 secondlevel_df,
-                 param_names_day1,
-                 'behav_fit',
-                 halting_rtol_day1)
+extra_storage = (Q_init_day1, # 0
+                 agent.Q[-1].detach(), # 1
+                 1, # day # 2
+                 'no preceding model', # 3
+                 max_log_like, # 4
+                 mle_locs, # 5
+                 '', # 6
+                 '', # 7
+                 secondlevel_df, # 8
+                 param_names_day1, # 9
+                 'behav_fit', # 10
+                 halting_rtol_day1, # 11
+                 WAIC, # 12
+                 ll,
+                 predictive_choices,
+                 obs_mask) # 13
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
@@ -189,10 +195,13 @@ for model_day2 in models_day2:
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
     if post_pred:
-        firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples_day2)
+        firstlevel_df, secondlevel_df, predictive_choices, obs_mask = infer.posterior_predictives(n_samples = posterior_pred_samples_day2)
+        
     else:
         firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples_day2)
         secondlevel_df = None
+        predictive_choices = None
+        obs_mask = None
     
     firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['group'][0][x])
     firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
@@ -202,7 +211,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC = infer.compute_IC()
+    BIC, AIC, WAIC, ll = infer.compute_IC()
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -226,7 +235,11 @@ for model_day2 in models_day2:
                      secondlevel_df,
                      param_names_day2,
                      'behav_fit',
-                     halting_rtol_day2)
+                     halting_rtol_day2,
+                     WAIC,
+                     ll,
+                     predictive_choices,
+                     obs_mask)
     
     if num_inf_steps_day2 > 1:
         pickle.dump( (firstlevel_df, 

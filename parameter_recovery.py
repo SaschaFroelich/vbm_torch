@@ -110,11 +110,13 @@ agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps, num_particl
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
-    firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+    firstlevel_df, secondlevel_df, predictive_choices, obs_mask = infer.posterior_predictives(n_samples = posterior_pred_samples)
     
 else:
     firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
     secondlevel_df = None
+    predictive_choices = None
+    obs_mask = None
 
 firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day1['group'][0][x])
 firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
@@ -123,7 +125,7 @@ ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
-BIC, AIC = infer.compute_IC()
+BIC, AIC, WAIC, ll = infer.compute_IC()
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -160,7 +162,11 @@ extra_storage = (Q_init_day1,
                  secondlevel_df,
                  param_names_day1,
                  'recovery',
-                 halting_rtol)
+                 halting_rtol,
+                 WAIC,
+                 ll,
+                 predictive_choices,
+                 obs_mask)
 
 filename_day1 = f'recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents'
 pickle.dump( (firstlevel_df, 
@@ -204,7 +210,7 @@ for model_day2 in models_day2:
     
     "----- Sample parameter estimates from posterior and add information to DataFrame"
     if post_pred:
-        firstlevel_df, secondlevel_df = infer.posterior_predictives(n_samples = posterior_pred_samples)
+        firstlevel_df, secondlevel_df, predictive_choices, obs_mask = infer.posterior_predictives(n_samples = posterior_pred_samples)
         
     else:
         firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
@@ -218,7 +224,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
-    BIC, AIC = infer.compute_IC()
+    BIC, AIC, WAIC, ll = infer.compute_IC()
     
     # "----- Q_init for next day"
     # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
@@ -237,7 +243,11 @@ for model_day2 in models_day2:
                      secondlevel_df,
                      param_names_day2,
                      'recovery',
-                     halting_rtol) 
+                     halting_rtol,
+                     WAIC,
+                     ll,
+                     predictive_choices,
+                     obs_mask) 
     
     pickle.dump( (firstlevel_df, 
                   group_behav_df_day2, 

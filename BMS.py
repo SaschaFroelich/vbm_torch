@@ -45,9 +45,11 @@ def sweep_probs(samples, index):
 
 num_models = 2
 num_agents = 60
+elbos_2nd_lvl = np.zeros(num_models)
 elbos = np.zeros((num_agents, num_models))
 AICs = np.zeros((num_agents, num_models))
 BICs = np.zeros((num_agents, num_models))
+WAIC = np.zeros(num_models)
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
 # 'behav_fit_model_Bhand_2023-11-28 23:25:11.p',
 # 'behav_fit_model_Conflict_2023-12-02 00:14:47_60agents.p',
@@ -63,8 +65,10 @@ participants = pd.DataFrame()
 for model in range(num_models):
     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
     elbos[:, model] = (-agent_elbo_tuple[0]).tolist()
+    elbos_2nd_lvl[model] = -np.array(loss[-10:]).mean()
     AICs[:, model] = np.squeeze(AIC)
     BICs[:, model] = np.squeeze(BIC)
+    WAIC[model] = np.squeeze(extra_storage[12])
     if len(extra_storage) >= 10:
         if extra_storage[11] >= 1e-03:
             raise Exception("rhalt too large for IC computation.")
@@ -92,7 +96,7 @@ with pm.Model() as BMS:
     pm.DensityDist('log_joint', model_probs, logp=logp,
                     observed=elbos)
     
-    BMSinferenceData = pm.sample(chains = 4, draws = 12_000, tune = 6000)
+    BMSinferenceData = pm.sample(chains = 4, draws = 16_000, tune = 6000)
 
 az.summary(BMSinferenceData)
 
@@ -135,19 +139,82 @@ import pickle
 
 #%%
 
-fig, ax = plt.subplots(1,2, sharey = True)
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(1,2, sharey = True, figsize = (15,5))
 for midx in range(num_models):
-    ax[0].scatter(range(num_agents), AICs[:, midx], s=5, label=model_names[midx])
+    # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+    ax[0].scatter(range(num_agents), AICs[:, midx], 
+                  marker=markershapes[midx], 
+                  edgecolor=colors[midx], 
+                  facecolors='none', 
+                  linewidth=1, 
+                  label=model_names[midx])
     
 ax[0].legend()
 ax[0].title.set_text(f'AIC (day {day})')
 ax[0].set_xlabel('Agent no.')
+ax[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
+
 
 for midx in range(num_models):
-    ax[1].scatter(range(num_agents), BICs[:, midx], s=5, label=model_names[midx])
+    ax[1].scatter(range(num_agents), BICs[:, midx], 
+                  marker=markershapes[midx], 
+                  edgecolor=colors[midx], 
+                  facecolors='none', 
+                  linewidth=1, 
+                  label=model_names[midx])
+    
     
 ax[1].legend()
 ax[1].title.set_text(f'BIC (day {day})')
 ax[1].set_xlabel('Agent no.')
+ax[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
 plt.savefig('BMS/ICs.png')
+plt.show()
+
+#%%
+'''
+    Compute Bayes Factors
+    BF = p(y_A)/p(y_B) = exp[log p(y_A) - log p(y_B)] = exp[elbo_A - elbo_B]
+'''
+
+compidx = model_names.index('Repbias_Conflict_lr')
+
+num_comparisons = num_models - 1
+
+BF = np.zeros((num_comparisons, num_agents))
+BF_2nd_lvl = np.zeros(num_comparisons)
+
+compnumb = 0
+for i in range(num_models):
+    if i != compidx:
+        BF[compnumb, :] = np.exp(elbos[:, compidx] - elbos[:, i])
+        BF_2nd_lvl[compnumb] = np.exp(elbos_2nd_lvl[compidx] - elbos_2nd_lvl[i])
+        # BF[compnumb, :] = np.exp(elbos[:, compidx]) / np.exp(elbos[:, i])
+        compnumb += 1
+        
+#%%
+'''
+    Plot WAIC
+'''
+
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(1)
+ax.scatter(range(num_models), WAIC)
+    
+# ax.legend()
+ax.title.set_text(f'WAIC (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/WAIC.png')
 plt.show()

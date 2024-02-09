@@ -58,6 +58,9 @@ class GeneralGroupInference():
         self.comp_subj_trials() # Trials per subject (used for AIC and BIC computation)
 
     def comp_subj_trials(self):
+        '''
+            Computes how many observations per participant (needed for BIC computation)
+        '''
         data_df = pd.DataFrame(self.data).explode(list(self.data.keys()))
         data_df = data_df[data_df['trialsequence'] > 10]
         data_df = data_df[data_df['choices'] != -2]
@@ -69,10 +72,8 @@ class GeneralGroupInference():
         "Arrange rows as they appear in self.data dict"
         data_df = data_df.loc[self.data['ID'][0], :]
         self.trial_counts = torch.squeeze(torch.tensor(data_df.to_numpy()))
-        
 
     def model(self, *args):
-        
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
         # torch.manual_seed(1234)
@@ -95,7 +96,6 @@ class GeneralGroupInference():
         # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
         # i.e. p1 below will have the length num_agents
         with pyro.plate('ag_idx', self.num_agents):
-            
             # draw parameters from Normal and transform (for numeric trick reasons)
             base_dist = dist.Normal(0., 1.).expand_by([self.num_params]).to_event(1)
             transform = dist.transforms.AffineTransform(mu, sig) # Transform via the pointwise affine mapping y = loc + scale*x (-> Neal's funnel)
@@ -138,6 +138,7 @@ class GeneralGroupInference():
                      dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
                      infer={'is_auxiliary': True})
 
+        # mu & tau unconstrained
         unc_mu = hyp[..., :self.num_params]
         unc_tau = hyp[..., self.num_params:]
 
@@ -233,18 +234,16 @@ class GeneralGroupInference():
 
             sample_dict["ag_idx"].extend(self.data['ag_idx'][0])
             sample_dict["ID"].extend(self.data['ID'][0])
-    
+
         firstlevel_df = pd.DataFrame(sample_dict)
         return firstlevel_df
     
     def posterior_predictives(self, n_samples = 1_000):
         '''
-
         Parameters
         ----------
         n_samples : int, optional
             The number of predictive samples. The default is 1_000.
-            
 
         Returns
         -------
@@ -253,6 +252,7 @@ class GeneralGroupInference():
         '''
 
         import time
+        import pprint as pp
         from pyro.infer import Predictive
         start = time.time()
         print(f"Posterior predictives with {n_samples} samples.")
@@ -265,14 +265,46 @@ class GeneralGroupInference():
         for param in self.agent.param_names:
             secondlevel_dict[param + '_sig'] = []
 
+        "Determine number of observation sites"
+        predictive_svi = Predictive(model = self.model,  
+                                    guide = self.guide, 
+                                    num_samples=1)()
+        
+        num_observed = sum([1 if '_observed' in k else 0 for k in predictive_svi.keys()])
+        
+        "Array for predictive choices"
+        predictive_choices = torch.zeros((self.num_agents, n_samples, num_observed))
+        
+        "Get obs mask"
+        obs_mask = torch.zeros((self.num_agents, num_observed))
+
+        conditioned_model = pyro.condition(self.model, 
+                                            data = {'locs' : self.guide()['locs']})
+        
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
+        
+        obs = 0
+        for k, v in trace.nodes.items():
+            if '_observed' in k:
+                obs_mask[:, obs] = v['mask']
+                obs += 1
+            
+        print("Starting predictive predictive_svi.")
         for i in range(n_samples):
+            print(f"Step {i} of {n_samples}.")
             predictive_svi = Predictive(model = self.model,  
                                         guide = self.guide, 
                                         num_samples=1)()
-
+            
+            obs = 0
+            for key in predictive_svi.keys():
+                if ('res' in key) and ('observed' not in key):
+                    predictive_choices[:, i, obs] = torch.squeeze(predictive_svi[key]).detach().clone()
+                    obs += 1
+                    
+            
             "----- 1st Level"
             predictive_locs = predictive_svi['locs']
-            
             predictive_model_params = self.agent.locs_to_pars(predictive_locs)
         
             "1st-level DataFrame"
@@ -288,15 +320,17 @@ class GeneralGroupInference():
             grouplevel_stdev = predictive_svi['sig']
 
             for param_name in self.agent.param_names:
-                secondlevel_dict[param_name + '_mu'].append(grouplevel_loc[..., self.agent.param_names.index(param_name)].item())
-                secondlevel_dict[param_name + '_sig'].append(grouplevel_stdev[..., self.agent.param_names.index(param_name)].item())
-                    
+                secondlevel_dict[param_name + '_mu'].append(grouplevel_loc[..., 
+                                                                           self.agent.param_names.index(param_name)].item())
+                secondlevel_dict[param_name + '_sig'].append(grouplevel_stdev[..., 
+                                                                              self.agent.param_names.index(param_name)].item())
+            
         firstlevel_df = pd.DataFrame(data = firstlevel_dict)
         secondlevel_df = pd.DataFrame(data = secondlevel_dict)
             
         print(f"Time elapsed: {time.time() - start} secs.")
         
-        return firstlevel_df, secondlevel_df
+        return firstlevel_df, secondlevel_df, predictive_choices, obs_mask
     
     def model_mle(self, mle_locs = None):
 
@@ -409,7 +443,64 @@ class GeneralGroupInference():
         '''
         AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
         
-        return BIC.detach(), AIC.detach()
+        '''
+            DIC (Deviance information criterion) Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). Bayesian Data Analysis: Second Edition
+            Effective number of parameters pD = 2*(log p(y|θ_Bayes) - E_post[log p(y|θ)])
+            θ_Bayes : mean of posterior
+            E_post[log p(y|θ)] : mean of log p(y|θ) under the posterior of θ
+        '''
+        
+        '''
+            WAIC
+        '''
+        
+        conditioned_model = pyro.condition(self.model, 
+                                            data = {'locs': self.guide()['locs']})
+        
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
+        
+        num_obs = 0
+        for key, val in trace.nodes.items():
+            if '_observed' in key:
+                num_obs += 1
+                obsmask = val['mask'].type(torch.int)
+                logprobs = val['fn'].probs
+                
+        num_samples = 1000
+        loglike = torch.zeros(num_obs)
+        like = torch.zeros(num_obs)
+        for i in range(num_samples):
+            print(f"Iterating to compute WAIC, step {i}.")
+            conditioned_model = pyro.condition(self.model, 
+                                                data = {'locs': self.guide()['locs']})
+            
+            trace = pyro.poutine.trace(conditioned_model).get_trace()
+            
+            obsidx = 0
+            for key, val in trace.nodes.items():
+                if '_observed' in key:
+                    choices = val['value']
+                    obsmask = val['mask'].type(torch.int)
+                    probs = val['fn'].probs
+                    
+                    choice_probs = probs[0, range(self.num_agents), choices]
+                    
+                    like[obsidx] += choice_probs[0, torch.where(obsmask==1)[1]].prod().detach()
+                    loglike[obsidx] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
+                    
+                    obsidx += 1
+                    
+                    
+            # del conditioned_model, trace
+            # ipdb.set_trace()
+         
+            
+        "effective number of parameters."
+        pwaic = 2*((torch.log(like/num_samples) - loglike/num_samples).sum())
+        
+        WAIC = torch.log(like).sum() - pwaic
+        
+        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.detach()
 
 class CoinflipGroupInference():
     
@@ -510,12 +601,12 @@ class CoinflipGroupInference():
                        torch.eye(2*self.num_params),
                        constraint=dist.constraints.lower_cholesky)
 
-        # set hyperprior to be multivariate normal
         # scale_tril (Tensor) – lower-triangular factor of covariance, with positive-valued diagonal
         hyp = pyro.sample('hyp',
                      dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
                      infer={'is_auxiliary': True})
 
+        # mu & tau unconstrained
         unc_mu = hyp[..., :self.num_params]
         unc_tau = hyp[..., self.num_params:]
 
@@ -766,9 +857,9 @@ class CoinflipGroupInference():
         
         return BIC, AIC
         
-        
+    
 class BC():
-    "Bayesian correlation"
+    "Bayesian Correlation"
     def __init__(self, x, y, method = 'pearson'):
         '''
         General Group inference.
@@ -839,7 +930,7 @@ class BC():
             
         elif self.method == 'spearman':
             
-            _, x_pos = self.x.sort()
+            _, x_pos = self.x.sort() # returns values, indices
             _, y_pos = self.y.sort()
             
             self.x_rearr = -torch.ones(self.num_datapoints, dtype = int)
@@ -864,12 +955,13 @@ class BC():
             xi = x[tau]
             yi = y[tau]
             
-            mean =xi*locs[..., 0]
+            mean = xi*locs[..., 0]
             std = torch.exp(locs[..., 1])
             
             pyro.sample(f'res_{tau}',
                         dist.Normal(loc = mean, scale = std),
                         obs = yi)
+            
 
     def guide(self, *args):
         trns = torch.distributions.biject_to(dist.constraints.positive)
@@ -885,6 +977,7 @@ class BC():
                      dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
                      infer={'is_auxiliary': True})
     
+        # mu & tau unconstrained
         unc_mu = hyp[..., :self.num_params]
         unc_tau = hyp[..., self.num_params:]
 
@@ -931,6 +1024,8 @@ class BC():
             pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
             if torch.isnan(loss[-1]):
                 break
+        
+        self.loss = loss
 
         
     def locs_to_pars(self, locs):
