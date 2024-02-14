@@ -24,12 +24,13 @@ post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo
 param_names = params_df.iloc[:, 0:-3].columns
 assert len(param_names) == num_params
 
-inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+inf_mean_df_day1 = pd.DataFrame(post_sample_df.groupby(['model', 
                                                    'ag_idx', 
                                                    'group', 
                                                    'ID'], as_index = False).mean())
 
-complete_df_day1 = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+complete_df_day1 = utils.create_complete_df(inf_mean_df_day1, sociopsy_df, expdata_df, post_sample_df, param_names)
+# inf_mean_df_day1['day'] = [1]*len(inf_mean_df_day1)
 
 rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
 complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
@@ -38,12 +39,12 @@ post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo
 param_names = params_df.iloc[:, 0:-3].columns
 assert len(param_names) == num_params
 
-inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
+inf_mean_df_day2 = pd.DataFrame(post_sample_df.groupby(['model', 
                                                    'ag_idx', 
                                                    'group', 
                                                    'ID'], as_index = False).mean())
 
-complete_df_day2 = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
+complete_df_day2 = utils.create_complete_df(inf_mean_df_day2, sociopsy_df, expdata_df, post_sample_df, param_names)
 
 rename_dict = {col: col+'_day2' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day2.columns}
 complete_df_day2 = complete_df_day2.rename(columns=rename_dict)
@@ -54,6 +55,194 @@ complete_df_day2 = complete_df_day2.drop(['group', 'ag_idx'], axis = 1)
 
 complete_df = pd.merge(complete_df_day1, complete_df_day2, on='ID')
 del complete_df_day1, complete_df_day2
+
+#%%
+exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+groupdf = utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
+groupdf['plottingcat'] = groupdf.apply(lambda row: 'random1' if row['DTT Types'] == 'random' and row['day'] == 1 else
+                                       'congruent1' if row['DTT Types'] == 'congruent' and row['day'] == 1 else
+                                        'incongruent1' if row['DTT Types'] == 'incongruent' and row['day'] == 1 else
+                                        'random2' if row['DTT Types'] == 'random' and row['day'] == 2 else
+                                        'congruent2' if row['DTT Types'] == 'congruent' and row['day'] == 2 else
+                                        'incongruent2', axis = 1)
+
+custom_palette = ['#67b798', '#BE54C6', '#7454C7'] # random, congruent, incongruent
+
+RT_df = pd.DataFrame()
+RTs = []
+RTs.extend(list(complete_df['RT_stt_seq_day1']))
+RTs.extend(list(complete_df['RT_stt_rand_day1']))
+RTs.extend(list(complete_df['RT_stt_seq_day2']))
+RTs.extend(list(complete_df['RT_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['RT_stt_seq_day1']))
+days.extend([1]*len(complete_df['RT_stt_rand_day1']))
+days.extend([2]*len(complete_df['RT_stt_seq_day2']))
+days.extend([2]*len(complete_df['RT_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['RT_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['RT_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['RT_stt_rand_day2']))
+
+ag_idx = []
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+ag_idx.extend(list(complete_df['ag_idx']))
+
+RT_df['RT'] = RTs
+RT_df['day'] = days
+RT_df['Condition'] = condition
+RT_df['ag_idx'] = ag_idx
+
+ER_df = pd.DataFrame()
+ERs = []
+ERs.extend(list(complete_df['ER_stt_seq_day1']))
+ERs.extend(list(complete_df['ER_stt_rand_day1']))
+ERs.extend(list(complete_df['ER_stt_seq_day2']))
+ERs.extend(list(complete_df['ER_stt_rand_day2']))
+
+days = []
+days.extend([1]*len(complete_df['ER_stt_seq_day1']))
+days.extend([1]*len(complete_df['ER_stt_rand_day1']))
+days.extend([2]*len(complete_df['ER_stt_seq_day2']))
+days.extend([2]*len(complete_df['ER_stt_rand_day2']))
+
+condition = []
+condition.extend(['F']*len(complete_df['ER_stt_seq_day1']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day1']))
+condition.extend(['F']*len(complete_df['ER_stt_seq_day2']))
+condition.extend(['R']*len(complete_df['ER_stt_rand_day2']))
+
+ER_df['ER'] = ERs
+ER_df['day'] = days
+ER_df['Condition'] = condition
+ER_df['ag_idx'] = ag_idx
+
+groupdf['choices_GD'] *=  100
+ER_df['ER'] *= 100
+
+groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
+
+'''
+    Lineplots
+    Subplot 1 : HRC by Day
+    Subplot 2 : ER by Day
+    Subplot 3 : RT by Day
+'''
+
+import seaborn as sns
+
+fig, ax = plt.subplots(1,3, figsize = (15, 5))
+sns.lineplot(x = "day",
+            y = "choices_GD",
+            hue = "DTT Types",
+            data = groupdf,
+            palette = custom_palette,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[0])
+ax[0].set_xticks([1,2])
+# ax[0].set_ylim([60, 100])
+ax[0].set_xlabel('Day')
+ax[0].set_ylabel('HRC (%)')
+
+custom_palette2 = ['#67b798', '#bd97c6']
+
+sns.lineplot(x = "day",
+            y = "ER",
+            hue = "Condition",
+            data = ER_df,
+            palette = custom_palette2,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[1])
+ax[1].set_xticks([1,2])
+# ax[2].set_ylim([0.61, 1])
+ax[1].set_xlabel('Day')
+ax[1].set_ylabel('ER (%)')
+
+sns.lineplot(x = "day",
+            y = "RT",
+            hue = "Condition",
+            data = RT_df,
+            palette = custom_palette2,
+            err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[2])
+ax[2].set_xticks([1,2])
+# ax[1].set_ylim([0.61, 1])
+ax[2].set_xlabel('Day')
+ax[2].set_ylabel('RT (ms)')
+# plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.png', dpi=600)
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.svg')
+plt.show()
+
+'''
+    Barplots
+    Subplot 1 : HRC by Day
+    Subplot 2 : ER by Day
+    Subplot 3 : RT by Day
+'''
+
+fig, ax = plt.subplots(1,3, figsize = (15, 5))
+sns.barplot(x = "day",
+            y = "choices_GD",
+            hue = "DTT Types",
+            data = groupdf,
+            palette = custom_palette,
+            # err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[0])
+ax[0].set_xticks([0,1])
+# ax[0].set_ylim([60, 100])
+ax[0].set_xlabel('Day')
+ax[0].set_ylabel('HRC (%)')
+
+custom_palette2 = ['#67b798', '#bd97c6']
+
+sns.barplot(x = "day",
+            y = "ER",
+            hue = "Condition",
+            data = ER_df,
+            palette = custom_palette2,
+            # err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[1])
+ax[1].set_xticks([0,1])
+# ax[2].set_ylim([0.61, 1])
+ax[1].set_xlabel('Day')
+ax[1].set_ylabel('ER (%)')
+
+sns.barplot(x = "day",
+            y = "RT",
+            hue = "Condition",
+            data = RT_df,
+            palette = custom_palette2,
+            # err_style = "bars",
+            errorbar = ("se", 1),
+            ax = ax[2])
+ax[2].set_xticks([0,1])
+# ax[1].set_ylim([0.61, 1])
+ax[2].set_xlabel('Day')
+ax[2].set_ylabel('RT (ms)')
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/results.png', dpi=600)
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/results.svg')
+plt.show()
+
+groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
+ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTTTypes']]
+ANOVA_df['day'] = ANOVA_df['day'].map(lambda x: 'one' if x == 1 else 'two')
+ANOVA_df['choices_GD'] = pd.to_numeric(ANOVA_df['choices_GD'])
+
+ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTTTypes'], as_index=False).mean()
+ANOVA_df.to_csv('GD_rmanova.csv')
+ER_df.to_csv('ER_rmanova.csv')
+RT_df.to_csv('RT_rmanova.csv')
 
 #%%
 '''
@@ -969,137 +1158,6 @@ complete_df['learnscore'] = complete_df['RT_diff_stt_day2'] / complete_df['RT_di
 
 complete_df['exploitscore'] = complete_df['learnscore'] + complete_df['conflict_param_day2']
 
-#%%
-exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-groupdf = utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
-groupdf['plottingcat'] = groupdf.apply(lambda row: 'random1' if row['DTT Types'] == 'random' and row['day'] == 1 else
-                                       'congruent1' if row['DTT Types'] == 'congruent' and row['day'] == 1 else
-                                        'incongruent1' if row['DTT Types'] == 'incongruent' and row['day'] == 1 else
-                                        'random2' if row['DTT Types'] == 'random' and row['day'] == 2 else
-                                        'congruent2' if row['DTT Types'] == 'congruent' and row['day'] == 2 else
-                                        'incongruent2', axis = 1)
-
-custom_palette = ['#348abd', '#CF3E53', '#E334B6']
-
-RT_df = pd.DataFrame()
-RTs = []
-RTs.extend(list(complete_df['RT_stt_seq_day1']))
-RTs.extend(list(complete_df['RT_stt_rand_day1']))
-RTs.extend(list(complete_df['RT_stt_seq_day2']))
-RTs.extend(list(complete_df['RT_stt_rand_day2']))
-
-days = []
-days.extend([1]*len(complete_df['RT_stt_seq_day1']))
-days.extend([1]*len(complete_df['RT_stt_rand_day1']))
-days.extend([2]*len(complete_df['RT_stt_seq_day2']))
-days.extend([2]*len(complete_df['RT_stt_rand_day2']))
-
-condition = []
-condition.extend(['F']*len(complete_df['RT_stt_seq_day1']))
-condition.extend(['R']*len(complete_df['RT_stt_rand_day1']))
-condition.extend(['F']*len(complete_df['RT_stt_seq_day2']))
-condition.extend(['R']*len(complete_df['RT_stt_rand_day2']))
-
-ag_idx = []
-ag_idx.extend(list(complete_df['ag_idx']))
-ag_idx.extend(list(complete_df['ag_idx']))
-ag_idx.extend(list(complete_df['ag_idx']))
-ag_idx.extend(list(complete_df['ag_idx']))
-
-RT_df['RT'] = RTs
-RT_df['day'] = days
-RT_df['Condition'] = condition
-RT_df['ag_idx'] = ag_idx
-
-ER_df = pd.DataFrame()
-ERs = []
-ERs.extend(list(complete_df['ER_stt_seq_day1']))
-ERs.extend(list(complete_df['ER_stt_rand_day1']))
-ERs.extend(list(complete_df['ER_stt_seq_day2']))
-ERs.extend(list(complete_df['ER_stt_rand_day2']))
-
-days = []
-days.extend([1]*len(complete_df['ER_stt_seq_day1']))
-days.extend([1]*len(complete_df['ER_stt_rand_day1']))
-days.extend([2]*len(complete_df['ER_stt_seq_day2']))
-days.extend([2]*len(complete_df['ER_stt_rand_day2']))
-
-condition = []
-condition.extend(['F']*len(complete_df['ER_stt_seq_day1']))
-condition.extend(['R']*len(complete_df['ER_stt_rand_day1']))
-condition.extend(['F']*len(complete_df['ER_stt_seq_day2']))
-condition.extend(['R']*len(complete_df['ER_stt_rand_day2']))
-
-ER_df['ER'] = ERs
-ER_df['day'] = days
-ER_df['Condition'] = condition
-ER_df['ag_idx'] = ag_idx
-
-groupdf['choices_GD'] *=  100
-ER_df['ER'] *= 100
-
-groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
-
-'''
-    Plot HPCF by day.
-'''
-
-import seaborn as sns
-
-fig, ax = plt.subplots(1,3, figsize = (15, 5))
-sns.lineplot(x = "day",
-            y = "choices_GD",
-            hue = "DTT Types",
-            data = groupdf,
-            palette = custom_palette,
-            err_style = "bars",
-            errorbar = ("se", 1),
-            ax = ax[0])
-ax[0].set_xticks([1,2])
-# ax[0].set_ylim([60, 100])
-ax[0].set_xlabel('Day')
-ax[0].set_ylabel('HRCF (%)')
-
-
-sns.lineplot(x = "day",
-            y = "ER",
-            hue = "Condition",
-            data = ER_df,
-            # palette = custom_palette,
-            err_style = "bars",
-            errorbar = ("se", 1),
-            ax = ax[1])
-ax[1].set_xticks([1,2])
-# ax[2].set_ylim([0.61, 1])
-ax[1].set_xlabel('Day')
-ax[1].set_ylabel('ER (%)')
-
-sns.lineplot(x = "day",
-            y = "RT",
-            hue = "Condition",
-            data = RT_df,
-            # palette = custom_palette,
-            err_style = "bars",
-            errorbar = ("se", 1),
-            ax = ax[2])
-ax[2].set_xticks([1,2])
-# ax[1].set_ylim([0.61, 1])
-ax[2].set_xlabel('Day')
-ax[2].set_ylabel('RT (ms)')
-# plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
-plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.png', dpi=600)
-plt.savefig('/home/sascha/Desktop/Nextcloud/work/FENS2024/Abstract/results.svg')
-plt.show()
-
-groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
-ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTTTypes']]
-ANOVA_df['day'] = ANOVA_df['day'].map(lambda x: 'one' if x == 1 else 'two')
-ANOVA_df['choices_GD'] = pd.to_numeric(ANOVA_df['choices_GD'])
-
-ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTTTypes'], as_index=False).mean()
-ANOVA_df.to_csv('GD_rmanova.csv')
-ER_df.to_csv('ER_rmanova.csv')
-RT_df.to_csv('RT_rmanova.csv')
 
 #%%
 '''
@@ -1169,15 +1227,15 @@ if day == 1:
     rename_labels = {'IES_stt_day1': 'IES (STT)',
                      'IES_dtt_day1': 'IES (DTT)',
                     'RT_day1': 'RT', 
-                     'RT_stt_day1': 'RT (STT)',
-                     'RT_dtt_day1': 'RT (DTT)',
+                     'RT_stt_day1': 'RT',
+                     'RT_dtt_day1': 'RT',
                 'hpcf_rand_day1': 'HRCF', 
                 'RT_diff_stt_day1': r'$\Delta$RT', 
                 'RIspread_day1': 'RI', 
                 'ER_diff_stt_day1': r'$\Delta$ER',
                 'IES_diff_stt_day_day1': r'$\Delta$IES',
-                'ER_stt_day1': 'ER (STT)',
-                'ER_dtt_day1': 'ER (DTT)',
+                'ER_stt_day1': 'ER',
+                'ER_dtt_day1': 'ER',
                 'ER_total_day1': 'ER',
                 'CRspread_day1': 'CR',
                 'CIspread_day1': 'CI'}
@@ -1186,7 +1244,7 @@ if day == 1:
               'RT_diff_stt_day1 & CIspread_day1': ['RIspread_day1', 'CRspread_day1'],
               'RT_diff_stt_day1 & CRspread_day1': ['RIspread_day1', 'CIspread_day1']}
     
-    covars = None
+    # covars = None
 
 elif day == 2:
     measures = ['RT_day2', 
@@ -1215,15 +1273,15 @@ elif day == 2:
     rename_labels = {'IES_stt_day2': 'IES (STT)',
                      'IES_dtt_day2': 'IES (DTT)',
                      'RT_day2': 'RT', 
-                     'RT_stt_day2': 'RT (STT)',
-                     'RT_dtt_day2': 'RT (DTT)',
+                     'RT_stt_day2': 'RT',
+                     'RT_dtt_day2': 'RT',
                 'hpcf_rand_day2': 'HRCF', 
                 'RT_diff_stt_day2': r'$\Delta$RT', 
                 'RIspread_day2': 'RI', 
                 'ER_diff_stt_day2': r'$\Delta$ER',
                 'IES_diff_stt_day_day2': r'$\Delta$IES (STT)',
-                'ER_stt_day2': 'ER (STT)',
-                'ER_dtt_day2': 'ER (DTT)',
+                'ER_stt_day2': 'ER',
+                'ER_dtt_day2': 'ER',
                 'ER_total_day2': 'ER',
                 'CRspread_day2': 'CR',
                 'CIspread_day2': 'CI'}
@@ -1238,6 +1296,9 @@ elif day == 2:
               'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
     
     covars = None
+    
+    # covars = {'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'], 
+    #           'ER_diff_stt_day2 & CIspread_day2': ['RIspread_day2']}
 
     # covars = {'RT_diff_stt_day2 & RIspread_day2': ['CIspread_day2', 'CRspread_day2'], 
     #           'RT_diff_stt_day2 & CIspread_day2': ['RIspread_day2', 'CRspread_day2'],
@@ -1248,16 +1309,101 @@ elif day == 2:
     #            'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
     #           'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
 
-r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'pearson')
+r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'spearman')
 
+# skyblue: DTT
+# Green: all
+# pink: stt
 utils.plot_corr_network(r_matrix,
                          p_matrix,
                          measures,
                          rename_labels,
                          method = 'p',
-                         correctp = False,
+                         correctp = True,
                          title=f'Day {day}',
                          saveas=f'Pearson_R_Day{day}')
+
+#%% 
+'''
+    Bayesian Correlation
+'''
+
+day = 1
+n_samples = 1_000
+
+import inferencemodels as inf
+import torch
+
+# measures = ['RT_day2', 
+#             'hpcf_rand_day2_trafo', 
+#             'RT_diff_stt_day2', 
+#             'RIspread_day2_trafo', 
+#             'ER_diff_stt_day2',
+#             'ER_total_day2',
+#             'CRspread_day2_trafo']
+
+if day == 2:
+    measures = ['RT_day2', 
+                'hpcf_rand_day2', 
+                'RT_diff_stt_day2', 
+                'RIspread_day2', 
+                'ER_diff_stt_day2',
+                'ER_total_day2',
+                'CRspread_day2',
+                'CIspread_day2']
+    
+elif day == 1:
+    measures = ['RT_day1', 
+                'RT_stt_day1',
+                'RT_dtt_day1',
+                'RT_diff_stt_day1', 
+                'ER_diff_stt_day1',
+                'ER_total_day1',
+                'ER_stt_day1',
+                'ER_dtt_day1',
+                'hpcf_rand_day1', 
+                'CRspread_day1',
+                'CIspread_day1',
+                'RIspread_day1']
+    
+num_measures = len(measures)
+
+BF_matrix = np.ones((num_measures,num_measures))
+r_matrix = np.ones((num_measures,num_measures))
+
+for idx in range(num_measures):
+    for jdx in range(idx+1, num_measures):
+        print("====")
+        print(idx)
+        print(jdx)
+        bayes_corr = inf.BC(torch.tensor(complete_df[measures[idx]]), torch.tensor(complete_df[measures[jdx]]), method = 'spearman')
+        bayes_corr.infer_posterior(iter_steps = n_samples)
+        post_sample_df = bayes_corr.sample_posterior(n_samples = 5000)
+        
+        BFpos = (post_sample_df['beta'] > 0).sum() / (post_sample_df['beta'] < 0).sum()
+        r_matrix[idx, jdx] = post_sample_df['beta'].mean()
+        r_matrix[jdx, idx] = post_sample_df['beta'].mean()
+        
+        plt.plot(bayes_corr.loss[-1000:])
+        plt.show()
+        
+        
+        if BFpos > 3.2:
+            "positive"
+            BF_matrix[idx, jdx] = BFpos
+            BF_matrix[jdx, idx] = BFpos
+            
+        elif 1/BFpos > 3.2:
+            "negative"
+            BF_matrix[idx, jdx] = - 1/BFpos
+            BF_matrix[jdx, idx] = - 1/BFpos
+            
+        else:
+            BF_matrix[idx, jdx] = 0
+            BF_matrix[jdx, idx] = 0
+
+
+pickle.dump((BF_matrix, r_matrix, measures), open(f"Bayesian_Spearman_Correlation_Day{day}_Jan23.p", "wb"))
 
 #%%
 '''
@@ -1278,33 +1424,116 @@ exploiters_df_day2 = complete_df[expl_condition_day2]
     DDM
 '''
 ddm_params = ['alpha_mu', 'b_mu', 'tau_mu', 'v_mu.1', 'v_mu.2', 'v_mu.3']
-ddm_day1 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata.csv')
-ddm_day2 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day2.csv')
-#%%
-fig, ax = plt.subplots(2, len(ddm_params), figsize=(15, 7))
+ddm_labels = {'alpha_mu': r'$\alpha$', 
+              'b_mu': 'bias', 
+              'tau_mu': r'$\tau$', 
+              'v_mu.1': r'$\theta_Q$', 
+              'v_mu.2': r'$\theta_R$', 
+              'v_mu.3': r'$\theta_\text{Switch}$'}
 
-for day in [1,2]:
-    paridx = 0
-    
-    if day == 1:
-        for col in ddm_day1.columns:
-            if 'mu' in col:
-                if col == ddm_params[paridx]:
-                    sns.kdeplot(ddm_day1[col], ax = ax[day-1, paridx])
-                    ax[0,paridx].set_ylabel('')
-                    
-                    
-                    paridx += 1
-                    
-                    
-    elif day == 2:
-        for col in ddm_day2.columns:
-            if 'mu' in col:
-                if col == ddm_params[paridx]:
-                    sns.kdeplot(ddm_day2[col], ax = ax[day-1, paridx])
-                    ax[1,paridx].set_ylabel('')
-                    ax[day-1, paridx].sharex(ax[day-2, paridx])
-                    paridx += 1
+ddm_data_files = ['/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_p60_day1.csv', 
+                  '/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_p60_day2.csv',
+                  '/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day1.csv',
+                  '/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day2.csv']
+
+# ddm_day1 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_p60_day1.csv')
+# ddm_day2 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_p60_day2.csv')
+
+# ddm_RT_day1 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day1.csv')
+# ddm_RT_day2 = pd.read_csv('/home/sascha/proni/AST/AST2/DDM/model_fit/DDMconflict_v1_newdata_day2.csv')
+#%%
+'''
+    Plot DDM for both experiments
+'''
+import seaborn as sns
+fig, ax = plt.subplots(4, len(ddm_params), figsize=(20, 15))
+
+for experiment in range(2):
+    print(f"Experiment no. {experiment+1}")
+    for day in range(2):
+        print(f"Day {day+1}")
+        row = experiment*2 + day
         
-# plt.ylabel('')
+        ddm_df = pd.read_csv(ddm_data_files[row])
+        paridx = 0
+        for col in ddm_df.columns:
+            if 'mu' in col and col != 'lrmu' and col != 'lrpremu':
+                print(f"Plotting {col}.")
+                sns.kdeplot(ddm_df[col], ax = ax[row, paridx])
+                ax[row, paridx].set_ylabel('')
+                if row == 3:
+                    ax[row, paridx].set_xlabel(ddm_labels[col], fontsize = 20)
+                    
+                else:
+                    ax[row, paridx].set_xlabel('')
+                
+                if row > 0:
+                    ax[row, paridx].sharex(ax[0, paridx])
+                    
+                elif row == 0:
+                    ax[0, 0].set_xlim([0.9, 1.5])
+                    ax[0, 1].set_xlim([-0.07, 0.07])
+                    ax[0, 2].set_xlim([0.2, 0.27])
+                    ax[0, 3].set_xlim([3.2, 5.2])
+                    ax[0, 4].set_xlim([0.7, 2])
+                    ax[0, 5].set_xlim([0.7, 2.5])
+                    
+                    
+                paridx += 1
+        
+        
+plt.savefig('DDM.svg')
 plt.show()
+
+del ddm_df
+#%%
+'''
+    Plot DDM for one of the two experiments
+'''
+import seaborn as sns
+fig, ax = plt.subplots(2, len(ddm_params), figsize=(20, 8))
+
+experiment = 0 # 0 or 1
+
+samples = np.zeros((2, len(ddm_params), 7500))
+
+print(f"Experiment no. {experiment+1}")
+for day in range(2):
+    print(f"Day {day+1}")
+    row = day
+    
+    ddm_df = pd.read_csv(ddm_data_files[experiment*2 + day])
+    paridx = 0
+    for col in ddm_df.columns:
+        if 'mu' in col and col != 'lrmu' and col != 'lrpremu':
+            print(f"Plotting {col}.")
+            samples[day, paridx] = np.array(ddm_df[col])
+            sns.kdeplot(ddm_df[col], ax = ax[row, paridx])
+            ax[row, paridx].set_ylabel('')
+            if row == 1:
+                ax[row, paridx].set_xlabel(ddm_labels[col], fontsize = 20)
+                
+            else:
+                ax[row, paridx].set_xlabel('')
+            
+            if row > 0:
+                ax[row, paridx].sharex(ax[0, paridx])
+                
+            # elif row == 0:
+            #     ax[0, 0].set_xlim([0.9, 1.5])
+            #     ax[0, 1].set_xlim([-0.07, 0.07])
+            #     ax[0, 2].set_xlim([0.2, 0.27])
+            #     ax[0, 3].set_xlim([3.2, 5.2])
+            #     ax[0, 4].set_xlim([0.7, 2])
+            #     ax[0, 5].set_xlim([0.7, 2.5])
+                
+                
+            paridx += 1
+        
+        
+plt.savefig('DDM.svg')
+plt.show()
+
+del ddm_df
+
+

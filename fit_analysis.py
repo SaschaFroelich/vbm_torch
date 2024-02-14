@@ -31,22 +31,14 @@ import itertools
 
 post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
 Q_init = extra_storage[0]
-if len(extra_storage) >= 10:
-    param_names = extra_storage[9]
-    if extra_storage[11] >= 1e-03:
-        raise Exception("rhalt too large for IC computation.")
-else:
-    param_names = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
-    # param_names = ['theta_Q', 'theta_rep', 'theta_conflict'] # Conflict nolr
-    # param_names = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
-    # param_names = ['theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
-    # param_names = ['lr', 'theta_Q', 'theta_rep'] # Repbias nolr
+param_names = extra_storage[9]
+if extra_storage[11] >= 1e-03:
+    raise Exception("rhalt too large for IC computation.")
 
 day = extra_storage[2]
 
 print(f"Preceding model is {extra_storage[3]}.")
 # assert len(param_names) == num_params
-
 # blocks = extra_storage[2]
 
 if sociopsy_df is None:
@@ -139,16 +131,15 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 
 # plt.style.use("seaborn-v0_8-dark")
-
-anal.violin(inf_mean_df.loc[:, [*param_names]], model)
+# anal.violin(inf_mean_df, param_names, model)
 
 complete_df = utils.create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names)
 
-if 'RT' in complete_df.columns:
-    anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points']], model = 'sociopsy')
+# if 'RT' in complete_df.columns:
+#     anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points']], model = 'sociopsy')
     
-else:
-    anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points']], model = 'errors')
+# else:
+#     anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points']], model = 'errors')
 
 if 0:
     '''
@@ -211,34 +202,24 @@ elif day == 2:
     utils.plot_grouplevel(expdata_df, sim_group_behav_df_day2, plot_single = False)
     sim_group_behav_df_day2['day'] = 2
 
-if day == 2 and len(extra_storage) > 6:
+if day == 2:
     print("\n\nCreating and appending dataframe for day 1.")
     filename_day1 = extra_storage[7]
     
-    if len(extra_storage) >= 10:
-        if extra_storage[10] == 'recovery':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
-            
-        elif extra_storage[10] == 'behav_fit':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')    
-            
-        else:
-            raise Exception('Error')
+    if extra_storage[10] == 'recovery':
+        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
+        
+    elif extra_storage[10] == 'behav_fit':
+        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')    
         
     else:
-        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')
-        
+        raise Exception('Error')
+
     post_sample_df_day1['day'] = 1
     # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
-    if len(extra_storage_day1) >= 10:
-        param_names_day1 = extra_storage_day1[9]
-        if extra_storage_day1[11] >= 1e-03:
-            raise Exception("rhalt too large for IC computation.")
-            
-    else:
-        # param_names_day1 = ['lr', 'theta_Qcong', 'theta_Qrand', 'theta_Qinc'] # OnlyQ
-        # param_names_day1 = ['lr', 'theta_Q', 'theta_rep'] # Repbias
-        param_names_day1 = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'] # Conflict
+    param_names_day1 = extra_storage_day1[9]
+    if extra_storage_day1[11] >= 1e-03:
+        raise Exception("rhalt too large for IC computation.")
     
     if 'handedness' in post_sample_df_day1.columns:
         inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
@@ -267,8 +248,11 @@ if day == 2 and len(extra_storage) > 6:
     # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
     complete_df_day1['day'] = [1]*len(complete_df_day1)
     complete_df['day'] = [2]*len(complete_df_day1)
-    
     complete_df_all = pd.concat([complete_df_day1, complete_df], ignore_index=True)
+    
+    inf_mean_df_day1['day'] = [1]*len(inf_mean_df_day1)
+    inf_mean_df['day'] = [2]*len(inf_mean_df)
+    inf_mean_df_all = pd.concat([inf_mean_df_day1, inf_mean_df], ignore_index=True)
     
     post_sample_df['day'] = 2
     post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df], ignore_index=True)
@@ -294,7 +278,7 @@ if day == 2 and len(extra_storage) > 6:
 
 #%%
 '''
-    Plot behaviour both days        
+    Plot behaviour both days
 '''
 
 # HPCF_DF = complete_df_all.loc[:, ['hpcf_cong', 'hpcf_incong',
@@ -309,7 +293,141 @@ hpcf_day2['day'] = 2
 
 hpcf_df_all = pd.concat((hpcf_day1, hpcf_day2), ignore_index = True)
 
-utils.plot_hpcf(hpcf_df_all, title=f'{model}')
+utils.plot_hpcf(hpcf_df_all, title=f'{model}', post_pred = False)
+
+#%%
+'''
+    Correlations with behavioural measures
+'''
+
+for day in [1,2]:
+    print(f"=========== Day {day} =================")
+    print("HPCF vs θ_Q")
+    r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['hpcf'], 
+                               complete_df_all[complete_df_all['day'] == day]['theta_Q'])
+    print(f"r={r}, p={p}")
+    
+    print("CI-spread vs θ_rep")
+    r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['CIspread'], 
+                               complete_df_all[complete_df_all['day'] == day]['theta_rep'])
+    print(f"r={r}, p={p}")
+    
+    print("CR-spread vs θ_rep")
+    r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['CRspread'], 
+                               complete_df_all[complete_df_all['day'] == day]['theta_rep'])
+    print(f"r={r}, p={p}")
+    
+    print("RI-spread vs θ_rep")
+    r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['RIspread'], 
+                               complete_df_all[complete_df_all['day'] == day]['theta_rep'])
+    print(f"r={r}, p={p}")
+    
+    print("CR-spread vs RI-spread")
+    r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['CRspread'], 
+                               complete_df_all[complete_df_all['day'] == day]['RIspread'])
+    print(f"r={r}, p={p}")
+
+    if model == 'Repbias_Conflict_lr':
+        print("CI-spread vs θ_Conflict")
+        r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['CIspread'], 
+                                   complete_df_all[complete_df_all['day'] == day]['theta_conflict'])
+        print(f"r={r}, p={p}")
+        
+        print("CR-spread vs θ_Conflict")
+        r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['CRspread'], 
+                                   complete_df_all[complete_df_all['day'] == day]['theta_conflict'])
+        print(f"r={r}, p={p}")
+        
+        print("RI-spread vs θ_Conflict")
+        r,p = scipy.stats.spearmanr(complete_df_all[complete_df_all['day'] == day]['RIspread'], 
+                                   complete_df_all[complete_df_all['day'] == day]['theta_conflict'])
+        print(f"r={r}, p={p}")
+
+        exploiters_df_day1 = complete_df_all[complete_df_all['day'] == 1].copy()
+        mean = exploiters_df_day1['theta_conflict'].mean()
+        std_dev = exploiters_df_day1['theta_conflict'].std()
+        exploiters_df_day1.loc[:, 'theta_conflict_z'] = (exploiters_df_day1['theta_conflict'] - mean) / std_dev
+        
+        exploiters_df_day1['expl_conflict_z'] = exploiters_df_day1['theta_conflict_z'].map(lambda x: 1 if x > 1 else 0)
+        
+        "--> LOWER RT-SPREAD (at x>1)!!"
+        r,p = scipy.stats.ttest_ind(exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 1]['RT_diff_stt'], 
+                              exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 0]['RT_diff_stt'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.ttest_ind(exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 1]['CRspread'], 
+                              exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 0]['CRspread'])
+        print(f"r={r}, p={p}")
+        
+        "--> LOWER RI-SPREAD (at x>1)!!"
+        r,p = scipy.stats.ttest_ind(exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 1]['RIspread'], 
+                              exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 0]['RIspread'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.ttest_ind(exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 1]['CIspread'], 
+                              exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 0]['CIspread'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.ttest_ind(exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 1]['hpcf_rand'], 
+                              exploiters_df_day1[exploiters_df_day1['expl_conflict_z'] == 0]['hpcf_rand'])
+        print(f"r={r}, p={p}")
+        
+        exploiters_df_day2 = complete_df_all[complete_df_all['day'] == 2].copy()
+        mean = exploiters_df_day2['theta_conflict'].mean()
+        std_dev = exploiters_df_day2['theta_conflict'].std()
+        exploiters_df_day2.loc[:, 'theta_conflict_z'] = (exploiters_df_day2['theta_conflict'] - mean) / std_dev
+        
+        exploiters_df_day2['expl_conflict_z'] = exploiters_df_day2['theta_conflict_z'].map(lambda x: 1 if x > 1 else 0)
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day1['theta_conflict_z'], exploiters_df_day2['theta_conflict_z'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day1['RT_diff_stt'], exploiters_df_day1['theta_conflict_z'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day2['RT_diff_stt'], exploiters_df_day2['theta_conflict_z'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day2['ER_diff_stt'], exploiters_df_day2['theta_conflict_z'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day1['RT_diff_stt'], exploiters_df_day1['theta_conflict'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day2['RT_diff_stt'], exploiters_df_day2['theta_conflict'])
+        print(f"r={r}, p={p}")
+        
+        r,p = scipy.stats.pearsonr(exploiters_df_day2['ER_diff_stt'], exploiters_df_day2['theta_conflict'])
+        print(f"r={r}, p={p}")
+        
+    elif model == 'Repbias_Interaction_lr':
+
+#%%
+
+exploiters_df_day1.loc[:, 'theta_rep_plus_conflict'] = exploiters_df_day1['theta_rep'] + exploiters_df_day1['theta_conflict']
+mean = exploiters_df_day1['theta_rep_plus_conflict'].mean()
+std_dev = exploiters_df_day1['theta_rep_plus_conflict'].std()
+exploiters_df_day1.loc[:, 'theta_rep_plus_conflict_z'] = (exploiters_df_day1['theta_rep_plus_conflict'] - mean) / std_dev
+exploiters_df_day1['expl_repconflict_z'] = exploiters_df_day1['theta_rep_plus_conflict_z'].map(lambda x: 1 if x > 1 else 0)
+
+
+exploiters_df_day2.loc[:, 'theta_rep_plus_conflict'] = exploiters_df_day2['theta_rep'] + exploiters_df_day2['theta_conflict']
+mean = exploiters_df_day2['theta_rep_plus_conflict'].mean()
+std_dev = exploiters_df_day2['theta_rep_plus_conflict'].std()
+exploiters_df_day2.loc[:, 'theta_rep_plus_conflict_z'] = (exploiters_df_day2['theta_rep_plus_conflict'] - mean) / std_dev
+exploiters_df_day2['expl_repconflict_z'] = exploiters_df_day2['theta_rep_plus_conflict_z'].map(lambda x: 1 if x > 1 else 0)
+
+r,p = scipy.stats.pearsonr(exploiters_df_day1['theta_rep_plus_conflict_z'], exploiters_df_day2['theta_rep_plus_conflict_z'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(exploiters_df_day1['RT_diff_stt'], exploiters_df_day1['theta_rep_plus_conflict_z'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(exploiters_df_day2['RT_diff_stt'], exploiters_df_day2['theta_rep_plus_conflict_z'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(exploiters_df_day2['ER_diff_stt'], exploiters_df_day2['theta_rep_plus_conflict_z'])
+print(f"r={r}, p={p}")
 
 #%%
 '''
@@ -395,6 +513,43 @@ anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
 
 #%%
 '''
+    Fig for paper
+'''
+fig, ax = plt.subplots(num_params, 2, figsize = (15, 15))
+
+for param in range(num_params):
+    for day in range(1, 3):
+        for ag in range(num_agents):
+            if param == 0:
+                sns.kdeplot(post_sample_df_all[(post_sample_df_all['ag_idx']==ag) & (post_sample_df_all['day']==day)][param_names[param]], 
+                            ax = ax[param, day-1], clip=(0,1))
+                
+            else:
+                sns.kdeplot(post_sample_df_all[(post_sample_df_all['ag_idx']==ag) & (post_sample_df_all['day']==day)][param_names[param]], 
+                            ax = ax[param, day-1])
+                
+            # if param == 4:
+            #     dfgh
+            ax[0, day-1].set_xlabel(r'learning rate')
+            ax[1, day-1].set_xlabel(r'$\Theta_Q$')
+            ax[2, day-1].set_xlabel(r'$\Theta_R$')
+            ax[3, day-1].set_xlabel(r'$\Theta_\text{Conflict}$')
+            ax[0, day-1].set_ylabel('')
+            ax[1, day-1].set_ylabel('')
+            ax[2, day-1].set_ylabel('')
+            ax[3, day-1].set_ylabel('')
+            # if param == 0:
+                # 'lr'
+            ax[0, day-1].set_xlim([-0.025, 0.08])
+            ax[1, day-1].set_xlim([-1, 8])
+            ax[2, day-1].set_xlim([-1, 5])
+            ax[3, day-1].set_xlim([-2, 4])
+
+# plt.savefig('posterior_diffs.svg')
+plt.show()
+
+#%%
+'''
     Points Analysis
 '''
 
@@ -436,6 +591,11 @@ param_names.append('Q/R')
 # anal.violin(inf_mean_df, model)
 
 diffs_df, clean_means_df = anal.daydiffBF(post_sample_df_all, BF = 5, parameter_names = list(param_names))
+
+# anal.daydiff(post_sample_df_all, threshold = 0.05)
+
+utils.lineplot_daydiffs(pd.melt(inf_mean_df_all, id_vars=['ag_idx', 'day'], value_vars = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'], var_name = 'parameter', value_name ='mean'))
+
 utils.lineplot_daydiffs(clean_means_df)
 utils.scatterplot_daydiffs(clean_means_df)
 
@@ -896,9 +1056,16 @@ utils.plot_grouplevel(sim_group_behav_df, plot_single = False)
 # cgd[cgd['jokertypes'] == 2]['choices_GD'].mean() # Incongruent
 #%%
 '''
-    Posterior Predictives
+    Posterior Predictives from posterior samples.
 '''
-complete_df = utils.posterior_predictives(post_sample_df.loc[:, ['ag_idx', 'group', 'model', *param_names]], exp_data = expdata_df)
+
+# ers = anal.compute_errors(expdata_df)
+out=utils.posterior_predictives(post_sample_df_all[post_sample_df_all['day']==2], 
+                                param_names, 
+                                Q_init = Q_init,
+                                seq_init = seq_counter_day2,
+                                errorrates=er)
+
 
 #%%
 '''
@@ -1674,10 +1841,84 @@ dataframe = pd.DataFrame({'Fertilizer': np.repeat(['daily', 'weekly'], 15),
 model = ols('height ~ C(Fertilizer) + C(Watering) + C(Fertilizer):C(Watering)', 
             data=dataframe).fit() 
 result = sm.stats.anova_lm(model, type=2) 
-  
+
 # Print the result 
 print(result) 
 
 #%%
+'''
+    High ΔRT and low CI
+'''
+# complete_df_all[(complete_df_all['RT_diff_stt_day2'] > complete_df_all['RT_diff_stt_day2'].mean()) & 
+#             (complete_df_all['CIspread_day2'] < complete_df_all['CIspread_day2'].mean())]
 
-day1_df = complete_df
+'''
+    High ΔER and low CI
+'''
+# complete_df_all[(complete_df_all['ER_diff_stt_day2'] > complete_df_all['ER_diff_stt_day2'].mean()) & 
+#             (complete_df_all['CIspread_day2'] < complete_df_all['CIspread_day2'].mean())]
+
+
+'''
+    High ΔER & ΔRT and low CI
+'''
+df_day2 = complete_df_all[complete_df_all['day'] == 2]
+test_df = df_day2[(df_day2['ER_diff_stt'] > df_day2['ER_diff_stt'].mean()) & 
+            (df_day2['RT_diff_stt'] > df_day2['RT_diff_stt'].mean()) & 
+            (df_day2['CIspread'] < df_day2['CIspread'].mean())]
+
+'''
+    High ΔER & ΔRT and low RI
+'''
+test_df = df_day2[(df_day2['ER_diff_stt'] > df_day2['ER_diff_stt'].mean()) & 
+            (df_day2['RT_diff_stt'] > df_day2['RT_diff_stt'].mean()) & 
+            (df_day2['RIspread'] < df_day2['RIspread'].mean())]
+
+anal.violin(df_day2, param_names, model)
+anal.violin(df_day2[df_day2['ID'].isin(test_df['ID'])], param_names, model)
+
+#%%
+'''
+    Responses from posterior predictives
+'''
+
+predictive_choices = extra_storage[14].mean(axis=1)
+obs_mask = extra_storage[15]
+
+df_pp_day2 = utils.post_pred_sim_df(predictive_choices, obs_mask, model, num_agents, inf_mean_df, day = 2)
+
+
+predictive_choices_day1 = extra_storage_day1[14].mean(axis=1)
+obs_mask_day1 = extra_storage_day1[15]
+    
+df_pp_day1 = utils.post_pred_sim_df(predictive_choices_day1, obs_mask_day1, model_day1, num_agents, inf_mean_df_day1, day = 1)
+
+# sim_group_behav_df['post_pred_GD'] = sim_group_behav_df.apply(lambda row: print(row['group']))
+
+#%%
+'''
+    Plot the predictive choices
+'''
+
+utils.plot_hpcf(complete_df_all, title='Experiment')
+
+hpcf_pp_day1 = utils.compute_hpcf(df_pp_day2)
+hpcf_pp_day1['day'] = 1
+hpcf_pp_day2 = utils.compute_hpcf(df_pp_day1)
+hpcf_pp_day2['day'] = 2
+
+hpcf_pp_df_all = pd.concat((hpcf_pp_day1, hpcf_pp_day2), ignore_index = True)
+
+utils.plot_hpcf(hpcf_pp_df_all, title=f'{model}', post_pred = True)
+
+#%%
+df_day2new = df_day2[df_day2['trialsequence']> 10]
+df_day2new = df_day2new[df_day2new['choices'] != -2]
+df_day2new = df_day2new[df_day2new['choices'] != -1]
+df_day2new = df_day2new.reset_index(drop = True)
+
+df_day2new = df_day2new.drop(['day', 'outcomes', 'choices_GD', 'ID', 'blockidx', 'blocktype'], axis = 1)
+
+for rowidx in range(len(df_day2new)):
+    if not df_day2new.iloc[rowidx]['post_pred_GD'] != df_day2new.iloc[rowidx]['post_pred'] and not df_day2new.iloc[rowidx]['post_pred_GD'] != (1-df_day2new.iloc[rowidx]['post_pred']):
+        print(f"rowidx {rowidx}")

@@ -39,6 +39,7 @@ def remap(blockno):
     return blockno_new
 
 def violin(df, 
+           param_names,
            model,
            with_colbar = 1, 
            sharey = False, 
@@ -72,138 +73,114 @@ def violin(df,
         
     # df = df.drop(['model', 'ag_idx', 'group', 'ID', 'handedness'], axis = 1)
     
-    num_params = len(df.columns)
+    num_params = len(param_names)
+    print(num_params)
     
-    fig, ax = plt.subplots(1, num_params, figsize=(15,5), sharey=0)
+    fig, ax = plt.subplots(len(df['day'].unique()), num_params, figsize=(15,5), sharey=0)
     
-    if model == 'B':
-        ylims = [[0, 0.04], # lr
-                  [0.5, 7.5], # theta_Q
-                  [0., 2.], # theta_rep
-                  [0, 0.04], # lr
-                  [0.5, 7.5], # theta_Q
-                  [0., 2]] # theta_rep
+    # if model == 'B':
+    #     ylims = [[0, 0.04], # lr
+    #               [0.5, 7.5], # theta_Q
+    #               [0., 2.], # theta_rep
+    #               [0, 0.04], # lr
+    #               [0.5, 7.5], # theta_Q
+    #               [0., 2]] # theta_rep
         
-    elif model == 'Conflict':
-        ylims = [[0, 0.04], # lr
-                  [0, 8], # theta_Q
-                  [0.5, 5], # theta_rep
-                  [0, 3], # conflict param
-                  [0, 0.04], # lr
-                  [0, 8], # theta_Q
-                  [0.5, 5], # theta_rep
-                  [0, 3]] # conflict param
+    # elif model == 'Conflict':
+    #     ylims = [[0, 0.04], # lr
+    #               [0, 8], # theta_Q
+    #               [0.5, 5], # theta_rep
+    #               [0, 3], # conflict param
+    #               [0, 0.04], # lr
+    #               [0, 8], # theta_Q
+    #               [0.5, 5], # theta_rep
+    #               [0, 3]] # conflict param
         
-    elif model == 'Seqparam' or model == 'Seqboost':
-        ylims = [[0, 0.04], # lr
-                  [0., 8], # theta_Q
-                  [0., 2], # theta_rep
-                  [-2, 2], # seqparam
-                  [0, 0.04], # lr
-                  [0., 8], # theta_Q
-                  [0., 2], # theta_rep
-                  [-2, 2]] # seqparam
+    # elif model == 'Seqparam' or model == 'Seqboost':
+    #     ylims = [[0, 0.04], # lr
+    #               [0., 8], # theta_Q
+    #               [0., 2], # theta_rep
+    #               [-2, 2], # seqparam
+    #               [0, 0.04], # lr
+    #               [0., 8], # theta_Q
+    #               [0., 2], # theta_rep
+    #               [-2, 2]] # seqparam
         
-    elif model == 'Bhand':
-        if num_params == 7:
-            ylims = [[0, 0.04], # lr
-                      [0., 8], # theta_Q
-                      [0., 2], # theta_rep
-                      [0, 0.04], # lr
-                      [0., 8], # theta_Q
-                      [0., 2], # theta_rep
-                      [-2.5, 2.5]] # hand_param
+    # elif model == 'Bhand':
+    #     if num_params == 7:
+    #         ylims = [[0, 0.04], # lr
+    #                   [0., 8], # theta_Q
+    #                   [0., 2], # theta_rep
+    #                   [0, 0.04], # lr
+    #                   [0., 8], # theta_Q
+    #                   [0., 2], # theta_rep
+    #                   [-2.5, 2.5]] # hand_param
         
-        elif num_params == 8:
-            ylims = [[0, 0.04], # lr
-                      [0., 8], # theta_Q
-                      [0., 2], # theta_rep
-                      [-2.5, 2.5], # hand_param
-                      [0, 0.04], # lr
-                      [0., 8], # theta_Q
-                      [0., 2], # theta_rep
-                      [-2.5, 2.5]] # hand_param
+    #     elif num_params == 8:
+    #         ylims = [[0, 0.04], # lr
+    #                   [0., 8], # theta_Q
+    #                   [0., 2], # theta_rep
+    #                   [-2.5, 2.5], # hand_param
+    #                   [0, 0.04], # lr
+    #                   [0., 8], # theta_Q
+    #                   [0., 2], # theta_rep
+    #                   [-2.5, 2.5]] # hand_param
          
-    elif model == 'sociopsy':
-        ylims = [[20, 65], # Age
-                  [0., 0.2], # ER_stt
-                  [0., 0.2], # ER_dtt
-                  [290, 480], # RT
-                  [2750, 3800]] # points
+    # elif model == 'sociopsy':
+    #     ylims = [[20, 65], # Age
+    #               [0., 0.2], # ER_stt
+    #               [0., 0.2], # ER_dtt
+    #               [290, 480], # RT
+    #               [2750, 3800]] # points
             
-    else:
-        ylims == None
-    
+    # else:
+    #     ylims == None
+    #
+
     for par in range(num_params):
+        "ax[0]"
+        dataseries = (df.melt()[df.melt()['variable'] == param_names[par]])
+        dataseries['value'] = pd.to_numeric(dataseries['value'], errors='coerce')
         
-        if 1:    
-            "With colorbar"
-            "ax[0]"
-            dataseries = (df.melt()[df.melt()['variable'] == df.columns[par]])
-            dataseries['value'] = pd.to_numeric(dataseries['value'], errors='coerce')
-            
-            sns.violinplot(ax = ax[par], 
-                           x = 'variable',
-                           y = 'value',
-                           data = dataseries,
-                           color=".8")
-            
-            sns.stripplot(x = 'variable',
-                          y = 'value',
-                          data = dataseries,
-                          edgecolor = 'auto',
-                          linewidth = 1,
-                          jitter=True,
-                          ax=ax[par])
-                          # palette="coolwarm")
-            
-            ax[par].legend([],[], frameon=False)
-            
-            "Position"
-            chartBox = ax[par].get_position()
-            ax[par].set_position([chartBox.x0+par/64,
-                              chartBox.y0,
-                              chartBox.width,
-                              chartBox.height])
-            
-            if ylims is not None:
-                ax[par].set_ylim(ylims[par])
+        sns.violinplot(ax = ax[par], 
+                       x = 'variable',
+                       y = 'value',
+                       data = dataseries,
+                       color=".8")
         
-            "Colorbar"
-            # variance = df[params_df.columns[par]].std()**2
-            
-            # normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, 
-            #                                  vmin=min(variance), 
-            #                                  vmax=max(variance))
-            
-            # colormap = cm.coolwarm
-            # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-            # scalarmappaple.set_array(variance)
-            # plt.colorbar(scalarmappaple, ax = ax[par])
-            
-        else:
-            "Without colorbar"
-            "ax[0]"
-            g1 = sns.violinplot(ax=ax[par], 
-                                x="parameter", 
-                                y="inferred", 
-                                data=df[df["parameter"]==df["parameter"].unique()[par]], 
-                                color=".8")
-            
-            g2 = sns.stripplot(x="parameter",
-                          y="inferred",
-                          edgecolor = 'gray',
-                          linewidth = 1,
-                          data = df[df["parameter"]==df["parameter"].unique()[par]],
-                          jitter = True,
-                          ax = ax[par])
-                
-            if par > 0:
-                g1.set(ylabel=None)
-                g2.set(ylabel=None)
-                
-            ax[par].legend([],[], frameon=False)
+        sns.stripplot(x = 'variable',
+                      y = 'value',
+                      data = dataseries,
+                      edgecolor = 'auto',
+                      linewidth = 1,
+                      jitter=True,
+                      ax=ax[par])
+                      # palette="coolwarm")
+        
+        ax[par].legend([],[], frameon=False)
+        
+        "Position"
+        chartBox = ax[par].get_position()
+        ax[par].set_position([chartBox.x0+par/64,
+                          chartBox.y0,
+                          chartBox.width,
+                          chartBox.height])
+        
+        # if ylims is not None:
+        #     ax[par].set_ylim(ylims[par])
     
+        "Colorbar"
+        # variance = df[params_df.columns[par]].std()**2
+        
+        # normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, 
+        #                                  vmin=min(variance), 
+        #                                  vmax=max(variance))
+        
+        # colormap = cm.coolwarm
+        # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
+        # scalarmappaple.set_array(variance)
+        # plt.colorbar(scalarmappaple, ax = ax[par])
+            
     plt.show()
 
 def param_corr(df, method = 'pearson'):
@@ -673,6 +650,9 @@ def daydiffBF(df, parameter_names, hdi_prob = None, threshold = 0, BF = None):
         Step 1: If provided posterior samples, check for each participant 
         if the two days are significantly different from each other.
     """
+    
+    raise Exception("BF cannot be computed from simply subtracting samples from one another.")
+    
     from scipy import stats
     import arviz as az
     
@@ -916,33 +896,44 @@ def network_corr(df, nodes, covars = None, method = 'spearman'):
     for idx in range(num_measures):
         for jdx in range(idx+1, num_measures):
             
-            if covars is not None:
+            if method == 'spearman':
                 r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
                 
-                r_matrix[idx, jdx] = r
-                r_matrix[jdx, idx] = r
-    
-                p_matrix[idx, jdx] = p
-                p_matrix[jdx, idx] = p
+            elif method == 'pearson':
+                r,p = scipy.stats.pearsonr(df[nodes[idx]], df[nodes[jdx]])
                 
+            else:
+                raise Exception("Correlation method not provided.")
+            
+            r_matrix[idx, jdx] = r
+            r_matrix[jdx, idx] = r
+
+            p_matrix[idx, jdx] = p
+            p_matrix[jdx, idx] = p
+            
+            '''
+                As soon as for one pair of correlates, the partial correlation with respect
+                to any third variable is not significant anymore, the new, insiginificant 
+                p-value is stored in the correlation matrix.
+            '''
+            if covars is not None:
                 if f'{nodes[idx]} & {nodes[jdx]}' in covars.keys():
-                    retain_correlation = True
                     for covaridx in range(len(covars[f'{nodes[idx]} & {nodes[jdx]}'])):
                         stats = pingouin.partial_corr(data = df, 
                                                       x=nodes[idx], 
                                                       y=nodes[jdx], 
                                                       covar = covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx], 
-                                                      method ='spearman')
+                                                      method = method)
                         rvalue = stats['r'].iloc[0]
                         pvalue = stats['p-val'].iloc[0]
                         if pvalue > 0.05:
-                            retain_correlation = False
                             print("=========================================")
                             print(f"Insignificant partial corr between {nodes[idx]}" + 
                                   f" & {nodes[jdx]} after correcting for "+ 
                                   f"{covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx]}," + 
                                   "r=%.3f, p=%.3f"%(rvalue, pvalue))
                             
+                            "Replace correlation values with corrected values."
                             r_matrix[idx, jdx] = rvalue
                             r_matrix[jdx, idx] = rvalue
                 
@@ -956,21 +947,10 @@ def network_corr(df, nodes, covars = None, method = 'spearman'):
                                   f"{covars[f'{nodes[idx]} & {nodes[jdx]}'][covaridx]}," + 
                                   "r=%.3f, p=%.3f"%(rvalue, pvalue))
                             
-                    
-                else:
-                    r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
-                    r_matrix[idx, jdx] = r
-                    r_matrix[jdx, idx] = r
-        
-                    p_matrix[idx, jdx] = p
-                    p_matrix[jdx, idx] = p
-                    
-            else:
-                r,p = scipy.stats.spearmanr(df[nodes[idx]], df[nodes[jdx]])
-                r_matrix[idx, jdx] = r
-                r_matrix[jdx, idx] = r
-    
-                p_matrix[idx, jdx] = p
-                p_matrix[jdx, idx] = p
                 
+                    
     return r_matrix, p_matrix
+
+# def daydiff(df, threshold = None):
+    
+    

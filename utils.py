@@ -1164,41 +1164,20 @@ def simulate_data(model,
     
     if params is not None:
         assert errorrates is not None
+        assert torch.is_tensor(errorrates)
     
     import env 
     start = time.time()
     print("Simulating %d agents."%num_agents)
 
-    # assert group is not None
-    # "Only group is set"
-    # print('Inferring sequence and blockorder from group.')
     if torch.is_tensor(group):
         assert group.ndim == 1
         group = list(group)
     assert isinstance(group, list)
-    # sequences = [1, 1, 2, 2]
-    # blockorders = [1, 2, 1, 2]
-    # sequence = [sequences[g] for g in group]
-    # blockorder = [blockorders[g] for g in group]
-        
-    # if group == None:
-    #     "seuqence and blockorder are set."
-    #     print('Inferring group from sequence and blockorder.')
-    #     seq_torch = torch.tensor(sequence)
-    #     blockorder_torch = torch.tensor(blockorder)
-    #     group = (seq_torch == 1).type(torch.int) * (blockorder_torch == 1).type(torch.int)*0 +\
-    #     (seq_torch == 1).type(torch.int) * (blockorder_torch == 2).type(torch.int)*1 +\
-    #     (seq_torch == 2).type(torch.int) * (blockorder_torch == 1).type(torch.int)*2 +\
-    #     (seq_torch == 2).type(torch.int) * (blockorder_torch == 2).type(torch.int)*3
-    #     group = group.tolist()
-        
-        
-    # assert len(blockorder) == num_agents
-    # assert len(sequence) == num_agents
-    # assert torch.all(torch.tensor(sequence) > 0), "list must only contain 1 and 2."
-    # assert torch.all(torch.tensor(blockorder) > 0), "blockorder must only contain 1 and 2."
     
     if params is not None:
+        assert isinstance(params, pd.DataFrame)
+        
         if isinstance(params, pd.DataFrame):
             params_sim_df = params.copy()
             params = params.to_dict(orient='list')
@@ -1208,6 +1187,7 @@ def simulate_data(model,
         for key in params.keys():
             if isinstance(params[key], list):
                 params[key] = torch.tensor(params[key])
+                
             if params[key].ndim == 1:
                 assert params[key].shape[0] == num_agents
                 params[key] = params[key][None, ...]
@@ -1241,6 +1221,7 @@ def simulate_data(model,
             'outcomes': newenv.outcomes,
             'trialsequence': newenv.data['trialsequence'], 
             'trialidx': newenv.data['trialidx'], 
+            'trialidx_day': newenv.data['trialidx_day'], 
             'blocktype': newenv.data['blocktype'],
             'jokertypes': newenv.data['jokertypes'], 
             'blockidx': newenv.data['blockidx'],
@@ -1338,6 +1319,9 @@ def plot_grouplevel(df1,
     "----- Remove errortrials (where choices_GD == -2)"
     groupdata_df_1 = groupdata_df_1[groupdata_df_1['choices_GD'] != -2]
     
+    "In simulated results, errors are -2 in choices, but not in choices_GD"
+    groupdata_df_1 = groupdata_df_1[groupdata_df_1['choices'] != -2]
+    
     "---------- Create new column block_num for different blockorders"
     blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
     groupdata_df_1['block_num'] = groupdata_df_1.apply(lambda row: \
@@ -1364,6 +1348,8 @@ def plot_grouplevel(df1,
         
         "----- Remove errortrials (where choices_GD == -2)"
         groupdata_df_2 = groupdata_df_2[groupdata_df_2['choices_GD'] != -2]
+        
+        groupdata_df_2 = groupdata_df_2[groupdata_df_2['choices'] != -2]
         
         "---------- Create new column block_num for different blockorders"
         blocknums_blockorder2 = [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12]
@@ -1594,6 +1580,10 @@ def plot_dual_behav(agent_df_1, agent_df_2):
     plt.show()        
 
 def posterior_predictives(post_sample, 
+                          param_names,
+                          Q_init,
+                          seq_init,
+                          errorrates = None,
                           exp_data = None,
                           plot_single = True):
     '''
@@ -1624,31 +1614,60 @@ def posterior_predictives(post_sample,
 
     '''
     
+    assert len(post_sample['day'].unique()) == 1
+    assert torch.is_tensor(errorrates)
+    assert len(post_sample['model'].unique()) == 1
+    model = post_sample['model'].unique()[0]
+    
     num_agents = len(post_sample['ag_idx'].unique())
     num_reps = len(post_sample[post_sample['ag_idx'] == 0])
     model = post_sample['model'].unique()[0]
-    assert num_reps <= 1000, "Number of repetitions must be less than 1000."
+    # assert num_reps <= 1000, "Number of repetitions must be less than 1000."
+    if num_reps > 1000:
+        num_reps = 1000
     
     complete_df = pd.DataFrame()
     
-    import seaborn
     custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     
-    for ag_idx in range(num_agents):
-        print("Simulating agent %d of %d with %d repetitions."%(ag_idx+1, num_agents, num_reps))
-        post_sample_agent_df = post_sample[post_sample['ag_idx'] == ag_idx]
-        model = post_sample_agent_df['model'].unique()[0]
+    for ID in post_sample['ID'].unique():
+        print(f"Simulating agent {ID} with {num_reps} repetitions.")
         
-        # params = torch.tensor(post_sample_agent_df.iloc[:, 0:-3].to_numpy().T)
-        # dfgh #test whether correct
-        params = post_sample_agent_df.iloc[:,0:-1].to_dict(orient='list')
-        for key in params.keys():
-            params[key] = torch.tensor(params[key])
+        post_sample_agent_df = post_sample[post_sample['ID'] == ID].reset_index(drop=True)
         
+        "Parameters"
+        params = post_sample_agent_df.iloc[0:num_reps][[*param_names]]
+        # params = post_sample_agent_df.iloc[0:num_reps][[*param_names]].to_dict(orient='list')
+        # for key in params.keys():
+        #     params[key] = torch.tensor(params[key])
+        
+        "ag_idx"
+        assert len(post_sample_agent_df[post_sample_agent_df['ID'] == ID]['ag_idx'].unique()) == 1
+        ag_idx = post_sample_agent_df[post_sample_agent_df['ID'] == ID]['ag_idx'].unique()[0]
+        
+        "group"
+        group = list(post_sample_agent_df.iloc[:num_reps]['group'])
+        
+        
+        '''
+        errorrates
+            rows
+                0 : STT
+                1 : Random
+                2 : Congruent
+                3 : incongruent
+        '''
+        ers = errorrates[:, ag_idx][..., None].repeat(1, num_reps)
+        qinit = Q_init[0, ag_idx,:][None, None, ...].repeat(1, num_reps, 1)
+        sinit = seq_init[0:1, ...].repeat(num_reps, 1, 1, 1, 1, 1)
         ag_data_dict, ag_data_df, params_df, agent = simulate_data(model, 
                                                                     num_reps,
-                                                                    group = params['group'],
-                                                                    params = params)
+                                                                    group = group,
+                                                                    day = post_sample['day'].unique()[0],
+                                                                    Q_init = qinit,
+                                                                    seq_init = sinit,
+                                                                    params = params,
+                                                                    errorrates = ers)
         
         agent_df = pd.DataFrame(ag_data_dict).explode(list(ag_data_dict.keys()))
         
@@ -1700,6 +1719,7 @@ def posterior_predictives(post_sample,
         exp_data = exp_data[exp_data['choices'] != -1]
         "Remove error trials"
         exp_data = exp_data[exp_data['choices'] != -2]
+        exp_data = exp_data[exp_data['choices_GD'] != -2]
         "Remove STT"
         exp_data = exp_data[exp_data['jokertypes'] != -1]
         
@@ -1798,6 +1818,7 @@ def create_grouped(df, ag_idx):
     groupdata_df = groupdata_df[groupdata_df['choices'] != -1]
     "Remove error trials"
     groupdata_df = groupdata_df[groupdata_df['choices'] != -2]
+    groupdata_df = groupdata_df[groupdata_df['choices_GD'] != -2]
     "Remove STT"
     groupdata_df = groupdata_df[groupdata_df['jokertypes'] != -1]
     
@@ -2030,9 +2051,10 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     return complete_df
 
 def compute_points(df, identifier = 'ID'):
-    print("Outcomes are not registered as -2 in simulated trials.")
+    print("Outcomes for errors are not registered as -2 in simulated trials.")
     expdata_df = df[df['choices'] != -1]
     expdata_df = expdata_df[expdata_df['choices'] != -2]
+    expdata_df = expdata_df[expdata_df['choices_GD'] != -2]
     
     "Total"
     points = expdata_df.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
@@ -2095,6 +2117,7 @@ def compute_hpcf(expdata_df):
     
     df = expdata_df[expdata_df['choices_GD'] != -1]
     df = df[df['choices_GD'] != -2]
+    df = df[df['choices'] != -2]
     df = df[df['trialsequence'] > 10]
     
     hpcf_df = pd.DataFrame(data = {'ID': expdata_df['ID'].unique()})
@@ -2142,7 +2165,45 @@ def compute_hpcf(expdata_df):
     hpcf_df['CRspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_rand']
     hpcf_df['CIspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_incong']
     
-    return hpcf_df
+    if 'post_pred_GD' in expdata_df.columns:
+        "Random"
+        df_pp_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_rand.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
+        
+        "-> Just for safety."
+        df_pp_rand2 = pd.DataFrame(df[(df['blocktype'] == 1) & (df['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                                'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_rand2.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
+
+        assert df_pp_rand2.equals(df_pp_rand)
+
+        "Sequential"
+        df_pp_seq = pd.DataFrame(df[(df['jokertypes'] == 1) | (df['jokertypes'] == 2)].loc[:, ['ID', 
+                                                                                            'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_seq.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+        
+        "-> Just for safety."
+        df_pp_seq2 = pd.DataFrame(df[(df['blocktype'] == 0) & (df['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                               'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_seq2.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+        
+        assert df_pp_seq2.equals(df_pp_seq2)
+        
+        "Congruent"
+        df_pp_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_cong.rename(columns = {'post_pred_GD': 'hpcf_pp_cong'}, inplace = True)
+        
+        "Incongruent"
+        df_pp_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+        df_pp_inc.rename(columns = {'post_pred_GD': 'hpcf_pp_incong'}, inplace = True)
+        
+        
+        hpcf_df = pd.merge(hpcf_df, df_pp_rand, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, df_pp_seq, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, df_pp_cong, on = 'ID')
+        hpcf_df = pd.merge(hpcf_df, df_pp_inc, on = 'ID')
+    
+    return hpcf_df 
 
 def compute_RT(expdata_df):
     '''
@@ -2181,6 +2242,7 @@ def compute_RT(expdata_df):
     
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
+    # RT_cond_df = RT_cond_df[RT_cond_df['choices_GD'] != -2]
     
     RT_df_all = pd.DataFrame(RT_cond_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     
@@ -2250,7 +2312,14 @@ def get_sociopsy_df():
     return sociopsy_df
 
 
-def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method = 'p', correctp = True, title='', saveas = None):
+def plot_corr_network(r_matrix, 
+                      evidence_matrix, 
+                      measures, 
+                      rename_labels, 
+                      method = 'p', 
+                      correctp = True, 
+                      title='', 
+                      saveas = None):
     '''
 
     Parameters
@@ -2373,7 +2442,9 @@ def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method
                 with_labels=True, 
                 font_weight='bold', 
                 node_size=700, 
-                node_color='skyblue',
+                #node_color= ['gold', 'salmon', '#85A389', 'magenta', 'pink', 'steelblue', 'pink', 'skyblue', 'green', 'yellow', 'darkorchid', 'fuchsia'],
+                # node_color= ['#85A389', 'pink', 'skyblue', 'pink', 'pink', '#85A389', 'pink', 'skyblue', 'skyblue', 'skyblue', 'skyblue', 'skyblue'],
+                node_color= ['#A1CCD1', '#E9B384', '#85A389', '#E9B384', '#E9B384', '#A1CCD1', '#E9B384', '#85A389', '#85A389', '#85A389', '#85A389', '#85A389'],
                 edge_color = cmap((np.array(edge_weights)+1)/2),
                 width = edge_widths,
                 edge_cmap = plt.cm.RdBu)
@@ -2413,10 +2484,12 @@ def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method
     
     if saveas is not None:
         if correctp:
-            plt.savefig(f"{saveas} (corrected p-values).png", dpi=300)
+            plt.savefig(f"{saveas} (corrected p-values).png", dpi=300, bbox_inches = 'tight')
+            plt.savefig(f"{saveas} (corrected p-values).svg", bbox_inches = 'tight')
             
         else: 
-            plt.savefig(f"{saveas} (corrected p-values).png", dpi=300)
+            plt.savefig(f"{saveas} (corrected p-values).png", dpi=300, bbox_inches = 'tight')
+            plt.savefig(f"{saveas} (corrected p-values).svg", bbox_inches = 'tight')
             
         # if partial:
         #     plt.savefig(f"Partial_Spearman_Correlation_Day{day}.png", dpi=300)
@@ -2425,7 +2498,7 @@ def plot_corr_network(r_matrix, evidence_matrix, measures, rename_labels, method
     plt.show()
     
     
-def plot_hpcf(df, title=None):
+def plot_hpcf(df, title=None, post_pred=False):
     '''
     
 
@@ -2449,15 +2522,27 @@ def plot_hpcf(df, title=None):
 
     '''
     
-    hpcf = list(df['hpcf_cong'])
-    hpcf.extend(list(df['hpcf_incong']))
-    hpcf.extend(list(df['hpcf_seq']))
-    hpcf.extend(list(df['hpcf_rand']))
-    
-    DTTType = [1]*len(df['hpcf_cong'])
-    DTTType.extend([2]*len(df['hpcf_incong']))
-    DTTType.extend([3]*len(df['hpcf_seq']))
-    DTTType.extend([4]*len(df['hpcf_rand']))
+    if post_pred:
+        hpcf = list(df['hpcf_pp_cong'])
+        hpcf.extend(list(df['hpcf_pp_incong']))
+        hpcf.extend(list(df['hpcf_pp_seq']))
+        hpcf.extend(list(df['hpcf_pp_rand']))
+        
+        DTTType = [1]*len(df['hpcf_pp_cong'])
+        DTTType.extend([2]*len(df['hpcf_pp_incong']))
+        DTTType.extend([3]*len(df['hpcf_pp_seq']))
+        DTTType.extend([4]*len(df['hpcf_pp_rand']))
+        
+    else:
+        hpcf = list(df['hpcf_cong'])
+        hpcf.extend(list(df['hpcf_incong']))
+        hpcf.extend(list(df['hpcf_seq']))
+        hpcf.extend(list(df['hpcf_rand']))
+        
+        DTTType = [1]*len(df['hpcf_cong'])
+        DTTType.extend([2]*len(df['hpcf_incong']))
+        DTTType.extend([3]*len(df['hpcf_seq']))
+        DTTType.extend([4]*len(df['hpcf_rand']))
     
     dayseq = list(df['day'])
     dayseq.extend(list(df['day']))
@@ -2483,11 +2568,29 @@ def plot_hpcf(df, title=None):
     
     plt.ylim([0.4, 1])
     
+    ax.set_ylabel('HRCF')
+    plt.savefig(f'behaviour_{title}.svg')
     plt.show()
     
     
-    
 def lineplot_daydiffs(df):
+    '''
+
+    Parameters
+    ----------
+    df : DataFrame
+        columns:
+            ag_idx
+            parameter
+            mean
+            day
+
+    Returns
+    -------
+    None.
+
+    '''
+    
     """
         Plot Day 2 - Day 1 with connecting lines
     """
@@ -2499,22 +2602,23 @@ def lineplot_daydiffs(df):
     num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
                     (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
     gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
-    param_idx = 0
+    param_idx = -1
     for par in parameter_names:
         
         param_idx += 1
         plot_col_idx = param_idx % num_plot_cols
         plot_row_idx = (param_idx // num_plot_cols)
+        print(f'{plot_row_idx}, {plot_col_idx}')
         
         # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
         t_statistic, p_value = scipy.stats.ttest_rel(df[(df['parameter'] == par) & (df['day'] == 1)].sort_values(by='ag_idx')['mean'], 
                                                     df[(df['parameter'] == par) & (df['day'] == 2)].sort_values(by='ag_idx')['mean'])
         
         if t_statistic > 0:
-            print("%s(day1) > %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+            print("%s(day1) > %s(day2) at p=%.5f"%(par, par, p_value))
 
         else:
-            print("%s(day1) < %s(day2) at p=%.5f"%(par[0:-5], par[0:-5], p_value))
+            print("%s(day1) < %s(day2) at p=%.5f"%(par, par, p_value))
         
         for name, group in df[df['parameter'] == par].groupby('ag_idx'):
             assert len(group) == 2
@@ -2596,3 +2700,133 @@ def scatterplot_daydiffs(df):
               
     # plt.savefig('/home/sascha/Downloads/daydiffscatter.svg')
     plt.show()
+
+
+def post_pred_sim_df(predictive_choices, obs_mask, model, num_agents, inf_mean_df, day):
+    def GD_prob(trial, group, post_pred):
+        # print("Only for newest AST version (2024 Paper).")
+        
+        opt1, opt2 = models.model_master.find_resp_options(None, torch.tensor(trial))
+        
+        if post_pred == -2:
+            "Keep errors as they were"
+            print("Keeping an error.")
+            return post_pred
+        
+        if trial == -1:
+            return trial
+        
+        if trial < 10:
+            return post_pred
+        
+        assert post_pred != -2 and post_pred != -1
+        
+        assert post_pred is not None
+        assert opt1 >= 0 and opt2 >= 0
+        assert opt1 < 4 and opt2 < 4
+        assert opt1 < opt2
+        if group == 0 or group == 1:
+            if opt1 == 0:
+                assert opt2 == 1 or opt2 == 2
+                
+                "Opt1 is goal-directed response"
+                return 1-post_pred
+            
+            elif opt1 > 0 and opt2 == 3:
+                "Opt2 is goal-directed response"
+                return post_pred
+                
+            else:
+                raise Exception("Not possible.")
+                
+        elif group == 2 or group == 3:
+            if opt1 == 1 or opt1 == 2:
+                
+                assert opt2 == 3
+                "Opt1 is goal-directed response"
+                return 1-post_pred
+            
+            elif opt2 == 1 or opt2 == 2:
+                
+                assert opt1 == 0
+                "Opt2 is goal-directed response"
+                return post_pred
+                
+            else:
+                raise Exception("Not possible.")
+                
+
+    groupdata_dict, sim_group_behav_df, params_sim_df, _ = simulate_data(model, 
+                                                                        num_agents,
+                                                                        group = list(inf_mean_df['group']),
+                                                                        day = day)
+
+    "Column encodes probability of choosing the 2nd response option"
+    sim_group_behav_df['post_pred'] = None
+    # sim_group_behav_df['post_pred_bool'] = None
+
+    import models_torch as models
+
+    jokeridx = 0
+    for trial in groupdata_dict['trialsequence']:
+        if torch.any(torch.tensor(trial)>10):
+            jokeridx += 1
+            
+    assert jokeridx == predictive_choices.shape[-1]
+
+    jokeridx = 0
+    if day == 1:
+        trialidx = 0
+        
+    elif day == 2:
+        trialidx = 2886
+        
+    else:
+        raise Exception("Nope!")
+        
+    for trial in groupdata_dict['trialsequence']:
+        print(f"Trial {trialidx}.")
+        if torch.any(torch.tensor(trial)>10):
+            
+            "At STT, obs_mask cannot be 1."
+            stt_agidx = np.where(sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx].loc[:, 'trialsequence'] < 10)[0]
+            assert np.all(np.array(obs_mask[stt_agidx, jokeridx]) == 0)
+            
+            old_responses = np.array(sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx]['choices'], dtype = 'float')
+            
+            dtt_agidx = np.where(sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx].loc[:, 'trialsequence'] > 10)[0]
+            error_idx = np.where(sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx].loc[:, 'choices'] == -2)[0]
+            
+            
+            "Do not set a posterior predictive response where an error was simulated."
+            set_new_resp_idx = np.delete(dtt_agidx, [i for i in range(dtt_agidx.size) if dtt_agidx[i] in error_idx])
+            
+            # trials = np.array(sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx]['trialsequence'].iloc[set_new_resp_idx], dtype='int')
+            
+            post_pred_resp = predictive_choices[set_new_resp_idx, jokeridx].clone()
+            
+            "Set responses to dataframe column choices"
+            old_responses[set_new_resp_idx] = post_pred_resp
+            # sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx].loc[:, 'post_pred'] = old_responses
+            
+            sim_group_behav_df.loc[sim_group_behav_df['trialidx'] == trialidx, 'post_pred'] = old_responses
+            
+            # if trialidx == 3214:
+                # dfgh
+            # sim_group_behav_df[sim_group_behav_df['trialidx'] == trialidx]['trialidx']
+            
+            jokeridx += 1
+        
+        trialidx += 1
+        
+    sim_group_behav_df['post_pred_GD'] = None
+    sim_group_behav_df['post_pred_GD'] = sim_group_behav_df.apply(lambda row: GD_prob(row['trialsequence'], row['group'], row['post_pred']), axis = 1)
+    
+    sim_group_behav_df['day'] = [day]*len(sim_group_behav_df)
+    # sim_group_behav_df['observed'] = sim_group_behav_df.apply(lambda row: 1 if row['trialsequence'] > 10 and row['choices'] != -2 else 0, axis = 1)
+    # bla = sim_group_behav_df[(sim_group_behav_df['observed']==1) & (sim_group_behav_df['post_pred']<1)]
+    # bla = bla.reset_index(drop=True)
+    # bla['trialidx_day'] = bla['trialidx'] - 2886
+    # dfgh
+    
+    return sim_group_behav_df
