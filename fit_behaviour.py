@@ -7,6 +7,9 @@
 
     @author: sascha
 """
+from IPython import get_ipython
+get_ipython().run_line_magic("reset", "-f")
+
 import numpy as np
 import torch
 import pandas as pd
@@ -21,21 +24,24 @@ import utils
 '''
 Modelle:
 
-    Vbm - 1 parameter 
-    Repbias - 2 parameters
-    Repbias_Conflict - 3 parameters
-    Repbias_Interaction - 3 parameters
-    OnlyQ - 3 parameters
+    Vbm_lr - 2 parameters
+    Repbias - 3 parameters
+    Repbias_Conflict - 4 parameters
+    Repbias_Interaction - 4 parameters
+    OnlyQ - 4 parameters
+    Bullshitmodel - 6 parameters
+    Repbias_3Q_lr - 4 parameters
 '''
 
-waithrs = 0
+waithrs = 25
 post_pred = 1
 
-model_day1 = 'Repbias_Conflict_lr'
-models_day2 = ['Repbias_Conflict_lr']
+model_day1 = 'OnlyQ_lr'
+models_day2 = ['OnlyQ_lr']
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
-posterior_pred_samples_day1 = 2_000
+posterior_pred_samples_day1 = 3_000
+num_waic_samples = 3_000
 
 num_inf_steps_day2 = num_inf_steps_day1
 halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
@@ -73,10 +79,6 @@ assert np.abs(np.diff(group_distro)).sum() == 0
 '''
     Fit day 1
 '''
-import time
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-print(f"Waiting for {waithrs} hours, starting at {timestamp}.")
-time.sleep(waithrs*3600)
 
 '''
     Inference
@@ -86,6 +88,11 @@ print(f"Starting inference of model {model_day1} for day 1 for {num_agents} agen
 agent = utils.init_agent(model_day1, 
                          group, 
                          num_agents = num_agents)
+
+import time
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+print(f"Waiting for {waithrs} hours, starting at {timestamp}.")
+time.sleep(waithrs*3600)
 
 Q_init_day1 = agent.Q_init
 
@@ -112,7 +119,7 @@ firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1[
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC, WAIC, ll = infer.compute_IC()
+BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples)
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -149,22 +156,23 @@ params_sim_df['model']  = model_day1
 
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-extra_storage = (Q_init_day1, # 0
-                 agent.Q[-1].detach(), # 1
-                 1, # day # 2
-                 'no preceding model', # 3
-                 max_log_like, # 4
-                 mle_locs, # 5
-                 '', # 6
-                 '', # 7
+extra_storage = (Q_init_day1, # 0 (Q_init))
+                 agent.Q[-1].detach(), # 1 (Q-final)
+                 1, # day # 2 (day)
+                 'no preceding model', # 3 (preceding model)
+                max_log_like, # 4 (Maximum Log Likelihood)
+                mle_locs, # 5 (MLE estimates)
+                 '', # 6 (initial seq_counter - only for day 2)
+                 '', # 7 (filename day 1 - only for day 2)
                  secondlevel_df, # 8
                  param_names_day1, # 9
                  'behav_fit', # 10
-                 halting_rtol_day1, # 11
+                 halting_rtol_day1, # 11 (halting r_tol)
                  WAIC, # 12
-                 ll,
-                 predictive_choices,
-                 obs_mask) # 13
+                 ll, # 13
+                 predictive_choices, # 14
+                 obs_mask,
+                 WAIC_var) # 15
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
@@ -211,7 +219,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll = infer.compute_IC()
+    BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -228,18 +236,19 @@ for model_day2 in models_day2:
                      agent.Q[-1].detach(), # final Q-values
                      2, # day
                      model_day1, # preceding model name
-                     max_log_like,
-                     mle_locs,
+                     '',
+                     '',
                      seq_counter_day2, # seq counter day 2
                      filename_day1, # filename day 1
                      secondlevel_df,
                      param_names_day2,
                      'behav_fit',
-                     halting_rtol_day2,
+                     halting_rtol_day2, # halting r_tol
                      WAIC,
                      ll,
                      predictive_choices,
-                     obs_mask)
+                     obs_mask,
+                     WAIC_var)
     
     if num_inf_steps_day2 > 1:
         pickle.dump( (firstlevel_df, 
@@ -253,3 +262,5 @@ for model_day2 in models_day2:
         
 from IPython import get_ipython
 get_ipython().run_line_magic("reset", "-f")
+
+quit()

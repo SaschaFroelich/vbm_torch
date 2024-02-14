@@ -125,7 +125,7 @@ ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
-BIC, AIC, WAIC, ll = infer.compute_IC()
+_, _, WAIC, ll, WAIC_var = infer.compute_IC()
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -155,23 +155,24 @@ extra_storage = (Q_init_day1,
                  agent.Q[-1].detach(),
                  1, # day
                  'no preceding model',
-                 max_log_like,
-                 mle_locs,
+                max_log_like,
+                mle_locs,
                  '',
                  '',
                  secondlevel_df,
                  param_names_day1,
                  'recovery',
-                 halting_rtol,
+                 '',
                  WAIC,
                  ll,
                  predictive_choices,
-                 obs_mask)
+                 obs_mask,
+                 WAIC_var)
 
 filename_day1 = f'recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents'
 pickle.dump( (firstlevel_df, 
               group_behav_df_day1,
-              (infer.loss, BIC, AIC), 
+              (infer.loss, None, None), 
               params_sim_df_day1, 
               agent_elbo_tuple, 
               extra_storage), 
@@ -224,7 +225,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol)
-    BIC, AIC, WAIC, ll = infer.compute_IC()
+    BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC()
     
     # "----- Q_init for next day"
     # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
