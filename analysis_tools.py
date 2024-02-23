@@ -560,7 +560,9 @@ def compute_errors(df, identifier = 'ID'):
     "STT"
     ER_stt = []
     ER_stt_seq = []
+    ER_stt_seq_std = []
     ER_stt_rand = []    
+    ER_stt_rand_std = [] 
     ER_stt = []
     
     ER_notimeouterrors_stt = []
@@ -594,7 +596,7 @@ def compute_errors(df, identifier = 'ID'):
                 (df[identifier] == ID) & \
                 (df['blocktype'] == 0)
         ER_stt_seq.append(len(df[mask & (df['choices'] == -2)]) / len(df[mask]))
-        
+                
         mask =  (df['trialsequence'] < 10) & \
                 (df[identifier] == ID) & \
                 (df['blocktype'] == 1)
@@ -950,7 +952,270 @@ def network_corr(df, nodes, covars = None, method = 'spearman'):
                 
                     
     return r_matrix, p_matrix
-
-# def daydiff(df, threshold = None):
+        
+def find_seqlearners(expdata_df, complete_df_all, day, correctp = True):
     
+    # df = expdata_df[expdata_df['choices'] != -1]
+    if 'day' in expdata_df.columns:
+        assert len(expdata_df['day'].unique()) == 1
+    df = expdata_df[(expdata_df['trialsequence'] != -1) & (expdata_df['trialsequence'] < 10)]
+    num_agents = len(df['ID'].unique())
+    
+    from scipy.stats import chi2_contingency
+
+    '''
+        Chi-squared test for ER
+    '''
+    IDs = []
+    chis = []
+    ps = []
+    r_minus_s_er = []
+
+    for ID in df['ID'].unique():
+        df_ag = df[df['ID'] == ID]
+        
+        seq_er = [len(df_ag[(df_ag['choices'] == -2) & (df_ag['blocktype'] == 0)]), 
+                  len(df_ag[(df_ag['choices'] > -2) & (df_ag['blocktype'] == 0)])] # 0 error, 1 correct
+        
+        rand_er = [len(df_ag[(df_ag['choices'] == -2) & (df_ag['blocktype'] == 1)]), 
+                  len(df_ag[(df_ag['choices'] > -2) & (df_ag['blocktype'] == 1)])] # 0 error, 1 correct
+        
+        chi2, p_value, dof, expected = chi2_contingency([seq_er, rand_er])
+        
+        IDs.append(ID)
+        chis.append(chi2)
+        ps.append(p_value)
+        r_minus_s_er.append(rand_er[0] - seq_er[0]) # difference in number of errors
+        
+        print(f"Chi-square Statistic: {chi2}")
+        print(f"P-value: {p_value}")
+        print(f"{rand_er[0] - seq_er[0]}")
+        
+        
+    chi_er_df = pd.DataFrame({'ID': IDs, 
+                           'chi': chis,
+                           'p_chi': ps,
+                           'Difference_ER': r_minus_s_er})
+        
+    
+    # "Nonparametric test"
+    # num_agents = ER_stt_R_forvar.shape[0]
+    # us = np.zeros(num_agents)
+    # ps_er = np.ones(num_agents)
+    # for ag_idx in range(num_agents):
+    #     u, p = scipy.stats.mannwhitneyu(ER_stt_S_forvar[ag_idx,:], 
+    #                                     ER_stt_R_forvar[ag_idx,:], alternative = 'less')
+    #     us[ag_idx] = u
+    #     ps_er[ag_idx] = p
+        
+    '''
+        t-test for Reaction times
+    '''
+    ts = np.zeros(num_agents)
+    ps_rt = np.ones(num_agents)
+    IDs = []
+    r_minus_s_rt = []
+    
+    ag_idx = 0
+    for ID in df['ID'].unique():
+        IDs.append(ID)
+        df_ag = df[df['ID'] == ID]
+        df_ag = df_ag[df_ag['choices'] != -2]
+        # df_ag = df_ag[df_ag['RT'] < 600]
+        
+        t,p = scipy.stats.ttest_ind(np.array(df_ag[df_ag['blocktype']==0]['RT'], dtype='float'), # seq
+                                    np.array(df_ag[df_ag['blocktype']==1]['RT'], 'float'), alternative = 'less') #random
+        
+        r_minus_s_rt.append(np.array(df_ag[df_ag['blocktype']==1]['RT'], 'float').mean()-np.array(df_ag[df_ag['blocktype']==0]['RT'], dtype='float').mean())
+        ts[ag_idx] = t
+        ps_rt[ag_idx] = p
+        ag_idx += 1
+    
+    t_rt_df = pd.DataFrame({'ID' : IDs,
+                            't' : ts,
+                            'p_t': ps_rt,
+                            'Difference_RT': r_minus_s_rt})
+    
+    # scipy.stats.pearsonr(ps_er, ps_rt)
+    
+    new_df = pd.merge(chi_er_df, t_rt_df, on = 'ID')
+    
+    print(new_df['p_chi'].corr(new_df['p_t']))
+    
+    chisquared = -2 * (np.log(new_df['p_chi']) + np.log(new_df['p_t']))
+    newp = 1-scipy.stats.chi2.cdf(chisquared, 4)
+    
+    if correctp:
+        ps_adjusted = scipy.stats.false_discovery_control(newp, method='bh')
+        
+    else:
+        ps_adjusted = newp
+    
+    
+    
+    new_df['p_compound_adjusted'] = ps_adjusted
+    
+    # IDs = list(new_df['ID'])
+    # ps_adjusted = scipy.stats.false_discovery_control(newp, method='by')
+    
+    # complete_df_all = complete_df_all[complete_df_all['day'] == day]
+    # complete_df_all['ps_adjusted'] = None
+    
+    # for pid, p in zip(IDs, ps_adjusted):
+    #     complete_df_all.loc[complete_df_all['ID'] == pid, 'ps_adjusted'] = p
+    
+    seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
+                            (new_df['Difference_ER'] > 0) & 
+                            (new_df['Difference_RT'] > 0)]
+    
+    print(f"{len(seqlearners_df)} strong sequence learners with RT & ER > 0.")
+    
+    seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
+                            (new_df['Difference_RT'] > 0)]
+    
+    print(f"{len(seqlearners_df)} strong sequence learners with RT > 0.")
+    
+    seqlearners_df = new_df[new_df['p_compound_adjusted'] < 0.05]
+    
+    print(f"{len(seqlearners_df)} strong sequence learners.")
+    
+    if 'day' in seqlearners_df.columns:
+        seqlearners_df = seqlearners_df[seqlearners_df['day'] == day]
+        
+    else:
+        seqlearners_df['day'] = day
+    
+    notseqlearners_df = new_df[new_df['p_compound_adjusted'] > 0.05]
+    
+    if 'day' in notseqlearners_df.columns:
+        notseqlearners_df = notseqlearners_df[notseqlearners_df['day'] == day]
+        
+    else:
+        notseqlearners_df['day'] = day
+    
+    # seqlearners_df['day'] = [day]*len(seqlearners_df)
+    # notseqlearners_df['day'] = [day]*len(notseqlearners_df)
+    
+    return seqlearners_df, notseqlearners_df
+
+def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, correctp = True):
+    num_agents = len(expdata_df['ID'].unique())
+    
+    df = expdata_df[expdata_df['trialsequence'] != -1]
+    df = df[df['trialsequence'] > 10]
+    df = df[df['choices'] != -2]
+    
+    assert len(df['choices_GD'].unique()) == 2
+    
+    from scipy.stats import chi2_contingency
+
+    '''
+        Chi-squared test for HRC
+    '''
+    IDs = []
+    
+    chis_cr = []
+    chis_ri = []
+    
+    ps_cr = []
+    ps_ri = []
+    
+    cr = []
+    ri = []
+
+    for ID in df['ID'].unique():
+        IDs.append(ID)
+        df_ag = df[df['ID'] == ID]
+        
+        rand = [len(df_ag[(df_ag['choices_GD'] == 0) & (df_ag['jokertypes'] == 0)]), 
+                len(df_ag[(df_ag['choices_GD'] == 1) & (df_ag['jokertypes'] == 0)])] # 0 not GD choice, 1 GD choice
+        
+        congruent = [len(df_ag[(df_ag['choices_GD'] == 0) & (df_ag['jokertypes'] == 1)]), 
+                     len(df_ag[(df_ag['choices_GD'] == 1) & (df_ag['jokertypes'] == 1)])] # 0 not GD choice, 1 GD choice
+        
+        incongruent = [len(df_ag[(df_ag['choices_GD'] == 0) & (df_ag['jokertypes'] == 2)]), 
+                       len(df_ag[(df_ag['choices_GD'] == 1) & (df_ag['jokertypes'] == 2)])] # 0 not GD choice, 1 GD choice
+        
+        
+        chi2, p_value, dof, expected = chi2_contingency([congruent, rand])
+        chis_cr.append(chi2)
+        ps_cr.append(p_value)
+        cr.append(congruent[1]/(congruent[1]+congruent[0]) - rand[1]/(rand[1]+rand[0])) # difference in proportion of GD responses
+        
+        chi2, p_value, dof, expected = chi2_contingency([rand, incongruent])
+        chis_ri.append(chi2)
+        ps_ri.append(p_value)
+        ri.append(rand[1]/(rand[1]+rand[0]) - incongruent[1]/(incongruent[1]+incongruent[0])) # difference in proportion of GD responses
+        
+        
+    if correctp:
+        ps_cr_adjusted = scipy.stats.false_discovery_control(ps_cr, method='bh')
+        ps_ri_adjusted = scipy.stats.false_discovery_control(ps_ri, method='bh')
+        
+    else: 
+        ps_cr_adjusted = np.array(ps_cr)
+        ps_ri_adjusted = np.array(ps_ri)
+    
+    # ps_cr_adjusted = scipy.stats.false_discovery_control(ps_cr, method='bh')
+    # ps_ri_adjusted = scipy.stats.false_discovery_control(ps_ri, method='bh')
+    
+    ri_small = np.where(ps_ri_adjusted > 0.05, 0, 1)
+    ri_small_idxs = np.where(ri_small == 0, range(1, num_agents+1), -1)
+    ri_small_idxs = np.array(ri_small_idxs[ri_small_idxs>0]) - 1
+    
+    ri_large = np.where(ps_ri_adjusted <= 0.05, 0, 1)
+    ri_large_idxs = np.where(ri_large == 0, range(1, num_agents+1), -1)
+    ri_large_idxs = np.array(ri_large_idxs[ri_large_idxs>0]) - 1 
+    
+    cr_small = np.where(ps_cr_adjusted > 0.05, 0, 1)
+    cr_small_idxs = np.where(cr_small == 0, range(1, num_agents+1), -1)
+    cr_small_idxs = np.array(cr_small_idxs[cr_small_idxs>0]) - 1
+    
+    cr_large = np.where(ps_cr_adjusted <= 0.05, 0, 1)
+    cr_large_idxs = np.where(cr_large == 0, range(1, num_agents+1), -1)
+    cr_large_idxs = np.array(cr_large_idxs[cr_large_idxs>0]) - 1
+    
+    IDs_ri_small = [IDs[r] for r in ri_small_idxs]
+    IDs_ri_large = [IDs[r] for r in ri_large_idxs]
+    
+    IDs_cr_small = [IDs[r] for r in cr_small_idxs]
+    IDs_cr_large = [IDs[r] for r in cr_large_idxs]
+    
+    "Habitual"
+    # %matplotlib inline
+    fig, ax = plt.subplots()
+    ax.text(0,0, 'HABITUAL', fontsize=40)
+    plt.show()
+    habitual_df = utils.plot_grouplevel(expdata_df[(expdata_df['ID'].isin(IDs_cr_large)) & 
+                                     (expdata_df['ID'].isin(IDs_ri_large))], plot_single = plot_single)
+    
+    fig, ax = plt.subplots()
+    ax.text(0,0, 'GD_df', fontsize=40)
+    plt.show()
+    GD_df = utils.plot_grouplevel(expdata_df[(expdata_df['ID'].isin(IDs_cr_small)) & 
+                                     (expdata_df['ID'].isin(IDs_ri_small))], plot_single = plot_single)
+    
+    fig, ax = plt.subplots()
+    ax.text(0,0, 'modulators', fontsize=40)
+    plt.show()
+    modulators_df = utils.plot_grouplevel(expdata_df[(expdata_df['ID'].isin(IDs_cr_large)) & 
+                                     (expdata_df['ID'].isin(IDs_ri_small))], plot_single = plot_single)
+    
+    fig, ax = plt.subplots()
+    ax.text(0,0, 'anti', fontsize=40)
+    plt.show()
+    "Low CR & High CI"
+    antimods_df = utils.plot_grouplevel(expdata_df[(expdata_df['ID'].isin(IDs_cr_small)) & 
+                                     (expdata_df['ID'].isin(IDs_ri_large))], plot_single = plot_single)
+
+    return habitual_df, GD_df, modulators_df, antimods_df
+
+def compute_BF(series, thresh):
+    '''
+        Computes BF of whether a pd series is larger than thresh
+    '''
+    
+    BF = (series.to_numpy() > thresh).sum() / (series.to_numpy() < thresh).sum()
+    
+    return BF
     

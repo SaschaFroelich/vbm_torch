@@ -58,15 +58,13 @@ del complete_df_day1, complete_df_day2
 
 #%%
 exp_behav_dict, expdata_df = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-groupdf = utils.plot_grouplevel(expdata_df.drop(['ID'], axis = 1, inplace=False))
+groupdf = utils.plot_grouplevel(expdata_df)
 groupdf['plottingcat'] = groupdf.apply(lambda row: 'random1' if row['DTT Types'] == 'random' and row['day'] == 1 else
                                        'congruent1' if row['DTT Types'] == 'congruent' and row['day'] == 1 else
                                         'incongruent1' if row['DTT Types'] == 'incongruent' and row['day'] == 1 else
                                         'random2' if row['DTT Types'] == 'random' and row['day'] == 2 else
                                         'congruent2' if row['DTT Types'] == 'congruent' and row['day'] == 2 else
                                         'incongruent2', axis = 1)
-
-custom_palette = ['#67b798', '#BE54C6', '#7454C7'] # random, congruent, incongruent
 
 RT_df = pd.DataFrame()
 RTs = []
@@ -135,6 +133,8 @@ groupdf['DTT Types'] = groupdf['DTT Types'].str.title()
 '''
 
 import seaborn as sns
+custom_palette = ['#67b798', '#BE54C6', '#7454C7'] # random, congruent, incongruent
+
 
 fig, ax = plt.subplots(1,3, figsize = (15, 5))
 sns.lineplot(x = "day",
@@ -199,12 +199,11 @@ sns.barplot(x = "day",
             errorbar = ("se", 1),
             ax = ax[0])
 ax[0].set_xticks([0,1])
-# ax[0].set_ylim([60, 100])
+ax[0].set_ylim([60, 100])
 ax[0].set_xlabel('Day')
 ax[0].set_ylabel('HRC (%)')
 
 custom_palette2 = ['#67b798', '#bd97c6']
-
 sns.barplot(x = "day",
             y = "ER",
             hue = "Condition",
@@ -214,7 +213,7 @@ sns.barplot(x = "day",
             errorbar = ("se", 1),
             ax = ax[1])
 ax[1].set_xticks([0,1])
-# ax[2].set_ylim([0.61, 1])
+ax[1].set_ylim([3, 9])
 ax[1].set_xlabel('Day')
 ax[1].set_ylabel('ER (%)')
 
@@ -227,22 +226,23 @@ sns.barplot(x = "day",
             errorbar = ("se", 1),
             ax = ax[2])
 ax[2].set_xticks([0,1])
-# ax[1].set_ylim([0.61, 1])
+ax[2].set_ylim([320, 420])
 ax[2].set_xlabel('Day')
 ax[2].set_ylabel('RT (ms)')
-plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/results.png', dpi=600)
-plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/results.svg')
+# plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/results.png', dpi=600)
+plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig0/res_fig0_python.svg')
 plt.show()
 
-groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
-ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTTTypes']]
+# groupdf.rename(columns={'DTT Types':'DTTTypes'}, inplace = True)
+ANOVA_df = groupdf.loc[:, ['ag_idx', 'choices_GD', 'day', 'DTT Types']]
 ANOVA_df['day'] = ANOVA_df['day'].map(lambda x: 'one' if x == 1 else 'two')
 ANOVA_df['choices_GD'] = pd.to_numeric(ANOVA_df['choices_GD'])
 
-ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTTTypes'], as_index=False).mean()
+ANOVA_df = ANOVA_df.groupby(['ag_idx', 'day', 'DTT Types'], as_index=False).mean()
 ANOVA_df.to_csv('GD_rmanova.csv')
 ER_df.to_csv('ER_rmanova.csv')
 RT_df.to_csv('RT_rmanova.csv')
+
 
 #%%
 '''
@@ -1164,164 +1164,187 @@ complete_df['exploitscore'] = complete_df['learnscore'] + complete_df['conflict_
     (Partial) Correlation
 '''
 
-day = 2
-# partial = False
-
-import scipy
-import pingouin
-
-import torch
-import networkx as nx
-import matplotlib.pyplot as pltW
-import numpy as np
-import pickle
-import matplotlib.pyplot as plt
-
-"IES DIfference berechnen."
-complete_df['IES_stt_day1'] = complete_df['RT_stt_day1']/ (1-complete_df['ER_stt_day1'])
-complete_df['IES_stt_day1'] = complete_df['RT_stt_day1']/ (1-complete_df['ER_stt_day1'])
-
-complete_df['IES_stt_seq_day1'] = complete_df['RT_stt_seq_day1']/ (1-complete_df['ER_stt_seq_day1'])
-complete_df['IES_stt_rand_day1'] = complete_df['RT_stt_rand_day1']/ (1-complete_df['ER_stt_rand_day1'])
-
-complete_df['IES_diff_stt_day_day1'] = complete_df['IES_stt_rand_day1'] - complete_df['IES_stt_seq_day1']
-
-complete_df['IES_dtt_day1'] = complete_df['RT_dtt_day1']/ (1-complete_df['ER_dtt_day1'])
-# complete_df['IES_day1'] = complete_df['RT_day1']/ (1-complete_df['ER_total_day1'])
-
-complete_df['IES_stt_day2'] = complete_df['RT_stt_day2']/ (1-complete_df['ER_stt_day2'])
-complete_df['IES_dtt_day2'] = complete_df['RT_dtt_day2']/ (1-complete_df['ER_dtt_day2'])
-
-complete_df['IES_stt_seq_day2'] = complete_df['RT_stt_seq_day2']/ (1-complete_df['ER_stt_seq_day2'])
-complete_df['IES_stt_rand_day2'] = complete_df['RT_stt_rand_day1']/ (1-complete_df['ER_stt_rand_day2'])
-
-complete_df['IES_diff_stt_day_day2'] = complete_df['IES_stt_rand_day2'] - complete_df['IES_stt_seq_day2']
-
-# complete_df['IES_day2'] = complete_df['RT_day2']/ (1-complete_df['ER_total_day2'])
-
-if day == 1:
-    measures = ['RT_day1', 
-                'RT_stt_day1',
-                'RT_dtt_day1',
-                'RT_diff_stt_day1', 
-                'ER_diff_stt_day1',
-                'ER_total_day1',
-                'ER_stt_day1',
-                'ER_dtt_day1',
-                'hpcf_rand_day1', 
-                'CRspread_day1',
-                'CIspread_day1',
-                'RIspread_day1']
+for day in [1,2,3]:
+    # partial = False
     
-    # measures = ['IES_stt_day1',
-    #             'IES_dtt_day1',
-    #             'IES_diff_stt_day_day1',
-    #             'RT_diff_stt_day1', 
-    #             'ER_diff_stt_day1',
-    #             'hpcf_rand_day1', 
-    #             'CRspread_day1',
-    #             'CIspread_day1',
-    #             'RIspread_day1']
-
-
-    rename_labels = {'IES_stt_day1': 'IES (STT)',
-                     'IES_dtt_day1': 'IES (DTT)',
-                    'RT_day1': 'RT', 
-                     'RT_stt_day1': 'RT',
-                     'RT_dtt_day1': 'RT',
-                'hpcf_rand_day1': 'HRCF', 
-                'RT_diff_stt_day1': r'$\Delta$RT', 
-                'RIspread_day1': 'RI', 
-                'ER_diff_stt_day1': r'$\Delta$ER',
-                'IES_diff_stt_day_day1': r'$\Delta$IES',
-                'ER_stt_day1': 'ER',
-                'ER_dtt_day1': 'ER',
-                'ER_total_day1': 'ER',
-                'CRspread_day1': 'CR',
-                'CIspread_day1': 'CI'}
+    import scipy
+    import pingouin
     
-    covars = {'RT_diff_stt_day1 & RIspread_day1': ['CIspread_day1', 'CRspread_day1'], 
-              'RT_diff_stt_day1 & CIspread_day1': ['RIspread_day1', 'CRspread_day1'],
-              'RT_diff_stt_day1 & CRspread_day1': ['RIspread_day1', 'CIspread_day1']}
+    import torch
+    import networkx as nx
+    import matplotlib.pyplot as pltW
+    import numpy as np
+    import pickle
+    import matplotlib.pyplot as plt
     
-    # covars = None
-
-elif day == 2:
-    measures = ['RT_day2', 
-                'RT_stt_day2',
-                'RT_dtt_day2',
-                'RT_diff_stt_day2', 
-                'ER_diff_stt_day2',
-                'ER_total_day2',
-                'ER_stt_day2',
-                'ER_dtt_day2',
-                'hpcf_rand_day2', 
-                'CRspread_day2',
-                'CIspread_day2',
-                'RIspread_day2']
+    "IES DIfference berechnen."
+    complete_df['IES_stt_day1'] = complete_df['RT_stt_day1']/ (1-complete_df['ER_stt_day1'])
+    complete_df['IES_stt_day1'] = complete_df['RT_stt_day1']/ (1-complete_df['ER_stt_day1'])
     
-    # measures = ['IES_stt_day2',
-    #             'IES_dtt_day2',
-    #             'IES_diff_stt_day_day2',
-    #             'RT_diff_stt_day2', 
-    #             'ER_diff_stt_day2',
-    #             'hpcf_rand_day2', 
-    #             'CRspread_day2',
-    #             'CIspread_day2',
-    #             'RIspread_day2']
+    complete_df['IES_stt_seq_day1'] = complete_df['RT_stt_seq_day1']/ (1-complete_df['ER_stt_seq_day1'])
+    complete_df['IES_stt_rand_day1'] = complete_df['RT_stt_rand_day1']/ (1-complete_df['ER_stt_rand_day1'])
     
-    rename_labels = {'IES_stt_day2': 'IES (STT)',
-                     'IES_dtt_day2': 'IES (DTT)',
-                     'RT_day2': 'RT', 
-                     'RT_stt_day2': 'RT',
-                     'RT_dtt_day2': 'RT',
-                'hpcf_rand_day2': 'HRCF', 
-                'RT_diff_stt_day2': r'$\Delta$RT', 
-                'RIspread_day2': 'RI', 
-                'ER_diff_stt_day2': r'$\Delta$ER',
-                'IES_diff_stt_day_day2': r'$\Delta$IES (STT)',
-                'ER_stt_day2': 'ER',
-                'ER_dtt_day2': 'ER',
-                'ER_total_day2': 'ER',
-                'CRspread_day2': 'CR',
-                'CIspread_day2': 'CI'}
-
-    covars = {'RT_diff_stt_day2 & RIspread_day2': ['CIspread_day2', 'CRspread_day2'], 
-              'RT_diff_stt_day2 & CIspread_day2': ['RIspread_day2', 'CRspread_day2'],
-              'RT_diff_stt_day2 & CRspread_day2': ['RIspread_day2', 'CIspread_day2'],
-              'ER_diff_stt_day2 & hpcf_rand_day2': ['ER_total_day2'],
-              'ER_diff_stt_day2 & CIspread_day2': ['hpcf_rand_day2', 'RIspread_day2'],
-              'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'],
-               'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
-              'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
+    complete_df['IES_diff_stt_day_day1'] = complete_df['IES_stt_rand_day1'] - complete_df['IES_stt_seq_day1']
     
-    covars = None
+    complete_df['IES_dtt_day1'] = complete_df['RT_dtt_day1']/ (1-complete_df['ER_dtt_day1'])
+    # complete_df['IES_day1'] = complete_df['RT_day1']/ (1-complete_df['ER_total_day1'])
     
-    # covars = {'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'], 
-    #           'ER_diff_stt_day2 & CIspread_day2': ['RIspread_day2']}
+    complete_df['IES_stt_day2'] = complete_df['RT_stt_day2']/ (1-complete_df['ER_stt_day2'])
+    complete_df['IES_dtt_day2'] = complete_df['RT_dtt_day2']/ (1-complete_df['ER_dtt_day2'])
+    
+    complete_df['IES_stt_seq_day2'] = complete_df['RT_stt_seq_day2']/ (1-complete_df['ER_stt_seq_day2'])
+    complete_df['IES_stt_rand_day2'] = complete_df['RT_stt_rand_day1']/ (1-complete_df['ER_stt_rand_day2'])
+    
+    complete_df['IES_diff_stt_day_day2'] = complete_df['IES_stt_rand_day2'] - complete_df['IES_stt_seq_day2']
+    
+    # complete_df['IES_day2'] = complete_df['RT_day2']/ (1-complete_df['ER_total_day2'])
+    
+    if day == 1:
+        measures = ['RT_day1', 
+                    'RT_stt_day1',
+                    'RT_dtt_day1',
+                    'RT_diff_stt_day1', 
+                    'ER_diff_stt_day1',
+                    'ER_total_day1',
+                    'ER_stt_day1',
+                    'ER_dtt_day1',
+                    'hpcf_rand_day1', 
+                    'CRspread_day1',
+                    'CIspread_day1',
+                    'RIspread_day1']
+        
+        # measures = ['IES_stt_day1',
+        #             'IES_dtt_day1',
+        #             'IES_diff_stt_day_day1',
+        #             'RT_diff_stt_day1', 
+        #             'ER_diff_stt_day1',
+        #             'hpcf_rand_day1', 
+        #             'CRspread_day1',
+        #             'CIspread_day1',
+        #             'RIspread_day1']
+    
+    
+        rename_labels = {'IES_stt_day1': 'IES (STT)',
+                         'IES_dtt_day1': 'IES (DTT)',
+                        'RT_day1': 'RT', 
+                         'RT_stt_day1': 'RT',
+                         'RT_dtt_day1': 'RT',
+                    'hpcf_rand_day1': 'HRCF', 
+                    'RT_diff_stt_day1': r'$\Delta$RT', 
+                    'RIspread_day1': 'RI', 
+                    'ER_diff_stt_day1': r'$\Delta$ER',
+                    'IES_diff_stt_day_day1': r'$\Delta$IES',
+                    'ER_stt_day1': 'ER',
+                    'ER_dtt_day1': 'ER',
+                    'ER_total_day1': 'ER',
+                    'CRspread_day1': 'CR',
+                    'CIspread_day1': 'CI'}
+        
+        # covars = {'RT_diff_stt_day1 & RIspread_day1': ['CIspread_day1', 'CRspread_day1'], 
+        #           'RT_diff_stt_day1 & CIspread_day1': ['RIspread_day1', 'CRspread_day1'],
+        #           'RT_diff_stt_day1 & CRspread_day1': ['RIspread_day1', 'CIspread_day1']}
+        
+        covars = None
+    
+    elif day == 2:
+        measures = ['RT_day2', 
+                    'RT_stt_day2',
+                    'RT_dtt_day2',
+                    'RT_diff_stt_day2', 
+                    'ER_diff_stt_day2',
+                    'ER_total_day2',
+                    'ER_stt_day2',
+                    'ER_dtt_day2',
+                    'hpcf_rand_day2', 
+                    'CRspread_day2',
+                    'CIspread_day2',
+                    'RIspread_day2']
+        
+        # measures = ['IES_stt_day2',
+        #             'IES_dtt_day2',
+        #             'IES_diff_stt_day_day2',
+        #             'RT_diff_stt_day2', 
+        #             'ER_diff_stt_day2',
+        #             'hpcf_rand_day2', 
+        #             'CRspread_day2',
+        #             'CIspread_day2',
+        #             'RIspread_day2']
+        
+        rename_labels = {'IES_stt_day2': 'IES (STT)',
+                         'IES_dtt_day2': 'IES (DTT)',
+                         'RT_day2': 'RT', 
+                         'RT_stt_day2': 'RT',
+                         'RT_dtt_day2': 'RT',
+                    'hpcf_rand_day2': 'HRCF', 
+                    'RT_diff_stt_day2': r'$\Delta$RT', 
+                    'RIspread_day2': 'RI', 
+                    'ER_diff_stt_day2': r'$\Delta$ER',
+                    'IES_diff_stt_day_day2': r'$\Delta$IES (STT)',
+                    'ER_stt_day2': 'ER',
+                    'ER_dtt_day2': 'ER',
+                    'ER_total_day2': 'ER',
+                    'CRspread_day2': 'CR',
+                    'CIspread_day2': 'CI'}
+    
+        covars = {'RT_diff_stt_day2 & RIspread_day2': ['CIspread_day2', 'CRspread_day2'], 
+                  'RT_diff_stt_day2 & CIspread_day2': ['RIspread_day2', 'CRspread_day2'],
+                  'RT_diff_stt_day2 & CRspread_day2': ['RIspread_day2', 'CIspread_day2'],
+                  'ER_diff_stt_day2 & hpcf_rand_day2': ['ER_total_day2'],
+                  'ER_diff_stt_day2 & CIspread_day2': ['hpcf_rand_day2', 'RIspread_day2'],
+                  'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'],
+                   'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
+                  'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
+        
+        covars = None
+        
+        # covars = {'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'], 
+        #           'ER_diff_stt_day2 & CIspread_day2': ['RIspread_day2']}
+    
+        # covars = {'RT_diff_stt_day2 & RIspread_day2': ['CIspread_day2', 'CRspread_day2'], 
+        #           'RT_diff_stt_day2 & CIspread_day2': ['RIspread_day2', 'CRspread_day2'],
+        #           'RT_diff_stt_day2 & CRspread_day2': ['RIspread_day2', 'CIspread_day2'],
+        #           'ER_diff_stt_day2 & hpcf_rand_day2': ['ER_total_day2'],
+        #           'ER_diff_stt_day2 & CIspread_day2': ['hpcf_rand_day2', 'RIspread_day2'],
+        #           'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'],
+        #            'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
+        #           'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
+    
+    r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'spearman')
+    
+    if day == 1:
+        r_matrix_day1 = r_matrix.copy()
+        p_matrix_day1 = p_matrix.copy()
+        
+    elif day == 2:
+        r_matrix_day2 = r_matrix.copy()
+        p_matrix_day2 = p_matrix.copy()
+    
+    # skyblue: DTT
+    # Green: all
+    # pink: stt
+    if day < 3:
+        utils.plot_corr_network(r_matrix,
+                                 p_matrix,
+                                 measures,
+                                 rename_labels,
+                                 method = 'p',
+                                 correctp = True,
+                                 title=f'Day {day}',
+                                 saveas=f'Pearson_R_Day{day}')
+    
+    if day == 3:
+        r_matrix_diff = r_matrix_day2 - r_matrix_day1
+        p_matrix_diff = p_matrix_day2 - p_matrix_day1
+        
+        utils.plot_corr_network(r_matrix_diff,
+                                 p_matrix_day2,
+                                 measures,
+                                 rename_labels,
+                                 method = 'p',
+                                 correctp = True,
+                                 title=f'Difference between days',
+                                 saveas=f'Pearson_R_Day_difference')
 
-    # covars = {'RT_diff_stt_day2 & RIspread_day2': ['CIspread_day2', 'CRspread_day2'], 
-    #           'RT_diff_stt_day2 & CIspread_day2': ['RIspread_day2', 'CRspread_day2'],
-    #           'RT_diff_stt_day2 & CRspread_day2': ['RIspread_day2', 'CIspread_day2'],
-    #           'ER_diff_stt_day2 & hpcf_rand_day2': ['ER_total_day2'],
-    #           'ER_diff_stt_day2 & CIspread_day2': ['hpcf_rand_day2', 'RIspread_day2'],
-    #           'ER_diff_stt_day2 & RIspread_day2': ['CIspread_day2'],
-    #            'hpcf_rand_day2 & CRspread_day2': ['CIspread_day2'],
-    #           'hpcf_rand_day2 & CIspread_day2': ['CRspread_day2']}
-
-r_matrix, p_matrix = anal.network_corr(complete_df, measures, covars=covars, method = 'spearman')
-
-# skyblue: DTT
-# Green: all
-# pink: stt
-utils.plot_corr_network(r_matrix,
-                         p_matrix,
-                         measures,
-                         rename_labels,
-                         method = 'p',
-                         correctp = True,
-                         title=f'Day {day}',
-                         saveas=f'Pearson_R_Day{day}')
 
 #%% 
 '''
