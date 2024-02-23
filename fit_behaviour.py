@@ -31,13 +31,16 @@ Modelle:
     OnlyQ - 4 parameters
     Bullshitmodel - 6 parameters
     Repbias_3Q_lr - 4 parameters
+    Repbias_Conflict_Repdiff_lr  - 4 parameters
+    OnlyQ_Qdiff_lr - 4 parameters
 '''
 
-waithrs = 25
+waithrs = 0
 post_pred = 1
+STT = 0
 
-model_day1 = 'OnlyQ_lr'
-models_day2 = ['OnlyQ_lr']
+model_day1 = 'OnlyQ_Qdiff_lr'
+models_day2 = ['OnlyQ_Qdiff_lr']
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 3_000
@@ -51,6 +54,7 @@ posterior_pred_samples_day2 = posterior_pred_samples_day1
 
 "Day 1"
 exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
+exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day1)
 
 num_agents = len(expdata_df_day1['ag_idx'].unique())
 group = exp_behav_dict_day1['group'][0]
@@ -68,6 +72,7 @@ assert np.abs(np.diff(group_distro)).sum() == 0
 
 "Day 2"
 exp_behav_dict_day2, expdata_df_day2 = pickle.load(open("behav_data/preproc_data_day2.p", "rb" ))
+exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day2)
 num_agents = len(expdata_df_day2['ag_idx'].unique())
 group = exp_behav_dict_day2['group'][0]
 
@@ -98,7 +103,11 @@ Q_init_day1 = agent.Q_init
 
 print("===== Starting inference for day 1 =====")
 "----- Start Inference"
-infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
+if STT:
+    infer = inferencemodels.GeneralGroupInferenceSTT(agent, exp_behav_dict_day1, 1)
+    
+else:
+    infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
 agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
@@ -136,14 +145,20 @@ _, _, _, sim_agent = utils.simulate_data(model_day1,
                                         num_agents,
                                         group = group,
                                         day = 1,
+                                        STT = STT,
                                         params = inf_mean_df.loc[:, [*param_names_day1]],
                                         errorrates = er_day1)
 
 assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
-Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
-Q_init_day2 = Q_init_day2[None, ...]
-assert Q_init_day2.ndim == 3
-Q_init_day2 = torch.tensor(Q_init_day2)
+
+if STT:
+    Q_init_day2 = None
+    
+else:
+    Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
+    Q_init_day2 = Q_init_day2[None, ...]
+    assert Q_init_day2.ndim == 3
+    Q_init_day2 = torch.tensor(Q_init_day2)
 
 "----- Save parameter names to DataFrame"
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -171,11 +186,12 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  WAIC, # 12
                  ll, # 13
                  predictive_choices, # 14
-                 obs_mask,
-                 WAIC_var) # 15
+                 obs_mask, #15
+                 WAIC_var) # 16
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
+    print("Storing results for day 1.")
     pickle.dump( (firstlevel_df, 
                   expdata_df_day1,
                   (infer.loss, BIC, AIC), 
@@ -183,22 +199,28 @@ if num_inf_steps_day1 > 1:
                   agent_elbo_tuple, 
                   extra_storage), 
                 open(f"behav_fit/{filename_day1}.p", "wb" ) )
-
 '''
     Fit day 2
 '''
 del exp_behav_dict_day1
 del expdata_df_day1
 for model_day2 in models_day2:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"======== INFERENCE DAY 2 ({timestamp}) ===========.")
     agent = utils.init_agent(model_day2, 
                              group, 
                              num_agents = num_agents,
-                             Q_init = Q_init_day2.detach(),
                              seq_init = seq_counter_day2)
+    
     param_names_day2 = agent.param_names
     print("===== Starting inference for day 2 =====")
     "----- Start Inference"
-    infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
+    if STT:
+        infer = inferencemodels.GeneralGroupInferenceSTT(agent, exp_behav_dict_day2, 1)
+        
+    else:
+        infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
+        
     agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
@@ -251,6 +273,7 @@ for model_day2 in models_day2:
                      WAIC_var)
     
     if num_inf_steps_day2 > 1:
+        print("Storing results for day two.")
         pickle.dump( (firstlevel_df, 
                       expdata_df_day2,
                       (infer.loss, BIC, AIC), 

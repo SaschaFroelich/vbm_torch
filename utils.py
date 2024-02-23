@@ -1100,6 +1100,7 @@ def simulate_data(model,
                   num_agents,
                   group,
                   day,
+                  STT,
                   params = None,
                   plotres = True,
                   Q_init = None,
@@ -1213,21 +1214,35 @@ def simulate_data(model,
     
     "----- Simulate"
     newenv.run(group = group,
-               day = day)
+               day = day,
+               STT = STT)
     
     "----- Save Data"
-    data = {'choices': newenv.choices, 
-            'choices_GD' : newenv.choices_GD,
-            'outcomes': newenv.outcomes,
-            'trialsequence': newenv.data['trialsequence'], 
-            'trialidx': newenv.data['trialidx'], 
-            'trialidx_day': newenv.data['trialidx_day'], 
-            'blocktype': newenv.data['blocktype'],
-            'jokertypes': newenv.data['jokertypes'], 
-            'blockidx': newenv.data['blockidx'],
-            'group': [group]*len(newenv.choices),
-            'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
-            'model' : [[model]*num_agents]*len(newenv.choices)}
+    if STT:
+        data = {'RTs': newenv.RTs, 
+                'trialsequence': newenv.data['trialsequence'], 
+                'trialidx': newenv.data['trialidx'], 
+                'trialidx_day': newenv.data['trialidx_day'], 
+                'blocktype': newenv.data['blocktype'],
+                'jokertypes': newenv.data['jokertypes'], 
+                'blockidx': newenv.data['blockidx'],
+                'group': [group]*len(newenv.RTs),
+                'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.RTs),
+                'model' : [[model]*num_agents]*len(newenv.RTs)}
+        
+    else:
+        data = {'choices': newenv.choices, 
+                'choices_GD' : newenv.choices_GD,
+                'outcomes': newenv.outcomes,
+                'trialsequence': newenv.data['trialsequence'], 
+                'trialidx': newenv.data['trialidx'], 
+                'trialidx_day': newenv.data['trialidx_day'], 
+                'blocktype': newenv.data['blocktype'],
+                'jokertypes': newenv.data['jokertypes'], 
+                'blockidx': newenv.data['blockidx'],
+                'group': [group]*len(newenv.choices),
+                'ag_idx' : [torch.arange(num_agents).tolist()]*len(newenv.choices),
+                'model' : [[model]*num_agents]*len(newenv.choices)}
     
     # print(len(data['ag_idx']))
     for key in data:
@@ -1287,16 +1302,10 @@ def plot_grouplevel(df1,
     None.
 
     '''
-    if 'ID' in df1.columns:
-        groupdata_df_1 = df1.drop(['ID'], axis = 1)
         
-    else:
-        groupdata_df_1 = df1
+    groupdata_df_1 = df1
         
-    if df2 is not None and 'ID' in df2:
-        groupdata_df_2 = df2.drop(['ID'], axis = 1)
-        
-    elif df2 is not None and 'ID' not in df2:
+    if df2 is not None:
         groupdata_df_2 = df2
         
     plt.style.use("ggplot")
@@ -1363,11 +1372,17 @@ def plot_grouplevel(df1,
     if plot_single:
         for ag_idx in np.sort(groupdata_df_1['ag_idx'].unique()):
             agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == ag_idx]
-            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                    ('Congruent' if x == 1 else 
+                                                                     ('Incongruent' if x == 2 else 
+                                                                      'no joker')))
             
             if df2 is not None:
                 agent_df_2 = groupdata_df_2[groupdata_df_2['ag_idx'] == ag_idx]
-                agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+                agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                        ('Congruent' if x == 1 else 
+                                                                         ('Incongruent' if x == 2 
+                                                                          else 'no joker')))
             
             if df2 is not None:
                 
@@ -1383,8 +1398,18 @@ def plot_grouplevel(df1,
                             ax = ax,
                             data = agent_df_1,
                             palette = custom_palette)
-                plt.title(f'agent {ag_idx}, model {model_1}')
-                ax.get_legend().remove()
+                plt.title(f'agent {agent_df_1["ID"].unique()}, model {model_1}')
+                # ax.get_legend().remove()
+                plt.show()
+                
+                fig, ax = plt.subplots()
+                sns.barplot(y= 'choices_GD',
+                            hue='jokertypes',
+                            ax = ax,
+                            data = agent_df_1,
+                            palette = custom_palette)
+                plt.title(f'agent {agent_df_1["ID"].unique()}, model {model_1}')
+                # ax.get_legend().remove()
                 plt.show()
     
     
@@ -1401,20 +1426,27 @@ def plot_grouplevel(df1,
                 agent_df_2 = groupdata_df_1[groupdata_df_1['ag_idx'] == plot_pairs[pair, 1]]
             
             # agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
-            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            agent_df_1['jokertypes'] = agent_df_1['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                    ('Congruent' if x == 1 else 
+                                                                     ('Incongruent' if x == 2 
+                                                                      else 'no joker')))
             # agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
-            agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+            agent_df_2['jokertypes'] = agent_df_2['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                    ('Congruent' if x == 1 else 
+                                                                     ('Incongruent' if x == 2 else 'no joker')))
             
             plot_dual_behav(agent_df_1, agent_df_2)
             
     "----- Plot grouplevel"
     groupdata_df_1 = groupdata_df_1.drop(['model'], axis = 1)
     
-    grouped_df_1 = pd.DataFrame(groupdata_df_1.loc[:, ['ag_idx',
+    grouped_df_1 = pd.DataFrame(groupdata_df_1.loc[:, ['ID', 'ag_idx',
                                                'block_num',
                                                'jokertypes',
-                                               'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
-    grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
+                                               'choices_GD']].groupby(['ID', 'ag_idx','block_num', 'jokertypes'], as_index = False).mean())
+    grouped_df_1['jokertypes'] = grouped_df_1['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                ('Congruent' if x == 1 else 
+                                                                 ('Incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
     
     if df2 is not None:
         groupdata_df_2 = groupdata_df_2.drop(['model'], axis = 1)
@@ -1423,7 +1455,9 @@ def plot_grouplevel(df1,
                                                    'jokertypes',
                                                    'choices_GD']].groupby(['ag_idx','block_num', 'jokertypes'], as_index = False).mean())
         # grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'NLP' if x == 3 else 'NHP' if x == 4 else 'no joker')))
-        grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'random' if x == 0 else ('congruent' if x == 1 else ('incongruent' if x == 2 else 'no joker')))
+        grouped_df_2['jokertypes'] = grouped_df_2['jokertypes'].map(lambda x: 'Random' if x == 0 else 
+                                                                    ('Congruent' if x == 1 else 
+                                                                     ('Incongruent' if x == 2 else 'no joker')))
         
         grouped_df_2['blocknum'] = grouped_df_2['block_num'].map(lambda x: 1 if x == 0 else x)
         grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 2 if x == 3 else x)
@@ -1456,7 +1490,7 @@ def plot_grouplevel(df1,
         ax1.grid(which='minor', alpha=0.5)
         ax1.set_title(f'Model {model_1}')
         ax1.axvline(3.5, color='k', linewidth=0.5)
-        ax1.get_legend().remove()
+        # ax1.get_legend().remove()
         
         sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
@@ -1467,7 +1501,7 @@ def plot_grouplevel(df1,
         ax2.set_xticks(np.arange(1, 8), minor = True)
         ax2.grid(which='minor', alpha=0.5)
         ax2.set_title(f'Model {model_2}')
-        ax2.get_legend().remove()
+        # ax2.get_legend().remove()
         ax2.set_xlabel('Block no.')
         ax2.set_ylabel('HRCF (%)')
         ax2.axvline(3.5, color='k', linewidth=0.5)
@@ -1507,25 +1541,40 @@ def plot_grouplevel(df1,
         ax.set_xlabel('Block no.')
         ax.set_ylabel('HRCF (%)')
         plt.title(f'Group Behaviour for model {model_1}')
-        plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
+        plt.savefig('/home/sascha/Desktop/Paper_2024/KW2.png', dpi=600)
         plt.show()
         
-        fig, ax = plt.subplots(figsize = (5, 5))
-        sns.lineplot(x = "day",
-                    y = "choices_GD",
-                    hue = "DTT Types",
-                    data = grouped_df_1,
-                    palette = custom_palette,
-                    err_style = "bars",
-                    errorbar = ("se", 1),
-                    ax = ax)
-        ax.set_xticks([1,2])
-        ax.set_ylim([0.61, 1])
-        ax.set_xlabel('Day')
-        ax.set_ylabel('HRCF (%)')
-        plt.savefig('/home/sascha/Desktop/Paper 2024/KW2.png', dpi=600)
-        plt.show()
-        # dfgh
+        if len(grouped_df_1['day'].unique()) > 1:
+            fig, ax = plt.subplots(figsize = (5, 5))
+            sns.lineplot(x = "day",
+                        y = "choices_GD",
+                        hue = "DTT Types",
+                        data = grouped_df_1,
+                        palette = custom_palette,
+                        err_style = "bars",
+                        errorbar = ("se", 1),
+                        ax = ax)
+            ax.set_xticks([1,2])
+            ax.set_ylim([0.61, 1])
+            ax.set_xlabel('Day')
+            ax.set_ylabel('HRCF (%)')
+            plt.savefig('/home/sascha/Desktop/Paper_2024/KW2.png', dpi=600)
+            plt.show()
+            
+        else:
+            fig, ax = plt.subplots(figsize = (5, 5))
+            sns.barplot(y = "choices_GD",
+                        hue = "DTT Types",
+                        data = grouped_df_1,
+                        palette = custom_palette,
+                        errorbar = ("se", 1),
+                        ax = ax)
+            ax.set_xticks([1,2])
+            ax.set_ylim([0.61, 1])
+            ax.set_xlabel('Day')
+            ax.set_ylabel('HRCF (%)')
+            # plt.savefig('/home/sascha/Desktop/Paper_2024/KW2.png', dpi=600)
+            plt.show()
         
         return grouped_df_1
         
@@ -2124,9 +2173,15 @@ def compute_hpcf(expdata_df):
     hpcf = pd.DataFrame(df.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     hpcf.rename(columns={'choices_GD' : 'hpcf'}, inplace = True)
     
+    hpcf_std = pd.DataFrame(df.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
+    hpcf_std.rename(columns={'choices_GD' : 'hpcf_std'}, inplace = True)
+    
     "Random"
     df_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
     df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+    
+    df_rand_std = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
+    df_rand_std.rename(columns = {'choices_GD': 'hpcf_rand_std'}, inplace = True)
     
     "-> Just for safety."
     df_rand2 = pd.DataFrame(df[(df['blocktype'] == 1) & (df['trialsequence'] > 10)].loc[:, ['ID', 
@@ -2156,10 +2211,12 @@ def compute_hpcf(expdata_df):
     df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
     
     hpcf_df = pd.merge(hpcf_df, hpcf, on = 'ID')
+    hpcf_df = pd.merge(hpcf_df, hpcf_std, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_seq, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_cong, on = 'ID')
     hpcf_df = pd.merge(hpcf_df, df_inc, on = 'ID')
+    
     
     hpcf_df['RIspread'] = hpcf_df['hpcf_rand'] - hpcf_df['hpcf_incong']
     hpcf_df['CRspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_rand']
@@ -2433,8 +2490,13 @@ def plot_corr_network(r_matrix,
     for i in range(num_nodes):
         pos[i] = [4*np.cos(angle_stepwidth * i), 4*np.sin(angle_stepwidth * i)]
         
-    standardize_color = 1
-    if standardize_color:
+    if 'between' in title:
+        standardize_color = 0
+    
+    else:
+        standardize_color = 1
+        
+    if standardize_color == 1:
         cmap = plt.cm.RdBu
         nx.draw(G, 
                 pos, 
@@ -2456,14 +2518,14 @@ def plot_corr_network(r_matrix,
         cbar = plt.colorbar(sm, ax=plt.gca())  # Adjust the shrink and aspect parameters as needed
         
         
-    else:
+    elif standardize_color == 0:
         nx.draw(G, 
                 pos, 
                 labels = node_labels, 
                 with_labels=True, 
                 font_weight='bold', 
                 node_size=700, 
-                node_color='skyblue',
+                node_color= ['#A1CCD1', '#E9B384', '#85A389', '#E9B384', '#E9B384', '#A1CCD1', '#E9B384', '#85A389', '#85A389', '#85A389', '#85A389', '#85A389'],
                 edge_color = edge_weights,
                 width = edge_widths,
                 edge_cmap = plt.cm.RdBu)
@@ -2473,6 +2535,28 @@ def plot_corr_network(r_matrix,
         sm = plt.cm.ScalarMappable(cmap=plt.cm.RdBu, norm=norm)
         sm.set_array([])  # dummy empty array
         cbar = plt.colorbar(sm, ax=plt.gca())  # Adjust the shrink and aspect parameters as needed
+        
+    elif standardize_color == 3:
+        cmap = plt.cm.RdBu
+        nx.draw(G, 
+                pos, 
+                labels = node_labels, 
+                with_labels=True, 
+                font_weight='bold', 
+                node_size=700, 
+                #node_color= ['gold', 'salmon', '#85A389', 'magenta', 'pink', 'steelblue', 'pink', 'skyblue', 'green', 'yellow', 'darkorchid', 'fuchsia'],
+                # node_color= ['#85A389', 'pink', 'skyblue', 'pink', 'pink', '#85A389', 'pink', 'skyblue', 'skyblue', 'skyblue', 'skyblue', 'skyblue'],
+                node_color= ['#A1CCD1', '#E9B384', '#85A389', '#E9B384', '#E9B384', '#A1CCD1', '#E9B384', '#85A389', '#85A389', '#85A389', '#85A389', '#85A389'],
+                edge_color = cmap((np.array(edge_weights)+1)/2),
+                width = edge_widths,
+                edge_cmap = plt.cm.RdBu)
+        
+        # Add colorbar
+        norm = plt.Normalize(vmin=-1., vmax=1.)
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.RdBu, norm=norm)
+        sm.set_array([])  # dummy empty array
+        cbar = plt.colorbar(sm, ax=plt.gca())  # Adjust the shrink and aspect parameters as needed
+        
     
     if correctp:
         plt.title(title + " (corrected p-values)")
@@ -2830,3 +2914,20 @@ def post_pred_sim_df(predictive_choices, obs_mask, model, num_agents, inf_mean_d
     # dfgh
     
     return sim_group_behav_df
+
+def RT_err_to_m2(data_dict):
+    '''
+        1) RT entries to -2 if an error was performed
+        2) Remove RT > 2000 and turn them into errors
+    '''
+    
+    for trialidx in range(len(data_dict["RT"])):
+        for agidx in range(len(data_dict["RT"][0])):
+            if data_dict["choices"][trialidx][agidx] == -2:
+                data_dict["RT"][trialidx][agidx] = -2
+                
+            if data_dict["RT"][trialidx][agidx] > 2000:
+                data_dict["RT"][trialidx][agidx] = -2
+                
+    return data_dict
+    

@@ -46,10 +46,6 @@ class Env():
         self.agent = agent
         self.matfile_dir = matfile_dir
         
-        self.choices = []
-        self.outcomes = []
-        self.choices_GD = []
-        
     def create_experiment(self, group, day):
         '''
         Creates experiment, i.e. sequence of stimuli by fetching from preprocessed
@@ -123,100 +119,14 @@ class Env():
             self.data['blockidx'] = blockidx
             self.data['trialidx'] = trialidx
         
-        # print("Let's truncate the preprocessed experimental data for simulation setup.")
-        # self.data = truncate_data(self.data, blocks)
         rewprobs = [[0.8, 0.2, 0.2, 0.8],
                     [0.8, 0.2, 0.2, 0.8],
                     [0.2, 0.8, 0.8, 0.2],
                     [0.2, 0.8, 0.8, 0.2]]
         
         self.data['rewprobs'] = torch.tensor(rewprobs)[torch.tensor(group), :]
-        # if blocks[0] > 0:
-        #     dfgh
-        # assert isinstance(sequence, list), "Sequence must be a list."
-        # assert isinstance(blockorder, list), "blockorder must be a list."
-        # assert len(sequence) == self.agent.num_agents
-        # assert len(blockorder) == self.agent.num_agents
         
-        # num_blocks = 14
-        
-        # seq_idxs = [1, 3, 5, 6, 8, 10, 12] # seq idxs for blockorder == 1
-        # rand_idxs = [0, 2, 4, 7, 9, 11, 13] # random idxs for blockorder == 1
-        
-        # "New Code"
-        # blocktype = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype = torch.int8);
-        
-        # # blockorder == 1
-        # # indices = 
-        # blocktype[(torch.tensor(blockorder) == 1).nonzero(as_tuple=True)[0].repeat_interleave(7), 
-        #           seq_idxs*len((torch.tensor(blockorder)==1).nonzero(as_tuple=True)[0]), :] = 0 # fixed sequence condition
-
-        # blocktype[(torch.tensor(blockorder) == 1).nonzero(as_tuple=True)[0].repeat_interleave(7), 
-        #           rand_idxs*len((torch.tensor(blockorder)==1).nonzero(as_tuple=True)[0]), :] = 1 # random condition
-        
-        # # blockorder == 2
-        # blocktype[(torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0].repeat_interleave(7), 
-        #           seq_idxs*len((torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0]), :] = 1 # fixed sequence condition
-
-        # blocktype[(torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0].repeat_interleave(7), 
-        #           rand_idxs*len((torch.tensor(blockorder) == 2).nonzero(as_tuple=True)[0]), :] = 0 # random condition
-        
-        # jokertypes = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
-        # blockidx = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
-        # trialsequence = -100*torch.ones((self.agent.num_agents, num_blocks, 481), dtype=torch.int8)
-        
-        # "New block!"
-        # trialsequence[:, :, 0] = -1
-        # jokertypes[:, :, 0] = -1
-        # blocktype[:, :, 0] = -1
-        
-        # blocktype_counter = torch.zeros((self.agent.num_agents, 2), dtype=torch.int8)
-        # # seq_block = 0
-        # # random_block = 0
-        # for block in range(num_blocks):
-            
-        #     "New block!"
-        #     blockidx[:, block, :] = block
-            
-        #     # block_no[:, block, :] = block # The index of the block in the current experiment
-            
-        #     current_blocktype = blocktype[:, block, 1]
-            
-        #     for ag_idx in range(self.agent.num_agents):
-        #         if current_blocktype[ag_idx] == 0:
-        #             "Sequential block"
-        #             seq_matlab, seq_no_jokers_matlab, seq_jokertypes = \
-        #                 utils.load_matfiles(self.matfile_dir, 
-        #                                    blocktype_counter[ag_idx, current_blocktype[ag_idx]].item(), 
-        #                                    current_blocktype[ag_idx], 
-        #                                    sequence = sequence[ag_idx])
-
-        #             blocktype_counter[ag_idx, current_blocktype[ag_idx]] += 1
-        #             # seq_block += 1
-                    
-        #         elif current_blocktype[ag_idx] == 1:
-        #             "Random block"
-        #             seq_matlab, seq_no_jokers_matlab, seq_jokertypes = \
-        #                 utils.load_matfiles(self.matfile_dir, 
-        #                                    blocktype_counter[ag_idx, current_blocktype[ag_idx]].item(), 
-        #                                    current_blocktype[ag_idx], 
-        #                                    sequence = sequence[ag_idx])
-
-        #             blocktype_counter[ag_idx, current_blocktype[ag_idx]] += 1
-        #             # random_block += 1
-                    
-        #         else:
-        #             raise Exception("Blocktypes must be 0 or 1.")
-                    
-        #         trialsequence[ag_idx, block, 1:481] = torch.tensor(seq_matlab)
-        #         jokertypes[ag_idx, block, 1:481] = torch.tensor(seq_jokertypes)
-
-        # self.data['trialsequence'] = trialsequence.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
-        # self.data['blocktype'] = blocktype.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
-        # self.data['jokertypes'] = jokertypes.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
-        # self.data['blockidx'] = blockidx.numpy().T.reshape((14*481, self.agent.num_agents),order='F').tolist()
-        
-    def run(self, group, day):
+    def run(self, group, day, STT):
         '''
         Parameters
         ----------
@@ -244,6 +154,14 @@ class Env():
 
         '''
         
+        if STT:
+            self.RTs = []
+            
+        else:
+            self.choices = []
+            self.outcomes = []
+            self.choices_GD = []
+        
         self.create_experiment(group = group,
                                day = day)
         
@@ -251,9 +169,10 @@ class Env():
         self.run_loop(agent = self.agent, 
                       data = self.data, 
                       num_particles = 1, 
-                      infer = 0)
+                      infer = 0,
+                      STT = STT)
         
-    def run_loop(self, agent, data, num_particles, infer):
+    def run_loop(self, agent, data, num_particles, infer, STT = False):
         '''
 
         Parameters
@@ -285,21 +204,13 @@ class Env():
         
         log_like = 0.
         # num_trials_per_block = 962
-        t = -1 # t is the index of the pyro sample sites.
+        dtt_trial = -1 # dtt_trial is the index of the pyro sample sites for DTT
+        stt_trial = -1 # dtt_trial is the index of the pyro sample sites for STT
         for tau in pyro.markov(range(len(data["trialsequence"]))):
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             jtype = torch.tensor(data["jokertypes"][tau])
-            
-            # if all([data["blockidx"][tau][i] <= 5 for i in range(agent.num_agents)]):
-            #     day = 1
-                
-            # elif all([data["blockidx"][tau][i] > 5 for i in range(agent.num_agents)]):
-            #     day = 2
-                
-            # else:
-            #     raise Exception("Da isch a Fehla!")
-            
+
             if all(trial == -1):
                 "Beginning of new block"
                 # blocknum += 1
@@ -313,35 +224,48 @@ class Env():
                 
                 if infer == 0:
                     "Simulation"
-                    self.choices_GD.append([-1]*self.agent.num_agents)
-                    self.choices.append([-1]*self.agent.num_agents)
-                    self.outcomes.append([-1]*self.agent.num_agents)
+                    if STT:
+                        self.RTs.append([-1]*self.agent.num_agents)
+                        
+                    else:
+                        self.choices_GD.append([-1]*self.agent.num_agents)
+                        self.choices.append([-1]*self.agent.num_agents)
+                        self.outcomes.append([-1]*self.agent.num_agents)
                 
             else:
                 if infer > 0:
                     "Inference"
-                    current_choice = torch.tensor(data["choices"][tau]).type(torch.int)
-                    outcome = torch.tensor(data["outcomes"][tau]).type(torch.int)
+                    if STT:
+                        current_RT = torch.tensor(data["RT"][tau]).type(torch.int)
+                        
+                    else:
+                        current_choice = torch.tensor(data["choices"][tau]).type(torch.int)
+                        outcome = torch.tensor(data["outcomes"][tau]).type(torch.int)
             
                 elif infer == 0:
                     "Simulation"
-                    current_choice = agent.choose_action(trial, blocktype = blocktype, jokertype = jtype)
-                    outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
-                    self.choices_GD.append((data['rewprobs'][range(agent.num_agents), 
-                                                             current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
-                    self.choices.append(current_choice.tolist())
-                    self.outcomes.append(outcome.tolist())
+                    if STT:
+                        current_RT = agent.stt_action(trial, blocktype = blocktype, jokertype = jtype)
+                        self.RTs.append(current_RT)
+                        
+                    else:
+                        current_choice = agent.choose_action(trial, blocktype = blocktype, jokertype = jtype)
+                        outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
+                        self.choices_GD.append((data['rewprobs'][range(agent.num_agents), 
+                                                                 current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
+                        self.choices.append(current_choice.tolist())
+                        self.outcomes.append(outcome.tolist())
                     
-                if infer>0 and any(trial > 10):
-                    "Dual-Target Trial"
-                    t+=1
+                if infer > 0 and any(trial > 10) and not STT:
+                    "Dual-Target Trial Inference"
+                    "Retrieve probs before updating"
                     option1, option2 = agent.find_resp_options(trial)
                     # print("MAKE SURE EVERYTHING WORKS FOR ERRORS AS WELL")
                     # probs should have shape [num_particles, num_agents, nactions], or [num_agents, nactions]
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype)
+                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype, blockidx = data["blockidx"][tau])
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
@@ -351,27 +275,54 @@ class Env():
     
                     if any(current_choice == -10):
                         raise Exception("Fehla!")
+                        
+                if infer > 0 and any((trial < 10)*(trial > 0)) and STT:
+                    "Single-Target Trial Inference"
+                    "Retrieve locs and scales before updating"
+                    
+                    loc, scale = agent.compute_probs(trial, blocktype = blocktype)
                 
-                agent.update(current_choice, 
-                                outcome, 
-                                blocktype, 
-                                # day = day, 
-                                trialstimulus = trial,
-                                jokertype = jtype)
-    
-                if infer==1 and any(trial > 10):
+                if STT:
+                    agent.update(blocktype, 
+                                 trialstimulus = trial,
+                                 RT = current_RT)
+                    
+                else:
+                    agent.update(current_choice, 
+                                    outcome, 
+                                    blocktype, 
+                                    # day = day, 
+                                    trialstimulus = trial,
+                                    jokertype = jtype)
+
+                if infer==1 and any(trial > 10) and not STT:
+                    "DTT Inference"
                     "STT are [0.5, 0.5]"
                     "errors are obs_masked"
-                    pyro.sample('res_{}'.format(t), 
+                    dtt_trial += 1
+                    pyro.sample('res_{}'.format(dtt_trial), 
                                 dist.Categorical(probs = probs),
                                 obs = choices_bin,
                                 obs_mask = obs_mask)
+                    
+                if infer == 1 and any((trial < 10)*(trial > 0)) and STT:
+                    "STT RT Inference"
+                    stt_trial += 1
+                    obs_mask = (current_RT != -2).broadcast_to(num_particles, agent.num_agents) *\
+                                ((trial < 10)*(trial > 0)).broadcast_to(num_particles, agent.num_agents)
+                    pyro.sample('res_{}'.format(stt_trial), 
+                                dist.Normal(loc = loc, scale = scale),
+                                obs = current_RT,
+                                obs_mask = obs_mask)
 
-                elif infer==2 and any(trial > 10):
+                elif infer==2 and any(trial > 10) and not STT:
                     log_like += torch.log(probs[range(agent.num_particles),
                                       range(agent.num_agents), 
                                       choices_bin]) * obs_mask
                     
+                # elif infer==2 and any((trial < 10)*(trial > 0)) and STT:
+                #     log_like += torch.log(probs[range(agent.num_particles),
+                #                       range(agent.num_agents), 
+                #                       choices_bin]) * obs_mask
                     
-
         return log_like
