@@ -50,6 +50,8 @@ elbos = np.zeros((num_agents, num_models))
 AICs = np.zeros((num_agents, num_models))
 BICs = np.zeros((num_agents, num_models))
 WAIC = np.zeros(num_models)
+WAIC_var = np.zeros(num_models)
+log_likelihood = np.zeros(num_models)
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
 # 'behav_fit_model_Bhand_2023-11-28 23:25:11.p',
 # 'behav_fit_model_Conflict_2023-12-02 00:14:47_60agents.p',
@@ -66,9 +68,11 @@ for model in range(num_models):
     post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
     elbos[:, model] = (-agent_elbo_tuple[0]).tolist()
     elbos_2nd_lvl[model] = -np.array(loss[-10:]).mean()
-    AICs[:, model] = np.squeeze(AIC)
-    BICs[:, model] = np.squeeze(BIC)
+    AICs[:, model] = np.squeeze(AIC.detach().numpy())
+    BICs[:, model] = np.squeeze(BIC.detach().numpy())
     WAIC[model] = np.squeeze(extra_storage[12])
+    WAIC_var[model] = np.squeeze(extra_storage[16])
+    log_likelihood[model] = np.squeeze(extra_storage[13])
     if len(extra_storage) >= 10:
         if extra_storage[11] >= 1e-03:
             raise Exception("rhalt too large for IC computation.")
@@ -96,10 +100,9 @@ with pm.Model() as BMS:
     pm.DensityDist('log_joint', model_probs, logp=logp,
                     observed=elbos)
     
-    BMSinferenceData = pm.sample(chains = 4, draws = 16_000, tune = 6000)
+    BMSinferenceData = pm.sample(chains = 4, draws = 18_000, tune = 6000)
 
 az.summary(BMSinferenceData)
-
 
 #%%
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
@@ -114,7 +117,7 @@ figname = 'Repbias_1day_vs_2days_wo_Q'
 # extract samples of all chains
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
 fig, ax = plt.subplots()
-sns.histplot(posteriorsModelProbs, stat='density', element='step', bins=30, alpha=.1, ax = ax) #, fill=False)
+# sns.histplot(posteriorsModelProbs, stat='density', element='step', bins=30, alpha=.1, ax = ax) #, fill=False)
 
 for modelidx in range(num_models):
     sns.kdeplot(posteriorsModelProbs[:, modelidx], linewidth=4, label = model_names[modelidx])
@@ -138,6 +141,9 @@ import pickle
 # pickle.dump((model_names, posteriorsModelProbs), open(f"BMS/{num_models}_models_{figname}.p", "wb"))
 
 #%%
+'''
+    AIC & BIC
+'''
 
 markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
 colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
@@ -166,7 +172,6 @@ for midx in range(num_models):
                   linewidth=1, 
                   label=model_names[midx])
     
-    
 ax[1].legend()
 ax[1].title.set_text(f'BIC (day {day})')
 ax[1].set_xlabel('Agent no.')
@@ -182,7 +187,7 @@ plt.show()
     BF = p(y_A)/p(y_B) = exp[log p(y_A) - log p(y_B)] = exp[elbo_A - elbo_B]
 '''
 
-compidx = model_names.index('Repbias_Conflict_lr')
+compidx = model_names.index('Bullshitmodel')
 
 num_comparisons = num_models - 1
 
@@ -205,8 +210,10 @@ for i in range(num_models):
 markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
 colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
 
-fig, ax = plt.subplots(1)
-ax.scatter(range(num_models), WAIC)
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.errorbar(range(num_models), WAIC, yerr=WAIC_var, fmt='o', ecolor='r', capsize=5, linestyle='None', label='Data points')
+
     
 # ax.legend()
 ax.title.set_text(f'WAIC (day {day})')
@@ -216,5 +223,42 @@ ax.set_xticklabels(model_names)
 # ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
 plt.tight_layout()
 
-plt.savefig('BMS/WAIC.png')
+plt.savefig('BMS/WAIC_day{day}.svg')
+plt.show()
+
+from scipy import stats
+model1idx = 2
+model2idx = 4
+
+print("Check these formulas")
+# Pooled variance
+sp2 = ((60 - 1) * WAIC_var[model1idx] + (60 - 1) * WAIC_var[model2idx]) / (60 + 60 - 2)
+
+# t-value
+t_value = (WAIC[model1idx] - WAIC[model2idx]) / np.sqrt(sp2 * (1/60 + 1/60))
+print(f"t={t_value}")
+
+# Degrees of freedom
+df = 60 + 60 - 2
+
+# p-value
+p_value = 2 * stats.t.sf(np.abs(t_value), df)  # Two-tailed test
+print(f'p-value: {p_value}')
+
+'''
+    Plot log-likelihood
+'''
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.scatter(range(num_models), log_likelihood)
+    
+# ax.legend()
+ax.title.set_text(f'Log-Likelihood (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/loglike_day{day}.svg')
 plt.show()
