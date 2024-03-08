@@ -35,12 +35,12 @@ Modelle:
     OnlyQ_Qdiff_lr - 4 parameters
 '''
 
-waithrs = 0
+waithrs = 12
 post_pred = 1
 STT = 0
 
-model_day1 = 'OnlyQ_Qdiff_lr'
-models_day2 = ['OnlyQ_Qdiff_lr']
+model_day1 = 'Repbias_Conflict_Repdiff_nobound_onlyseq_lr'
+models_day2 = ['Repbias_Conflict_Repdiff_nobound_onlyseq_lr']
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 3_000
@@ -51,7 +51,6 @@ halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
 posterior_pred_samples_day2 = posterior_pred_samples_day1
 
 #%%
-
 "Day 1"
 exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
 exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day1)

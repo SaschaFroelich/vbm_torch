@@ -1130,6 +1130,13 @@ def simulate_data(model,
         blockorder : list, len num_agents
             Which blockorder
             1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
+            
+            
+    day : int
+        Day of experiment
+        
+    STT : bool
+        Whether to simulate single-target trials (STT)
         
     params : DataFrame or dict, values are tensors or list, shape [num_agents]
         Contains the latent model parameters with which to simulate data.
@@ -1299,7 +1306,10 @@ def plot_grouplevel(df1,
 
     Returns
     -------
-    None.
+    DF
+        columns:
+            block_num : changed blockidx for groups with 2nd block order, so that block with the same block_num is the same block (Rep or Rand) for each participant
+            blocknum : only for plotting
 
     '''
         
@@ -1368,7 +1378,6 @@ def plot_grouplevel(df1,
         
         # groupdata_df_2 = groupdata_df_2.drop(['blockidx', 'trialsequence', 'outcomes', 'choices'], axis = 1)
         
-    custom_palette = ['r', 'g', 'b'] # random, congruent, incongruent
     if plot_single:
         for ag_idx in np.sort(groupdata_df_1['ag_idx'].unique()):
             agent_df_1 = groupdata_df_1[groupdata_df_1['ag_idx'] == ag_idx]
@@ -1397,7 +1406,8 @@ def plot_grouplevel(df1,
                             hue='jokertypes',
                             ax = ax,
                             data = agent_df_1,
-                            palette = custom_palette)
+                            color = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
+                            palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'})
                 plt.title(f'agent {agent_df_1["ID"].unique()}, model {model_1}')
                 # ax.get_legend().remove()
                 plt.show()
@@ -1407,7 +1417,8 @@ def plot_grouplevel(df1,
                             hue='jokertypes',
                             ax = ax,
                             data = agent_df_1,
-                            palette = custom_palette)
+                            color = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
+                            palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'})
                 plt.title(f'agent {agent_df_1["ID"].unique()}, model {model_1}')
                 # ax.get_legend().remove()
                 plt.show()
@@ -1459,6 +1470,8 @@ def plot_grouplevel(df1,
                                                                     ('Congruent' if x == 1 else 
                                                                      ('Incongruent' if x == 2 else 'no joker')))
         
+        "blocknum is only important for plotting"
+        "0 -> 1, 3 -> 2, 4,5 -> 3, 6,7 -> 4, 8,9 -> 5, 10,11 -> 6, 12,13 -> 7"
         grouped_df_2['blocknum'] = grouped_df_2['block_num'].map(lambda x: 1 if x == 0 else x)
         grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 2 if x == 3 else x)
         grouped_df_2['blocknum'] = grouped_df_2['blocknum'].map(lambda x: 3 if x == 4 or x == 5 else x)
@@ -1482,6 +1495,8 @@ def plot_grouplevel(df1,
         sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
                     hue = 'jokertypes', 
+                    hue_order = ['Random', 'Congruent', 'Incongruent'],
+                    color = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                     data = grouped_df_1,
                     ax = ax1)
         ax1.set_xticks(np.arange(1, 8), minor = True)
@@ -1495,6 +1510,8 @@ def plot_grouplevel(df1,
         sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
                     hue ='jokertypes', 
+                    hue_order = ['Random', 'Congruent', 'Incongruent'],
+                    color = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                     data = grouped_df_2,
                     ax = ax2)
 
@@ -1524,8 +1541,9 @@ def plot_grouplevel(df1,
         sns.lineplot(x = "blocknum",
                     y = "choices_GD",
                     hue = "DTT Types",
+                    hue_order = ['Random', 'Congruent', 'Incongruent'],
                     data = grouped_df_1,
-                    palette = custom_palette,
+                    palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                     err_style = "bars",
                     errorbar = ("se", 1),
                     ax = ax)
@@ -1549,8 +1567,9 @@ def plot_grouplevel(df1,
             sns.lineplot(x = "day",
                         y = "choices_GD",
                         hue = "DTT Types",
+                        hue_order = ['Random', 'Congruent', 'Incongruent'],
                         data = grouped_df_1,
-                        palette = custom_palette,
+                        palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                         err_style = "bars",
                         errorbar = ("se", 1),
                         ax = ax)
@@ -1565,8 +1584,9 @@ def plot_grouplevel(df1,
             fig, ax = plt.subplots(figsize = (5, 5))
             sns.barplot(y = "choices_GD",
                         hue = "DTT Types",
+                        hue_order = ['Random', 'Congruent', 'Incongruent'],
                         data = grouped_df_1,
-                        palette = custom_palette,
+                        palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                         errorbar = ("se", 1),
                         ax = ax)
             ax.set_xticks([1,2])
@@ -1576,7 +1596,7 @@ def plot_grouplevel(df1,
             # plt.savefig('/home/sascha/Desktop/Paper_2024/KW2.png', dpi=600)
             plt.show()
         
-        return grouped_df_1
+        return grouped_df_1.drop(['blocknum'], axis = 1)
         
 def plot_dual_behav(agent_df_1, agent_df_2):
     '''
@@ -1663,6 +1683,7 @@ def posterior_predictives(post_sample,
 
     '''
     
+    raise Exception("This is obsolete, use posterior predictives as stored in extra_storage.")
     assert len(post_sample['day'].unique()) == 1
     assert torch.is_tensor(errorrates)
     assert len(post_sample['model'].unique()) == 1
@@ -1713,6 +1734,7 @@ def posterior_predictives(post_sample,
                                                                     num_reps,
                                                                     group = group,
                                                                     day = post_sample['day'].unique()[0],
+                                                                    STT = False,
                                                                     Q_init = qinit,
                                                                     seq_init = sinit,
                                                                     params = params,
@@ -2638,22 +2660,31 @@ def plot_hpcf(df, title=None, post_pred=False):
     IDseq.extend(list(df['ID']))
     IDseq.extend(list(df['ID']))
     
-    HPCF_DF = pd.DataFrame({'HPCF': hpcf, 'Day': dayseq, 'ID': IDseq, 'DTTType': DTTType})
+    HPCF_DF = pd.DataFrame({'HPCF': hpcf, 
+                            'Day': dayseq, 
+                            'ID': IDseq, 
+                            'DTTType': DTTType})
     
     fig, ax = plt.subplots()
     
-    rename_dtt = ['Cong', 'Incong', 'Fix', 'Rand']
+    rename_dtt = ['Cong', 'Incong', 'Rep', 'Rand']
     HPCF_DF['DTTType'] = HPCF_DF['DTTType'].map(lambda x: rename_dtt[x-1])
     
-    sns.barplot(data = HPCF_DF, x = 'Day', y = 'HPCF', hue='DTTType')
+    sns.barplot(data = HPCF_DF, 
+                x = 'Day', 
+                y = 'HPCF', 
+                hue='DTTType',
+                hue_order = ['Rand', 'Cong', 'Incong', 'Rep'],
+                palette = {'Rand': '#67b798', 'Cong': '#BE54C6', 'Incong': '#7454C7', 'Rep': '#B99DC0'})
     
     if title is not None:
         plt.title(title)
     
     plt.ylim([0.4, 1])
-    
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
     ax.set_ylabel('HRCF')
-    plt.savefig(f'behaviour_{title}.svg')
+    # plt.savefig(f'behaviour_{title}.svg')
     plt.show()
     
     
@@ -2931,3 +2962,181 @@ def RT_err_to_m2(data_dict):
                 
     return data_dict
     
+def load_data():
+    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = get_data_from_file()
+    post_sample_df_day2['day'] = 2
+    Q_init_day2 = extra_storage[0]
+    param_names = extra_storage[9]
+    if extra_storage[11] >= 1e-03:
+        raise Exception("rhalt too large for IC computation.")
+    
+    day = extra_storage[2]
+    
+    if day != 2:
+        raise Exception("Have to load day 2, bruh.")
+    
+    print(f"Preceding model is {extra_storage[3]}.")
+    # assert len(param_names) == num_params
+    # blocks = extra_storage[2]
+    
+    if sociopsy_df is None:
+        "Experimental data"
+        experimental_data = 0
+        
+    else:
+        "Simulated data"
+        experimental_data = 1
+    
+    # _, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
+    # expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
+    
+    if 'ID_x' in post_sample_df_day2.columns:
+        raise Exception("NONONONONO")
+    
+    if 'handedness' in post_sample_df_day2.columns:
+        inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
+                                                           'ag_idx', 
+                                                           'group', 
+                                                           'ID', 
+                                                           'handedness'], as_index = False).mean())
+    
+    else:
+        inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
+                                                           'ag_idx', 
+                                                           'group', 
+                                                           'ID'], as_index = False).mean())  
+    
+    inf_mean_df_day2['day'] = 2
+    inf_mean_df_day2 = inf_mean_df_day2.sort_values(by=['ag_idx'])
+    
+    model = post_sample_df_day2['model'][0]
+    num_agents = len(post_sample_df_day2['ag_idx'].unique())
+    
+    print(f"Model fit of model {model} for {num_agents} agents after %d inference steps."%len(loss))
+    '''
+        Plot ELBO
+    '''
+    fig, ax = plt.subplots()
+    plt.plot(loss)
+    plt.title(f"ELBO for model {model} ({num_agents} agents)")
+    ax.set_xlabel("Number of iterations")
+    ax.set_ylabel("ELBO")
+    plt.show()
+    # print(np.array(loss[-1000:]).mean())
+    
+    '''
+        Violin Plot
+    '''
+    import matplotlib.colors as mcolors
+    import matplotlib.cm as cm
+    
+    # plt.style.use("seaborn-v0_8-dark")
+    # anal.violin(inf_mean_df_day2, param_names, model)
+    
+    complete_df_day2 = create_complete_df(inf_mean_df_day2, sociopsy_df, expdata_df_day2, post_sample_df_day2, param_names)
+    complete_df_day2['day'] == 2
+    
+    '''
+        Simulate from means
+    '''
+    '''
+    er:
+        0 : STT
+        1 : Random
+        2 : Congruent
+        3 : incongruent
+    '''
+    er_day2 = torch.zeros((4, num_agents))
+    er_day2[0, :] = torch.tensor(complete_df_day2['ER_stt']) # stt
+    er_day2[1, :] = torch.tensor(complete_df_day2['ER_randomdtt']) # random
+    er_day2[2, :] = torch.tensor(complete_df_day2['ER_congruent']) # congruent
+    er_day2[3, :] = torch.tensor(complete_df_day2['ER_incongruent']) # incongruent
+    
+    if day == 2:
+        seq_counter_day2 = extra_storage[6]
+        groupdata_dict_day2, sim_group_behav_df_day2, params_sim_df_day2, _ = simulate_data(model, 
+                                                                                num_agents,
+                                                                                group = list(inf_mean_df_day2['group']),
+                                                                                day = day,
+                                                                                STT = 0,
+                                                                                Q_init = Q_init_day2,
+                                                                                seq_init = seq_counter_day2,
+                                                                                params = inf_mean_df_day2.loc[:, [*param_names]],
+                                                                                errorrates = er_day2)
+        
+        plot_grouplevel(expdata_df_day2, sim_group_behav_df_day2, plot_single = False)
+        sim_group_behav_df_day2['day'] = 2
+        
+        print("\n\nCreating and appending dataframe for day 1.")
+        filename_day1 = extra_storage[7]
+        
+        if extra_storage[10] == 'recovery':
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
+            
+        elif extra_storage[10] == 'behav_fit':
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('behav_fit/'+filename_day1+'.p')    
+            
+        else:
+            raise Exception('Error')
+    
+        post_sample_df_day1['day'] = 1
+        # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
+        param_names_day1 = extra_storage_day1[9]
+        if extra_storage_day1[11] >= 1e-03:
+            raise Exception("rhalt too large for IC computation.")
+        
+        if 'handedness' in post_sample_df_day1.columns:
+            inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                               'ag_idx', 
+                                                               'group', 
+                                                               'ID', 
+                                                               'handedness'], as_index = False).mean())
+        
+        else:
+            inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                               'ag_idx', 
+                                                               'group', 
+                                                               'ID'], as_index = False).mean())  
+        
+        inf_mean_df_day1 = inf_mean_df_day1.sort_values(by=['ag_idx'])
+        
+        model_day1 = post_sample_df_day1['model'][0]
+        
+        complete_df_day1 = create_complete_df(inf_mean_df_day1, 
+                                                    sociopsy_df_day1,
+                                                    expdata_df_day1,
+                                                    post_sample_df_day1, 
+                                                    param_names_day1)
+        
+        # rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
+        # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
+        complete_df_day1['day'] = 1
+        complete_df_all = pd.concat([complete_df_day1, complete_df_day2], ignore_index=True)
+        
+        expdata_df_day1['day'] = 1
+        expdata_df_day2['day'] = 2
+        expdata_df_all = pd.concat([expdata_df_day1, expdata_df_day2], ignore_index=True)
+        
+        inf_mean_df_day1['day'] = 1
+        inf_mean_df_all = pd.concat([inf_mean_df_day1, inf_mean_df_day2], ignore_index=True)
+        
+        post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df_day2], ignore_index=True)
+        
+        er_day1 = torch.zeros((4, num_agents))
+        er_day1[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
+        er_day1[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
+        er_day1[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
+        er_day1[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
+        groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = simulate_data(model_day1, 
+                                                                                num_agents,
+                                                                                group = list(inf_mean_df_day1['group']),
+                                                                                day = 1,
+                                                                                STT = 0,
+                                                                                params = inf_mean_df_day1.loc[:, [*param_names_day1]],
+                                                                                errorrates = er_day1)
+        
+        sim_group_behav_df_day1['day'] = 1
+        
+        sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
+    
+        return complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2

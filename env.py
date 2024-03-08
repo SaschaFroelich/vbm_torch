@@ -92,9 +92,9 @@ class Env():
                 
         else:
             '''
-            For posterior predictives
-            Assert that group is the same for each entry 
-            (since we're repeating the same participant several times).
+                For posterior predictives
+                Assert that group is the same for each entry 
+                (since we're repeating the same participant several times).
             '''
             assert all(x==group[0] for x in group)
             grp = group[0]
@@ -142,6 +142,9 @@ class Env():
             
         day : int
             1 or 2
+            
+        STT : bool
+            Whether to simulate single-target trials (STT)
 
         Raises
         ------

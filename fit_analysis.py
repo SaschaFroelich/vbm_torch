@@ -29,249 +29,9 @@ from sklearn.linear_model import LinearRegression
 import scipy
 import itertools
 
-post_sample_df_day2, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
-post_sample_df_day2['day'] = 2
-Q_init = extra_storage[0]
-param_names = extra_storage[9]
-if extra_storage[11] >= 1e-03:
-    raise Exception("rhalt too large for IC computation.")
+complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names,  Q_init_day2, seq_counter_day2, er_day2 = utils.load_data()
 
-day = extra_storage[2]
-
-if day != 2:
-    raise Exception("Have to load day 2, bruh.")
-
-print(f"Preceding model is {extra_storage[3]}.")
-# assert len(param_names) == num_params
-# blocks = extra_storage[2]
-
-if sociopsy_df is None:
-    "Experimental data"
-    experimental_data = 0
-    
-else:
-    "Simulated data"
-    experimental_data = 1
-
-# _, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
-# expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
-
-if 'ID_x' in post_sample_df_day2.columns:
-    raise Exception("NONONONONO")
-
-if 'handedness' in post_sample_df_day2.columns:
-    inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
-                                                       'ag_idx', 
-                                                       'group', 
-                                                       'ID', 
-                                                       'handedness'], as_index = False).mean())
-
-else:
-    inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
-                                                       'ag_idx', 
-                                                       'group', 
-                                                       'ID'], as_index = False).mean())  
-
-inf_mean_df_day2['day'] = 2
-inf_mean_df_day2 = inf_mean_df_day2.sort_values(by=['ag_idx'])
-
-model = post_sample_df_day2['model'][0]
-num_agents = len(post_sample_df_day2['ag_idx'].unique())
-
-print(f"Model fit of model {model} for {num_agents} agents after %d inference steps."%len(loss))
-'''
-    Plot ELBO
-'''
-fig, ax = plt.subplots()
-plt.plot(loss)
-plt.title(f"ELBO for model {model} ({num_agents} agents)")
-ax.set_xlabel("Number of iterations")
-ax.set_ylabel("ELBO")
-plt.show()
-# print(np.array(loss[-1000:]).mean())
-
-'''
-    Plot Parameter Distributions
-'''
-if model != 'Bullshitmodel':
-    print("Plot parameter distributions")
-    num_plot_cols = 3
-    num_plot_rows = int((num_params <= num_plot_cols) * 1 + \
-                    (num_params > num_plot_cols) * np.ceil(num_params / num_plot_cols))
-    
-    fig = plt.figure(figsize=(16,12), dpi=100)
-    gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.2)
-    ax = gs.subplots()
-    # params_df.columns
-    for param_idx in range(num_params):
-        plot_col_idx = param_idx % num_plot_cols
-        plot_row_idx = (param_idx // num_plot_cols)
-        
-        if num_params > 3:
-            ax_idxs = [plot_row_idx, plot_col_idx]
-            
-        else:
-            ax_idxs = [plot_col_idx]
-        
-        # ca = sns.kdeplot(inf_mean_df_day2[post_sample_df_day2.columns[param_idx]], ax = ax[*ax_idxs], cut = 0)
-        ca = sns.histplot(inf_mean_df_day2[post_sample_df_day2.columns[param_idx]], ax = ax[*ax_idxs], kde = False)
-        ax[*ax_idxs].set_xlabel(post_sample_df_day2.columns[param_idx], fontsize = 20)    
-    
-        if plot_col_idx > 0:
-            ax[*ax_idxs].set_ylabel(None)
-            
-        else:
-            ax[*ax_idxs].set_ylabel('Density', fontsize = 20)
-            ax[*ax_idxs].set_ylabel('Counts', fontsize = 20)
-            
-        if plot_row_idx > 0:
-            ax[*ax_idxs].get_position().y0 += 10
-    
-        # ca.plot([0,0], ca.get_ylim())
-    
-    plt.show()
-
-'''
-    Violin Plot
-'''
-import matplotlib.colors as mcolors
-import matplotlib.cm as cm
-
-# plt.style.use("seaborn-v0_8-dark")
-# anal.violin(inf_mean_df_day2, param_names, model)
-
-complete_df_day2 = utils.create_complete_df(inf_mean_df_day2, sociopsy_df, expdata_df, post_sample_df_day2, param_names)
-complete_df_day2['day'] == 2
-
-# if 'RT' in complete_df.columns:
-#     anal.violin(complete_df.loc[:, ['age', 'ER_stt', 'ER_dtt', 'RT', 'points']], model = 'sociopsy')
-    
-# else:
-#     anal.violin(complete_df.loc[:, ['ER_stt', 'ER_dtt', 'points']], model = 'errors')
-
-if 0:
-    '''
-        Kdpelots
-    '''
-    fig, ax = plt.subplots(len(param_names), 1, figsize=(10,35))
-    if model == 'Conflict':
-        xlims = [[0, 0.08],
-                 [0, 9],
-                 [0, 3.0],
-                 [-2.5, 3],
-                 [0, 0.08],
-                [0, 9],
-                [0, 3.0],
-                [-2.5, 3]]
-        
-    for param_idx in range(len(param_names)):
-        sns.kdeplot(post_sample_df_day2[param_names[param_idx]], ax = ax[param_idx])
-        ax[param_idx].set_xlabel(param_names[param_idx])
-        # ax[param_idx].set_xlim(xlims[param_idx])
-    
-    plt.show()
-
-'''
-    Simulate from means
-'''
-'''
-er:
-    0 : STT
-    1 : Random
-    2 : Congruent
-    3 : incongruent
-'''
-er = torch.zeros((4, num_agents))
-er[0, :] = torch.tensor(complete_df_day2['ER_stt']) # stt
-er[1, :] = torch.tensor(complete_df_day2['ER_randomdtt']) # random
-er[2, :] = torch.tensor(complete_df_day2['ER_congruent']) # congruent
-er[3, :] = torch.tensor(complete_df_day2['ER_incongruent']) # incongruent
-
-if day == 2:
-    seq_counter_day2 = extra_storage[6]
-    groupdata_dict_day2, sim_group_behav_df_day2, params_sim_df_day2, _ = utils.simulate_data(model, 
-                                                                            num_agents,
-                                                                            group = list(inf_mean_df_day2['group']),
-                                                                            day = day,
-                                                                            STT = 0,
-                                                                            Q_init = Q_init,
-                                                                            seq_init = seq_counter_day2,
-                                                                            params = inf_mean_df_day2.loc[:, [*param_names]],
-                                                                            errorrates = er)
-    
-    utils.plot_grouplevel(expdata_df, sim_group_behav_df_day2, plot_single = False)
-    sim_group_behav_df_day2['day'] = 2
-    
-    print("\n\nCreating and appending dataframe for day 1.")
-    filename_day1 = extra_storage[7]
-    
-    if extra_storage[10] == 'recovery':
-        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
-        
-    elif extra_storage[10] == 'behav_fit':
-        post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = utils.get_data_from_file('behav_fit/'+filename_day1+'.p')    
-        
-    else:
-        raise Exception('Error')
-
-    post_sample_df_day1['day'] = 1
-    # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
-    param_names_day1 = extra_storage_day1[9]
-    if extra_storage_day1[11] >= 1e-03:
-        raise Exception("rhalt too large for IC computation.")
-    
-    if 'handedness' in post_sample_df_day1.columns:
-        inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
-                                                           'ag_idx', 
-                                                           'group', 
-                                                           'ID', 
-                                                           'handedness'], as_index = False).mean())
-    
-    else:
-        inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
-                                                           'ag_idx', 
-                                                           'group', 
-                                                           'ID'], as_index = False).mean())  
-    
-    inf_mean_df_day1 = inf_mean_df_day1.sort_values(by=['ag_idx'])
-    
-    model_day1 = post_sample_df_day1['model'][0]
-    
-    complete_df_day1 = utils.create_complete_df(inf_mean_df_day1, 
-                                                sociopsy_df_day1,
-                                                expdata_df_day1,
-                                                post_sample_df_day1, 
-                                                param_names_day1)
-    
-    # rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
-    # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
-    complete_df_day1['day'] = 1
-    complete_df_all = pd.concat([complete_df_day1, complete_df_day2], ignore_index=True)
-    
-    inf_mean_df_day1['day'] = 1
-    inf_mean_df_all = pd.concat([inf_mean_df_day1, inf_mean_df_day2], ignore_index=True)
-    
-    post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df_day2], ignore_index=True)
-    
-    er = torch.zeros((4, num_agents))
-    er[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
-    er[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
-    er[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
-    er[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
-    groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = utils.simulate_data(model_day1, 
-                                                                            num_agents,
-                                                                            group = list(inf_mean_df_day1['group']),
-                                                                            day = 1,
-                                                                            STT = 0,
-                                                                            params = inf_mean_df_day1.loc[:, [*param_names_day1]],
-                                                                            errorrates = er)
-    
-    sim_group_behav_df_day1['day'] = 1
-    
-    sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
-    
-    del day
-    del post_sample_df_day1, post_sample_df_day2
+model = complete_df_all['model'][0]
 
 #%%
 '''
@@ -283,9 +43,9 @@ if day == 2:
 
 utils.plot_hpcf(complete_df_all, title='Experiment')
 
-hpcf_day1 = utils.compute_hpcf(sim_group_behav_df_day1)
+hpcf_day1 = utils.compute_hpcf(sim_df[sim_df['day']==1])
 hpcf_day1['day'] = 1
-hpcf_day2 = utils.compute_hpcf(sim_group_behav_df_day2)
+hpcf_day2 = utils.compute_hpcf(sim_df[sim_df['day']==2])
 hpcf_day2['day'] = 2
 
 hpcf_df_all = pd.concat((hpcf_day1, hpcf_day2), ignore_index = True)
@@ -402,36 +162,6 @@ for day in [1,2]:
 
 #%%
 '''
-    Exploiters
-'''
-
-# exploiters_df_day1.loc[:, 'theta_rep_plus_conflict'] = exploiters_df_day1['theta_rep'] + exploiters_df_day1['theta_conflict']
-# mean = exploiters_df_day1['theta_rep_plus_conflict'].mean()
-# std_dev = exploiters_df_day1['theta_rep_plus_conflict'].std()
-# exploiters_df_day1.loc[:, 'theta_rep_plus_conflict_z'] = (exploiters_df_day1['theta_rep_plus_conflict'] - mean) / std_dev
-# exploiters_df_day1['expl_repconflict_z'] = exploiters_df_day1['theta_rep_plus_conflict_z'].map(lambda x: 1 if x > 1 else 0)
-
-
-# exploiters_df_day2.loc[:, 'theta_rep_plus_conflict'] = exploiters_df_day2['theta_rep'] + exploiters_df_day2['theta_conflict']
-# mean = exploiters_df_day2['theta_rep_plus_conflict'].mean()
-# std_dev = exploiters_df_day2['theta_rep_plus_conflict'].std()
-# exploiters_df_day2.loc[:, 'theta_rep_plus_conflict_z'] = (exploiters_df_day2['theta_rep_plus_conflict'] - mean) / std_dev
-# exploiters_df_day2['expl_repconflict_z'] = exploiters_df_day2['theta_rep_plus_conflict_z'].map(lambda x: 1 if x > 1 else 0)
-
-# r,p = scipy.stats.pearsonr(exploiters_df_day1['theta_rep_plus_conflict_z'], exploiters_df_day2['theta_rep_plus_conflict_z'])
-# print(f"r={r}, p={p}")
-
-# r,p = scipy.stats.pearsonr(exploiters_df_day1['RT_diff_stt'], exploiters_df_day1['theta_rep_plus_conflict_z'])
-# print(f"r={r}, p={p}")
-
-# r,p = scipy.stats.pearsonr(exploiters_df_day2['RT_diff_stt'], exploiters_df_day2['theta_rep_plus_conflict_z'])
-# print(f"r={r}, p={p}")
-
-# r,p = scipy.stats.pearsonr(exploiters_df_day2['ER_diff_stt'], exploiters_df_day2['theta_rep_plus_conflict_z'])
-# print(f"r={r}, p={p}")
-
-#%%
-'''
     Sort by counterbalancing group
 '''
 
@@ -513,10 +243,13 @@ anal.violin(inf_mean_df_nozero.loc[:, [*param_names]], model)
     Fig for paper
     Individual posteriors
 '''
+num_params = len(param_names)
+num_agents = len(complete_df_all['ID'].unique())
+
 fig, ax = plt.subplots(num_params, 2, figsize = (15, 15))
 
 for param in range(num_params):
-    for day in range(1, 3):
+    for day in range(1, 3): 
         for ag in range(num_agents):
             if param == 0:
                 sns.kdeplot(post_sample_df_all[(post_sample_df_all['ag_idx']==ag) & (post_sample_df_all['day']==day)][param_names[param]], 
@@ -665,19 +398,6 @@ for param_idx in range(num_params):
 
 #%%
 '''
-    Correlations between subjects
-'''
-import analysis_tools as anal
-anal.param_corr(inf_mean_df, method = 'spearman')
-
-#%%
-'''
-    Plot Experimental Data
-'''
-utils.plot_grouplevel(expdata_df[expdata_df['ag_idx'] == 35], plot_single = False)
-
-#%%
-'''
     Simulate only from means
 '''
 
@@ -695,24 +415,6 @@ utils.plot_grouplevel(expdata_df, sim_group_behav_df, plot_single = False)
 
 utils.plot_grouplevel(sim_group_behav_df, plot_single = False)
 
-# df_temp = expdata_df[expdata_df['choices_GD']>=0]
-# df_temp = df_temp[df_temp['trialsequence']>10]
-# cgd = pd.DataFrame(df_temp.loc[:, ['ID', 'choices_GD', 'jokertypes']].groupby(['ID', 'jokertypes'], as_index = False).mean())
-
-# cgd[cgd['jokertypes'] == 0]['choices_GD'].mean() # Random
-# cgd[cgd['jokertypes'] == 1]['choices_GD'].mean() # Congruent
-# cgd[cgd['jokertypes'] == 2]['choices_GD'].mean() # Incongruent
-#%%
-'''
-    Posterior Predictives from posterior samples.
-'''
-
-# ers = anal.compute_errors(expdata_df)
-out=utils.posterior_predictives(post_sample_df_all[post_sample_df_all['day']==2], 
-                                param_names, 
-                                Q_init = Q_init,
-                                seq_init = seq_counter_day2,
-                                errorrates=er)
 
 #%%
 '''
@@ -1458,24 +1160,25 @@ for ID in df['ID'].unique():
     Modulators
 '''
 
-seqlearners_df_day1, notseqlearners_df_day1 = anal.find_seqlearners(expdata_df_day1,
-                                                          complete_df_all, 
+expdata_df_day1 = expdata_df_all[expdata_df_all['day'] == 1]
+expdata_df_day2 = expdata_df_all[expdata_df_all['day'] == 2]
+
+seqlearners_df_day1, notseqlearners_df_day1, seqlearn_df_day1 = anal.find_seqlearners(expdata_df_day1,
                                                           day = 1,
                                                           correctp = True)
 
 
-seqlearners_df_day2, notseqlearners_df_day2 = anal.find_seqlearners(expdata_df,
-                                                          complete_df_all, 
+seqlearners_df_day2, notseqlearners_df_day2, seqlearn_df_day2 = anal.find_seqlearners(expdata_df_day2,
                                                           day = 2,
                                                           correctp = True)
 
 seqall = pd.concat((seqlearners_df_day1, seqlearners_df_day2))
 notseqall = pd.concat((notseqlearners_df_day1, notseqlearners_df_day2))
 
-seq_plotdf_day2 = utils.plot_grouplevel(expdata_df[expdata_df['ID'].isin(seqlearners_df_day2['ID'].unique())], plot_single = False)
+seq_plotdf_day2 = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(seqlearners_df_day2['ID'].unique())], plot_single = False)
 seq_plotdf_day1 = utils.plot_grouplevel(expdata_df_day1[expdata_df_day1['ID'].isin(seqlearners_df_day1['ID'].unique())], plot_single = False)
 
-notseq_plotdf_day2 = utils.plot_grouplevel(expdata_df[expdata_df['ID'].isin(notseqlearners_df_day2['ID'].unique())], plot_single = False)
+notseq_plotdf_day2 = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(notseqlearners_df_day2['ID'].unique())], plot_single = False)
 notseq_plotdf_day1 = utils.plot_grouplevel(expdata_df_day1[expdata_df_day1['ID'].isin(notseqlearners_df_day1['ID'].unique())], plot_single = False)
 
 
@@ -1602,6 +1305,7 @@ for rowidx in range(len(complete_df_all)):
         complete_df_all.loc[rowidx, 'strong_seq_day2']  = 'weak sequence learner'
 
 
+#%%
 '''
     Figure
     Scatterplots
@@ -1654,6 +1358,10 @@ plt.show()
 dfseq = seq_plotdf_all.loc[:, ['ID', 'DTT Types', 'choices_GD']].groupby(['ID', 'DTT Types'], as_index = False).mean()
 
 #%%
+'''
+   T-Tests 
+'''
+
 
 print("Hypothesis Tests for pevious figure.")
 "======= Day 1 ========="
@@ -1741,15 +1449,18 @@ print("Day 2")
 print(len(seq_plotdf_all_day2['ID'].unique()))
 print(len(notseq_plotdf_all_day2['ID'].unique()))
 
+
 #%%
 '''
     Among strong sequence learners, find habitual learners, GD learners, modulators, and others.
 '''
 
-%matplotlib inline
-habitual_df, GD_df, modulators_df, antimods_df = anal.find_strategies(expdata_df[expdata_df['ID'].isin(seq_plotdf_all_day2['ID'].unique())], 
-                                                         day = 2, 
-                                                         num_sections = 4,
+habitual_df, GD_df, modulators_df, antimods_df, ps_df_day1 = anal.find_strategies(expdata_df_day1[expdata_df_day1['ID'].isin(seq_plotdf_all_day1['ID'].unique())], 
+                                                         plot_single = False,
+                                                         correctp = False)
+
+
+habitual_df, GD_df, modulators_df, antimods_df, ps_df_day2 = anal.find_strategies(expdata_df_day2[expdata_df_day2['ID'].isin(seq_plotdf_all_day2['ID'].unique())], 
                                                          plot_single = False,
                                                          correctp = False)
 
@@ -1773,6 +1484,7 @@ print(f"r={r}, p={p}")
 
 antimods_all = complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['ID'].isin(antimods_df[antimods_df['day']==2]['ID'].unique()))]
 
+#%%
 '''
     Barplots
     Left: Habitual
@@ -1802,7 +1514,7 @@ ax[0].legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0., title
 
 pGD_plot_df = GD_df[GD_df['day']==2].loc[:, ['ID', 'DTT Types', 'choices_GD']]
 pGD_plot_df['choices_GD'] = pGD_plot_df['choices_GD']*100
-pGD_plot_df['Type'] = 'Suppresser'
+pGD_plot_df['Type'] = 'pure GD'
 sns.barplot(ax = ax[1],
             data = pGD_plot_df, 
             # x = 'day',
@@ -1859,7 +1571,6 @@ fig, ax = plt.subplots()
 sns.barplot(ax = ax,
             data = dfplot,
             x = 'Type',
-            order = ['Suppresser', 'Exploiter', 'Habitual', 'Anti-GD'],
             y = 'choices_GD',
             hue = 'DTT Types',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
@@ -1877,42 +1588,79 @@ plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig2b/res_fig2b_a_python.sv
 plt.show()
 
 print(len(dfplot[dfplot['Type'] == 'Habitual']['ID'].unique()))
-print(len(dfplot[dfplot['Type'] == 'Suppresser']['ID'].unique()))
+print(len(dfplot[dfplot['Type'] == 'pure GD']['ID'].unique()))
 print(len(dfplot[dfplot['Type'] == 'Exploiter']['ID'].unique()))
 print(len(dfplot[dfplot['Type'] == 'Anti-GD']['ID'].unique()))
 
+#%%
+'''
+    T-Tests
+'''
+
+"===== == Between Strategy Groups == ======"
 "=== Supp vs Expl ==="
-t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Suppresser') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
+"Congruent"
+t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'pure GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Exploiter') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
+"Random"
+t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'pure GD') & (dfplot['DTT Types'] == 'Random')]['choices_GD'], dtype='float'),
+np.array(dfplot[(dfplot['Type'] == 'Exploiter') & (dfplot['DTT Types'] == 'Random')]['choices_GD'], dtype='float'))
+print(f"t={t}, p={p}")
+
+"Incongruent"
+t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'pure GD') & (dfplot['DTT Types'] == 'Incongruent')]['choices_GD'], dtype='float'),
+np.array(dfplot[(dfplot['Type'] == 'Exploiter') & (dfplot['DTT Types'] == 'Incongruent')]['choices_GD'], dtype='float'))
+print(f"t={t}, p={p}")
+
 "=== Supp vs habitual ==="
-t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Suppresser') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
+t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'pure GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Habitual') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
 
 "=== Supp vs Anti ==="
-t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Suppresser') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
+"Congruent"
+t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'pure GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Anti-GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
 "=== Exploiter vs Habitual ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Exploiter') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Habitual') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
 "=== Exploiter vs Anti ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Exploiter') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Anti-GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
 "=== Habitual vs Anti ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == 'Habitual') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'),
 np.array(dfplot[(dfplot['Type'] == 'Anti-GD') & (dfplot['DTT Types'] == 'Congruent')]['choices_GD'], dtype='float'))
 print(f"t={t}, p={p}")
 
+strategies = ['pure GD', 'Exploiter', 'Habitual', 'Anti-GD']
+dttt = ['Random', 'Incongruent']
+for strat1idx in range(len(strategies)):
+    for strat2idx in range(strat1idx+1, len(strategies)):
+        strategy1 = strategies[strat1idx]
+        strategy2 = strategies[strat2idx]
+        for dtype in dttt:
+            t,p = scipy.stats.ttest_ind(np.array(dfplot[(dfplot['Type'] == strategy1) & (dfplot['DTT Types'] == dtype)]['choices_GD'], dtype='float'),
+            np.array(dfplot[(dfplot['Type'] == strategy2) & (dfplot['DTT Types'] == dtype)]['choices_GD'], dtype='float'))
+            # print(f"t={t}, p={p}")
+            
+            if p > 0.05:
+                print(f"{strategy1} vs {strategy2} for {dtype}")
+
+"===== == Within Strategy Groups == ======"
 "=== Habitual ==="
+"Congruent"
 t,p = scipy.stats.ttest_rel(np.array(habitual_plot_df[habitual_plot_df['DTT Types']=='Congruent']['choices_GD']), 
                             np.array(habitual_plot_df[habitual_plot_df['DTT Types']=='Random']['choices_GD']))
 print(f"t={t}, p={p}")
@@ -1928,6 +1676,7 @@ print(f"t={t}, p={p}")
 # del habitual_plot_df
 
 "=== purely GD ==="
+"Congruent"
 t,p = scipy.stats.ttest_rel(np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Congruent']['choices_GD']), 
                             np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Random']['choices_GD']))
 print(f"t={t}, p={p}")
@@ -1943,6 +1692,7 @@ print(f"t={t}, p={p}")
 # del pGD_plot_df
 
 "=== GD-modulators ==="
+"Congruent"
 t,p = scipy.stats.ttest_rel(np.array(GDm_plot_df[GDm_plot_df['DTT Types']=='Congruent']['choices_GD']), 
                             np.array(GDm_plot_df[GDm_plot_df['DTT Types']=='Random']['choices_GD']))
 print(f"t={t}, p={p}")
@@ -1956,6 +1706,7 @@ t,p = scipy.stats.ttest_rel(np.array(GDm_plot_df[GDm_plot_df['DTT Types']=='Rand
 print(f"t={t}, p={p}")
 
 "=== Habitual vs purely GD ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'), 
                             np.array(habitual_plot_df[habitual_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'))
 print(f"t={t}, p={p}")
@@ -1969,6 +1720,7 @@ t,p = scipy.stats.ttest_ind(np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Inco
 print(f"t={t}, p={p}")
 
 "=== purely GD vs GD modulators ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'), 
                             np.array(GDm_plot_df[GDm_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'))
 print(f"t={t}, p={p}")
@@ -1982,6 +1734,7 @@ t,p = scipy.stats.ttest_ind(np.array(pGD_plot_df[pGD_plot_df['DTT Types']=='Inco
 print(f"t={t}, p={p}")
 
 "=== Habitual vs GD modulators ==="
+"Congruent"
 t,p = scipy.stats.ttest_ind(np.array(habitual_plot_df[habitual_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'), 
                             np.array(GDm_plot_df[GDm_plot_df['DTT Types']=='Congruent']['choices_GD'], dtype = 'float'))
 print(f"t={t}, p={p}")
@@ -2000,7 +1753,7 @@ print(f"t={t}, p={p}")
     HRC ~ DTT type, Day
 '''
 
-hpcf_df_day2 = utils.compute_hpcf(expdata_df)
+hpcf_df_day2 = utils.compute_hpcf(expdata_df_day2)
 hpcf_df_day2['day'] = 2
 hpcf_df_day2 = hpcf_df_day2.loc[:, ['ID', 'hpcf_cong', 'hpcf_incong', 'hpcf_rand', 'day']].reset_index(drop=True)
 
@@ -2200,12 +1953,10 @@ print(np.array(complete_df_all[complete_df_all['day']==2]['ER_stt_seq']).mean())
 print(np.array(complete_df_all[complete_df_all['day']==2]['ER_stt_rand']).mean())
 print(f"t={t}, p={p}")
 
+
 #%%
 '''
-    Fig
-    A: HRC Day 1 & Day 2
-    B: ER Day 1 & Day 2
-    C: RT Day 1 & Day 2
+    T-Tests
 '''
 
 hpcf_all = complete_df_all.loc[:, ['ID',
@@ -2220,56 +1971,6 @@ hpcf_all['DTT Type'] = hpcf_all['DTT Type'].map(lambda x: "Congruent" if x == 'h
                                                 'Incongruent' if x == 'hpcf_incong' else
                                                 'Random' if x == 'hpcf_rand' else
                                                 'None')
-
-colors1 = ['#BE54C6', '#7454C7', '#67b798', ] # random, congruent, incongruent]
-colors2 = ['#67b798', '#bd97c6'] # random, fix
-hpcf_all['HRC'] = hpcf_all['HRC']*100
-fig, ax = plt.subplots(1, 3, figsize = (20, 10))
-sns.barplot(data = hpcf_all,
-            x = 'day',
-            y = 'HRC',
-            hue = 'DTT Type',
-            palette = colors1,
-            errorbar=('se', 1),
-            ax = ax[0])
-
-ax[0].legend(title="", fontsize = 14)
-ax[0].set_ylabel("HRC (%)", fontsize = 20)
-ax[0].set_ylim([60, 100])
-ax[0].set_xlabel("Day", fontsize = 20)
-ax[0].tick_params(axis='both', labelsize=14)
-
-ER_all['ER'] = ER_all['ER']*100
-sns.barplot(data = ER_all,
-            x = 'day',
-            y = 'ER',
-            hue = 'Condition',
-            palette = colors2,
-            errorbar=('se', 1),
-            ax = ax[1])
-
-
-ax[1].legend(title="", fontsize = 14)
-ax[1].set_ylabel("ER STT (%)", fontsize = 20)
-ax[1].set_ylim([3, 9])
-ax[1].set_xlabel("Day", fontsize = 20)
-ax[1].tick_params(axis='both', labelsize=14)
-
-sns.barplot(data = RT_all,
-            x = 'day',
-            y = 'RT',
-            hue = 'Condition',
-            palette = colors2,
-            errorbar=('se', 1),
-            ax = ax[2])
-
-ax[2].legend(title="", fontsize = 14)
-ax[2].set_ylabel("RT STT (ms)", fontsize = 20)
-ax[2].set_ylim([320, 420])
-ax[2].set_xlabel("Day", fontsize = 20)
-ax[2].tick_params(axis='both', labelsize=14)
-plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig0/res_fig0_python.svg')
-plt.show()
 
 "=== Analyses ==="
 "HPCF"
@@ -2332,7 +2033,7 @@ print(f"t={t}, p={p}.")
 
 # BF = anal.compute_BF(post_sample_df_all[(post_sample_df_all['day'] == 2) & ])
 
-if model == 'Repbias_Conflict_lr':
+if model == 'Repbias_Conflict_lr' or model == 'Repbias_Conflict_Repdiff_lr':
     testparam1 = 'theta_rep'
     testparam2 = 'theta_conflict'
     
@@ -2356,7 +2057,7 @@ weak_df = complete_df_all[complete_df_all['strong_seq_day2'] == 'weak sequence l
 strong_df['strategy'] = None
 
 strong_df['strategy'] = strong_df['ID'].map(lambda x: 'Habitual' if x in habitual_df['ID'].unique() else
-                                            'Suppresser' if x in GD_df['ID'].unique() else
+                                            'pure GD' if x in GD_df['ID'].unique() else
                                             'Exploiter' if x in modulators_df['ID'].unique() else 
                                             'Anti-GD' if x in antimods_df['ID'].unique() else
                                             'none')
@@ -2372,10 +2073,10 @@ y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Habitual')][f'{te
 ax.scatter(x, 
            y, color='g', label = 'Habitual')
 
-x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam1}']
-y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam2}']
+x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam1}']
+y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam2}']
 ax.scatter(x, 
-           y, color='b', label = 'Suppresser')
+           y, color='b', label = 'pure GD')
 
 x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam1}']
 y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam2}']
@@ -2392,7 +2093,7 @@ ax.set_ylabel(f'{testparam2}')
 
 plt.show()
 
-strong_df['stratgroup'] = strong_df['strategy'].map(lambda x: "Exploiter + Suppresser" if x == "Exploiter" or x == "Suppresser" else "Habitual + Anti-GD")
+strong_df['stratgroup'] = strong_df['strategy'].map(lambda x: "Exploiter + pure GD" if x == "Exploiter" or x == "pure GD" else "Habitual + Anti-GD")
 
 fig, ax = plt.subplots()
 sns.scatterplot(strong_df[strong_df['day'] == 1],
@@ -2423,106 +2124,110 @@ sns.scatterplot(strong_df[strong_df['day'] == 2],
                 hue = 'stratgroup')
 plt.title('Day 2')
 plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_b_python.svg', bbox_inches = 'tight')
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_b_python.svg', bbox_inches = 'tight')
+plt.show()
+
+#%%
+strong_df['strategy_new'] = strong_df['strategy'].map(lambda x: 'Adapter' if x == 'Exploiter' else x)
+strong_df['stratgroup_new'] = strong_df['stratgroup'].map(lambda x: 'Habitual' if x == 'Habitual + Anti-GD' else 'Goal-Directed')
+
+fig, ax = plt.subplots()
+sns.scatterplot(strong_df[strong_df['day'] == 1],
+                x = f'{testparam1}',
+                y = f'{testparam2}',
+                hue = 'strategy')
+plt.title('Day 1')
+plt.show()
+
+fig, ax = plt.subplots()
+sns.scatterplot(strong_df[strong_df['day'] == 2],
+                x = f'{testparam1}',
+                y = f'{testparam2}',
+                palette = ['r', 'g', 'b', 'm'],
+                hue = 'strategy')
+plt.title('Day 2')
+ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 15)
+ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 15)
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_a_python.svg', bbox_inches = 'tight')
+plt.show()
+
+
+fig, ax = plt.subplots(1,2, sharey=True, sharex=True, figsize=(8, 4))
+sns.scatterplot(ax = ax[0],
+                data = strong_df[strong_df['day'] == 2],
+                x = f'{testparam1}',
+                y = f'{testparam2}',
+                hue = 'stratgroup_new',
+                palette = ['brown', 'b'])
+ax[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+ax[0].set_xlabel(r'$\theta_{Rep}$', fontsize = 18)
+ax[0].set_ylabel(r'$\theta_\text{Switch}$', fontsize = 18)
+
+sns.scatterplot(ax = ax[1],
+                data = strong_df[strong_df['day'] == 2],
+                x = f'{testparam1}',
+                y = f'{testparam2}',
+                hue = 'strategy_new', 
+                palette = ['red', 'fuchsia', 'b', 'b'],
+                hue_order=['pure GD', 'Adapter', 'Habitual', 'Anti-GD'])
+# plt.title('Day 2')
+ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 18)
+ax[1].set_ylabel(r'$\theta_\text{Switch}$', fontsize = 18)
+ax[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
 plt.show()
 
 #%%
 '''
     Fig for Retreat
+    Left
+        x : θ_Rep
+        y : θ_Switch
+        Color: 4 Groups
+        
+    Right
+        x : θ_Rep
+        y : θ_Switch
+        Color: 2 groups (exploiter + pure GD and Habitual + Anti-GD)
 '''
 fig, ax = plt.subplots(1,2, sharex=True, sharey=True, figsize = (10, 4))
 sns.scatterplot(strong_df[strong_df['day'] == 2],
                 x = f'{testparam1}',
                 y = f'{testparam2}',
-                palette = ['r', 'g', 'b', 'm'],
+                palette = ['y', 'c', 'b', 'r'],
                 hue = 'strategy',
+                hue_order=['Exploiter', 'pure GD', 'Habitual', 'Anti-GD'],
+                edgecolor='k',
                 ax = ax[0])
-ax[0].set_title('Day 1')
+# ax[0].set_title('Day 1')
 
 ax[0].set_xlabel(r'$\theta_{Rep}$', fontsize = 15)
 ax[0].set_ylabel(r'$\theta_{Switch}$', fontsize = 15)
 ax[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
+ax[0].legend().get_frame().set_edgecolor('black')
+ax[0].legend().get_frame().set_linewidth(2)
 
 sns.scatterplot(strong_df[strong_df['day'] == 2],
                 x = f'{testparam1}',
                 y = f'{testparam2}',
-                palette = ['r', 'b'],
+                palette = ['#27F509', 'm'],
                 hue = 'stratgroup',
+                edgecolor='k',
                 ax = ax[1])
 ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 15)
 ax[1].set_ylabel(r'$\theta_{Switch}$', fontsize = 15)
-ax[1].set_title('Day 2')
+# ax[1].set_title('Day 2')
 ax[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.savefig('/home/sascha/Desktop/presentations/AST/2024_03_Weimar/strategies_model_scatter_python.svg')
+ax[1].legend().get_frame().set_edgecolor('black')
+ax[1].legend().get_frame().set_linewidth(2)
+
 plt.show()
+
+
+
 
 #%%
-strong_df['ratio_repconf'] = strong_df.apply(lambda row: row['theta_rep']/row['theta_conflict'], axis = 1)
-strong_df['ratio_confrep'] = strong_df.apply(lambda row: row['theta_conflict']/row['theta_rep'], axis = 1)
-
-strong_df['ratio_repconfdiff'] = strong_df.apply(lambda row: row['theta_rep']-row['theta_conflict'], axis = 1)
-strong_df['ratio_confrepdiff'] = strong_df.apply(lambda row: row['theta_conflict']-row['theta_rep'], axis = 1)
-
-fig, ax = plt.subplots(1,3, figsize = (12,4))
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                x = f'{testparam1}',
-                y = f'{testparam2}',
-                hue = 'strategy',
-                palette = ['r', 'g', 'b', 'm'],
-                ax = ax[0])
-ax[0].get_legend().remove()
-
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                x = f'{testparam1}',
-                y = 'theta_Q',
-                hue = 'strategy',
-                palette = ['r', 'g', 'b', 'm'],
-                ax = ax[1])
-
-ax[1].get_legend().remove()
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                y = 'theta_Q',
-                x = f'{testparam2}',
-                hue = 'strategy',
-                palette = ['r', 'g', 'b', 'm'],
-                ax = ax[2])
-
-# x = np.array([1, 2.5])
-# ax.plot(x, x-0.5)
-ax[2].legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.show()
-
-
-fig, ax = plt.subplots(1,3, figsize = (12,4))
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                x = f'{testparam1}',
-                y = f'{testparam2}',
-                hue = 'stratgroup',
-                palette = ['r', 'b'],
-                ax = ax[0])
-ax[0].get_legend().remove()
-
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                x = f'{testparam1}',
-                y = 'theta_Q',
-                hue = 'stratgroup',
-                palette = ['r', 'b'],
-                ax = ax[1])
-
-ax[1].get_legend().remove()
-sns.scatterplot(strong_df[strong_df['day'] == 2],
-                y = 'theta_Q',
-                x = f'{testparam2}',
-                hue = 'stratgroup',
-                palette = ['r', 'b'],
-                ax = ax[2])
-
-# x = np.array([1, 2.5])
-# ax.plot(x, x-0.5)
-ax[2].legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_c_python.svg', bbox_inches ='tight')
-plt.show()
-
 fig, ax = plt.subplots()
 sns.scatterplot(strong_df[strong_df['day'] == 2],
                 x = 'theta_rep',
@@ -2601,13 +2306,13 @@ ax.scatter(x,
            z,
            color='b', label = 'Habitual')
 
-x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam1}']
-y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam2}']
-z = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')]['corr_day2']
+x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam1}']
+y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam2}']
+z = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')]['corr_day2']
 
 ax.scatter(x, 
            y, 
-           z, color='g', label = 'Suppresser')
+           z, color='g', label = 'pure GD')
 
 x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam1}']
 y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam2}']
@@ -2660,13 +2365,13 @@ ax.scatter(x,
            z,
            color='g', label = 'Habitual', s=40)
 
-x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam1}']
-y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')][f'{testparam2}']
-z = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Suppresser')]['theta_Q']
+x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam1}']
+y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')][f'{testparam2}']
+z = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='pure GD')]['theta_Q']
 
 ax.scatter(x, 
            y, 
-           z, color='b', label = 'Suppresser', s=40)
+           z, color='b', label = 'pure GD', s=40)
 
 x = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam1}']
 y = strong_df[(strong_df['day']==2) & (strong_df['strategy']=='Exploiter')][f'{testparam2}']
@@ -2701,3 +2406,95 @@ ax.set_xlabel(f'{testparam1}')
 ax.set_ylabel(f'{testparam2}')
 ax.set_zlabel('theta_Q')
 plt.show()
+
+#%%
+
+complete_df_day2 = complete_df_all[complete_df_all['day'] == 2]
+
+seqlearn_df_day1['day'] = 1
+seqlearn_df_day2['day'] = 2
+
+habitual_df, GD_df, modulators_df, antimods_df, ps_df_day1 = anal.find_strategies(expdata_df_day1, 
+                                                         plot_single = False,
+                                                         correctp = False)
+
+
+habitual_df, GD_df, modulators_df, antimods_df, ps_df_day2 = anal.find_strategies(expdata_df_day2, 
+                                                         plot_single = False,
+                                                         correctp = False)
+
+ps_df_day1['day'] = 1
+ps_df_day2['day'] = 2
+
+df = pd.merge(complete_df_day2, seqlearn_df_day2, on ='ID')
+df = pd.merge(df, ps_df_day2, on ='ID')
+df['ri_0'] = df['ps_ri'].map(lambda x: 'yes' if x > 0.05 else 'no')
+#%%
+
+# for ID in complete_df_all['ID'].unique():
+#     BF = anal.compute_BF(post_sample_df_all[post_sample_df_all['ID'] == ID]['theta_conflict'], 
+#                          post_sample_df_all[post_sample_df_all['ID'] == ID]['theta_rep'].mean())
+#     if BF > 5:
+#         print(BF)
+
+if 1:
+    df['exploit_score'] = df.apply(lambda row: row['theta_conflict']/row['theta_rep'], axis=1)
+    
+else:
+    df['exploit_score'] = df.apply(lambda row: 1 - row['CIspread']/row['CRspread'], axis=1)
+
+
+fig, ax = plt.subplots(1,2, sharey=True, sharex = True, figsize = (8,4))
+sns.scatterplot(df,
+                x = 'theta_rep',
+                y = 'theta_conflict',
+                # palette = ['r', 'b'],
+                hue = 'ri_0',
+                hue_order = ['yes', 'no'],
+                ax = ax[0])
+custom_labels = ["no negative effect of habit", "negative effect of habit"]  # Define your custom labels here
+handles, labels = ax[0].get_legend_handles_labels()
+
+ax[0].legend(handles, custom_labels, fontsize = 15, loc='upper left', bbox_to_anchor=(1, 1))
+sns.scatterplot(df,
+                x = 'theta_rep',
+                y = 'theta_conflict',
+                # palette = ['r', 'b'],
+                hue = 'exploit_score',
+                ax = ax[1])
+ax[1].legend(title='Habit Exploitation Score', loc='upper left', bbox_to_anchor=(1, 1))
+# plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+# plt.plot([0, 2.5], [0, 1.1])
+ax[1].set_xlim([0, 2.5])
+ax[1].set_ylim([0, 2.5])
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_b_python.svg', bbox_inches = 'tight')
+plt.show()
+
+# plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+# plt.plot([0, 2.5], [0, 1.1])
+# ax[0].set_xlim([0, 2.5])
+# ax[0].set_ylim([0, 2.5])
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_b_python.svg', bbox_inches = 'tight')
+
+#%%
+'''
+    Histogram of Habit Exploitation Score
+'''
+fig, ax = plt.subplots()
+sns.histplot(data = df, x='exploit_score', bins = 9, binrange = [0, 1.5])
+ax.set_xlabel('Habit Exploitation Score')
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.show()
+
+#%%
+
+num_agents = len(complete_df_all['ID'].unique())
+groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+                                                                        num_agents,
+                                                                        group = list(inf_mean_df['group']),
+                                                                        day = day,
+                                                                        params = inf_mean_df.loc[:, [*param_names]])
+
+utils.plot_hpcf(complete_df_all[complete_df_all['ID'].isin(df[df['exploit_score']>=1]['ID'].unique())], title='Experiment')
+
+
