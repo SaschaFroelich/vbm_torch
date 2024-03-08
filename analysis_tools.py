@@ -952,13 +952,50 @@ def network_corr(df, nodes, covars = None, method = 'spearman'):
                 
                     
     return r_matrix, p_matrix
+
+def find_seqlearners(expdata_df, 
+                     day, 
+                     correctp = True,
+                     by = 'STT'):
+    '''
+    
+    Parameters
+    ----------
+    expdata_df : DataFrame with experimental data.
+        DESCRIPTION.
         
-def find_seqlearners(expdata_df, complete_df_all, day, correctp = True):
+    day : TYPE
+        DESCRIPTION.
+        
+    correctp : bool, optional
+        DESCRIPTION. The default is True.
+        
+    by : str
+        STT or DTT.
+        How to differentiate seq lerners from non-seq learners.
+        STT : by STT Random - Fixed Condition
+        DTT : Congruent - Incongruent DTT
+
+    Returns
+    -------
+    seqlearners_df : DataFrame
+        DESCRIPTION.
+
+    notseqlearners_df : DataFrame
+        DESCRIPTION.
+
+    '''
     
     # df = expdata_df[expdata_df['choices'] != -1]
     if 'day' in expdata_df.columns:
         assert len(expdata_df['day'].unique()) == 1
-    df = expdata_df[(expdata_df['trialsequence'] != -1) & (expdata_df['trialsequence'] < 10)]
+        
+    if by == 'STT':
+        df = expdata_df[(expdata_df['trialsequence'] != -1) & (expdata_df['trialsequence'] < 10)]
+        
+    else:
+        raise Exception("Not yet implemented.")
+        
     num_agents = len(df['ID'].unique())
     
     from scipy.stats import chi2_contingency
@@ -997,16 +1034,6 @@ def find_seqlearners(expdata_df, complete_df_all, day, correctp = True):
                            'p_chi': ps,
                            'Difference_ER': r_minus_s_er})
         
-    
-    # "Nonparametric test"
-    # num_agents = ER_stt_R_forvar.shape[0]
-    # us = np.zeros(num_agents)
-    # ps_er = np.ones(num_agents)
-    # for ag_idx in range(num_agents):
-    #     u, p = scipy.stats.mannwhitneyu(ER_stt_S_forvar[ag_idx,:], 
-    #                                     ER_stt_R_forvar[ag_idx,:], alternative = 'less')
-    #     us[ag_idx] = u
-    #     ps_er[ag_idx] = p
         
     '''
         t-test for Reaction times
@@ -1054,15 +1081,7 @@ def find_seqlearners(expdata_df, complete_df_all, day, correctp = True):
     
     
     new_df['p_compound_adjusted'] = ps_adjusted
-    
-    # IDs = list(new_df['ID'])
-    # ps_adjusted = scipy.stats.false_discovery_control(newp, method='by')
-    
-    # complete_df_all = complete_df_all[complete_df_all['day'] == day]
-    # complete_df_all['ps_adjusted'] = None
-    
-    # for pid, p in zip(IDs, ps_adjusted):
-    #     complete_df_all.loc[complete_df_all['ID'] == pid, 'ps_adjusted'] = p
+    new_df['chi_compound'] = chisquared
     
     seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
                             (new_df['Difference_ER'] > 0) & 
@@ -1093,13 +1112,28 @@ def find_seqlearners(expdata_df, complete_df_all, day, correctp = True):
     else:
         notseqlearners_df['day'] = day
     
-    # seqlearners_df['day'] = [day]*len(seqlearners_df)
-    # notseqlearners_df['day'] = [day]*len(notseqlearners_df)
-    
-    return seqlearners_df, notseqlearners_df
+    return seqlearners_df, notseqlearners_df, new_df
 
-def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, correctp = True):
-    num_agents = len(expdata_df['ID'].unique())
+def hpcf_within(expdata_df, correctp = False):
+    '''
+
+    Parameters
+    ----------
+    expdata_df : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    IDs : TYPE
+        DESCRIPTION.
+    ps_cr : TYPE
+        DESCRIPTION.
+    ps_ri : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    assert len(expdata_df['day'].unique()) == 1
     
     df = expdata_df[expdata_df['trialsequence'] != -1]
     df = df[df['trialsequence'] > 10]
@@ -1116,12 +1150,15 @@ def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, corre
     
     chis_cr = []
     chis_ri = []
+    chis_ci = []
     
     ps_cr = []
     ps_ri = []
+    ps_ci = []
     
     cr = []
     ri = []
+    ci = []
 
     for ID in df['ID'].unique():
         IDs.append(ID)
@@ -1136,7 +1173,6 @@ def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, corre
         incongruent = [len(df_ag[(df_ag['choices_GD'] == 0) & (df_ag['jokertypes'] == 2)]), 
                        len(df_ag[(df_ag['choices_GD'] == 1) & (df_ag['jokertypes'] == 2)])] # 0 not GD choice, 1 GD choice
         
-        
         chi2, p_value, dof, expected = chi2_contingency([congruent, rand])
         chis_cr.append(chi2)
         ps_cr.append(p_value)
@@ -1146,7 +1182,67 @@ def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, corre
         chis_ri.append(chi2)
         ps_ri.append(p_value)
         ri.append(rand[1]/(rand[1]+rand[0]) - incongruent[1]/(incongruent[1]+incongruent[0])) # difference in proportion of GD responses
+    
+        chi2, p_value, dof, expected = chi2_contingency([congruent, incongruent])
+        chis_ci.append(chi2)
+        ps_ci.append(p_value)
+        ci.append(congruent[1]/(congruent[1]+congruent[0]) - incongruent[1]/(incongruent[1]+incongruent[0])) # difference in proportion of GD responses
+    
+    if correctp:
+        ps_cr = scipy.stats.false_discovery_control(ps_cr, method='bh')
+        ps_ri = scipy.stats.false_discovery_control(ps_ri, method='bh')
+        ps_ci = scipy.stats.false_discovery_control(ps_ci, method='bh')
+    
+    return IDs, ps_cr, ps_ri, ps_ci, chis_cr, chis_ri, chis_ci
+
+def find_strategies(expdata_df, 
+                    plot_single = True, 
+                    correctp = True,):
+    '''
+    
+
+    Parameters
+    ----------
+    expdata_df : TYPE
+        DESCRIPTION.
         
+    day : TYPE
+        DESCRIPTION.
+        
+    num_sections : TYPE, optional
+        DESCRIPTION. The default is 3.
+        
+    plot_single : TYPE, optional
+        DESCRIPTION. The default is True.
+        
+    correctp : TYPE, optional
+        DESCRIPTION. The default is True.
+        
+    by : str, optional
+        Random or Fix.
+        Random : Compare HRC of Congruent and Incongruent with HRC of Random.
+        Fix : Compare HRC of Congruent with HRC of Incongruent.
+
+    Returns
+    -------
+    habitual_df : TYPE
+        DESCRIPTION.
+        
+    GD_df : TYPE
+        DESCRIPTION.
+        
+    modulators_df : TYPE
+        DESCRIPTION.
+        
+    antimods_df : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    num_agents = len(expdata_df['ID'].unique())
+    assert len(expdata_df['day'].unique()) == 1
+    
+    IDs, ps_cr, ps_ri, _, chis_cr, chis_ri, _ = hpcf_within(expdata_df)
         
     if correctp:
         ps_cr_adjusted = scipy.stats.false_discovery_control(ps_cr, method='bh')
@@ -1155,7 +1251,7 @@ def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, corre
     else: 
         ps_cr_adjusted = np.array(ps_cr)
         ps_ri_adjusted = np.array(ps_ri)
-    
+        
     # ps_cr_adjusted = scipy.stats.false_discovery_control(ps_cr, method='bh')
     # ps_ri_adjusted = scipy.stats.false_discovery_control(ps_ri, method='bh')
     
@@ -1208,7 +1304,13 @@ def find_strategies(expdata_df, day, num_sections = 3, plot_single = True, corre
     antimods_df = utils.plot_grouplevel(expdata_df[(expdata_df['ID'].isin(IDs_cr_small)) & 
                                      (expdata_df['ID'].isin(IDs_ri_large))], plot_single = plot_single)
 
-    return habitual_df, GD_df, modulators_df, antimods_df
+    ps_df = pd.DataFrame({'ID': IDs,
+                          'ps_ri': ps_ri_adjusted, 
+                          'chis_ri': chis_ri,
+                          'ps_cr': ps_cr_adjusted,
+                          'chis_cr': chis_cr})
+
+    return habitual_df, GD_df, modulators_df, antimods_df, ps_df
 
 def compute_BF(series, thresh):
     '''
