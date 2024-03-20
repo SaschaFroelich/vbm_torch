@@ -192,20 +192,23 @@ class GeneralGroupInference():
             if torch.isnan(loss[-1]):
                 break
 
-        print("\nComputing first-level ELBOs.")
-        num_iters = 10
-        ELBOs = torch.zeros(num_iters, self.agent.num_agents)
-        for i in range(num_iters):
-            print(f"Iteration {i} of {num_iters}")
-            ELBOs[i, :] = svi.step_agent_elbos()
-            # ELBOs[i, :] = self.step_agent_elbos(svi)
+        if 0:
+            print("\nComputing first-level ELBOs.")
+            num_iters = 10
+            ELBOs = torch.zeros(num_iters, self.agent.num_agents)
+            for i in range(num_iters):
+                print(f"Iteration {i} of {num_iters}")
+                ELBOs[i, :] = svi.step_agent_elbos()
+                # ELBOs[i, :] = self.step_agent_elbos(svi)
+            
+            elbos = ELBOs.mean(dim=0)
+            std = ELBOs.std(dim=0)
+            
+            self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
+            
+            return (elbos.detach(), std.detach())
         
-        elbos = ELBOs.mean(dim=0)
-        std = ELBOs.std(dim=0)
-        
-        self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
-        
-        return (elbos.detach(), std.detach())
+        return (torch.zeros(60), torch.zeros(60))
     
     def sample_posterior(self, n_samples = 1_000):
         '''

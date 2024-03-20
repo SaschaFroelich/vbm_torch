@@ -31,16 +31,37 @@ Modelle:
     OnlyQ - 4 parameters
     Bullshitmodel - 6 parameters
     Repbias_3Q_lr - 4 parameters
-    Repbias_Conflict_Repdiff_lr  - 4 parameters
     OnlyQ_Qdiff_lr - 4 parameters
+    OnlyQ_Qdiff_onlyseq_lr
+    
+    ---- Repdiff Models ----
+    Repbias_Conflict_Repdiff_onlyseq_onlyseq_lr
+    Repbias_Conflict_Repdiff_onlyseq_onlyseq_nobound_lr
+    Repbias_Conflict_Repdiff_onlyseq_both
+    Repbias_Conflict_Repdiff_onlyseq_both_nobound
+    Repbias_Conflict_Repdiff_onlyseq_lr
+    Repbias_Conflict_Repdiff_onlyseq_nobound
+    Repbias_Conflict_Repdiff_lr
+    Repbias_Conflict_Repdiff_lr_nobound
+    
+    ---- Conflict Models ----
+    Repbias_Conflict_onlyseq_onlyseq_lr
+    Repbias_Conflict_onlyseq_onlyseq_nobound_lr
+    Repbias_Conflict_onlyseq_both
+    Repbias_Conflict_onlyseq_both_nobound
+    Repbias_Conflict_both_onlyseq
+    Repbias_Conflict_both_onlyseq_nobound
+    Repbias_Conflict_both_both
+    Repbias_Conflict_both_both_nobound
+
 '''
 
-waithrs = 12
+waithrs = 0
 post_pred = 1
 STT = 0
 
-model_day1 = 'Repbias_Conflict_Repdiff_nobound_onlyseq_lr'
-models_day2 = ['Repbias_Conflict_Repdiff_nobound_onlyseq_lr']
+model_day1 = 'Repbias_Conflict_onlyseq_onlyseq_lr'
+models_day2 = ['Repbias_Conflict_onlyseq_onlyseq_lr']
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 3_000
