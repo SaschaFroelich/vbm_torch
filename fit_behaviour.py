@@ -62,10 +62,10 @@ STT = 0
 
 model_day1 = 'Repbias_Conflict_onlyseq_onlyseq_lr'
 models_day2 = ['Repbias_Conflict_onlyseq_onlyseq_lr']
-num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-07 # for MLE estimation
-posterior_pred_samples_day1 = 3_000
-num_waic_samples = 3_000
+num_inf_steps_day1 = 15
+halting_rtol_day1 = 1e-02 # for MLE estimation
+posterior_pred_samples_day1 = 2
+num_waic_samples = 2
 
 num_inf_steps_day2 = num_inf_steps_day1
 halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
@@ -175,10 +175,13 @@ if STT:
     Q_init_day2 = None
     
 else:
-    Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
-    Q_init_day2 = Q_init_day2[None, ...]
+    Q_init_day2= torch.zeros((1, num_agents, 4))
+    idxgenerator = range(10,0,-1)
+    for lastidx in idxgenerator:
+        print(lastidx)
+        Q_init_day2 += sim_agent.Q[-lastidx]/len(idxgenerator)
+    
     assert Q_init_day2.ndim == 3
-    Q_init_day2 = torch.tensor(Q_init_day2)
 
 "----- Save parameter names to DataFrame"
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
