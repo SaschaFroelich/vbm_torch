@@ -192,6 +192,8 @@ class GeneralGroupInference():
             if torch.isnan(loss[-1]):
                 break
 
+        self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
+
         if 0:
             print("\nComputing first-level ELBOs.")
             num_iters = 10
@@ -203,8 +205,6 @@ class GeneralGroupInference():
             
             elbos = ELBOs.mean(dim=0)
             std = ELBOs.std(dim=0)
-            
-            self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
             
             return (elbos.detach(), std.detach())
         
