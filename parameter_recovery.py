@@ -42,25 +42,48 @@ Modelle:
     
     OnlyR
     OnlyQ
-'''
-
-'''
-Modelle:
-
-    Vbm_lr
+    
     Repbias_lr
-    Repbias_CongConflict_lr
-    OnlyQ_lr
+    
+    ---- Repdiff Models ----
+    Repbias_Conflict_Repdiff_onlyseq_onlyseq_lr
+    Repbias_Conflict_Repdiff_onlyseq_onlyseq_nobound_lr
+    Repbias_Conflict_Repdiff_onlyseq_both
+    Repbias_Conflict_Repdiff_onlyseq_both_nobound
+    Repbias_Conflict_Repdiff_onlyseq_lr
+    Repbias_Conflict_Repdiff_onlyseq_nobound
+    Repbias_Conflict_Repdiff_lr
+    Repbias_Conflict_Repdiff_lr_nobound
+    
+    ---- Conflict Models ----
+    Repbias_Conflict_onlyseq_onlyseq_lr
+    Repbias_Conflict_onlyseq_onlyseq_nobound_lr
+    Repbias_Conflict_onlyseq_both
+    Repbias_Conflict_onlyseq_both_nobound
+    Repbias_Conflict_both_onlyseq
+    Repbias_Conflict_both_onlyseq_nobound
+    Repbias_Conflict_both_both
+    Repbias_Conflict_both_both_nobound
 '''
 
+waithrs = 0
 post_pred = 0
-model_day1 = 'Repbias_Conflict_Repdiff_lr'
-models_day2 = ['Repbias_Conflict_Repdiff_lr', 'Repbias_Conflict_Repdiff_lr']
-num_inf_steps = 2
-halting_rtol = 1e-02 # for MLE estimation
+sim_model_day1 = 'Repbias_Conflict_Repdiff_lr'
+sim_models_day2 = ['Repbias_Conflict_Repdiff_lr']
+
+if 0:
+    inf_model_day1 = sim_model_day1
+    inf_models_day2 = sim_models_day2
+    
+else:
+    inf_model_day1 = 'Repbias_Conflict_Repdiff_lr'
+    inf_models_day2 = ['Bullshitmodel3']
+
+num_inf_steps = 3_000
+halting_rtol = 1e-07 # for MLE estimation
 num_agents = 60
-posterior_pred_samples = 2
-num_waic_samples = 2
+posterior_pred_samples = 10
+num_waic_samples = 3_000
 
 #%%
 '''
@@ -81,7 +104,7 @@ group.extend([3]*(num_agents//4))
 day = 1
 er_day1 = torch.rand((4, num_agents))*0.2
 
-groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils.simulate_data(model_day1, 
+groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils.simulate_data(sim_model_day1, 
                                                                       num_agents,
                                                                       group = group,
                                                                       day = day,
@@ -89,6 +112,12 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
                                                                       errorrates = er_day1)
 
 #%%
+import time
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+print(f"Waiting for {waithrs} hours, starting at {timestamp}.")
+time.sleep(waithrs*3600)
+
+
 '''
     Fit day 1
 '''
@@ -102,7 +131,7 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
     Inference
 '''
 "----- Initialize new agent object with num_agents agents for inference"
-agent = utils.init_agent(model_day1, 
+agent = utils.init_agent(inf_model_day1, 
                          group, 
                          num_agents = num_agents)
 
@@ -124,7 +153,8 @@ else:
     obs_mask = None
 
 firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day1['group'][0][x])
-firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
+firstlevel_df['sim_model'] = [sim_model_day1]*len(firstlevel_df)
+firstlevel_df['inf_model'] = [inf_model_day1]*len(firstlevel_df)
 
 ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
@@ -141,8 +171,8 @@ inf_mean_df = firstlevel_df.loc[:, [*param_names_day1,
                                       'ID'], as_index = False).mean()
 assert torch.all(torch.tensor(inf_mean_df['ag_idx']) == torch.tensor(groupdata_dict_day1['ag_idx'][0]))
 assert all([inf_mean_df['ID'][i] == groupdata_dict_day1['ID'][0][i] for i in range(num_agents)])
-                                      
-_, _, _, sim_agent = utils.simulate_data(model_day1, 
+
+_, _, _, sim_agent = utils.simulate_data(sim_model_day1, 
                                         num_agents,
                                         group = group,
                                         day = day,
@@ -169,14 +199,14 @@ extra_storage = (Q_init_day1,
                  secondlevel_df,
                  param_names_day1,
                  'recovery',
-                 '',
+                 halting_rtol,
                  WAIC,
                  ll,
                  predictive_choices,
                  obs_mask,
                  WAIC_var)
 
-filename_day1 = f'recovery_model_{model_day1}_day{day}_{timestamp}_{num_agents}agents'
+filename_day1 = f'recovery_infmodel_{inf_model_day1}_simmodel_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents'
 pickle.dump( (firstlevel_df, 
               group_behav_df_day1,
               (infer.loss, None, None), 
@@ -195,9 +225,10 @@ pickle.dump( (firstlevel_df,
 day = 2
 del groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1
 # blocks_day2 = [3,7]
-for model_day2 in models_day2:
+for md2_idx in range(len(sim_models_day2)):
+    print("Start day 2.")
     er_day2 = er_day1
-    groupdata_dict_day2, group_behav_df_day2, params_sim_df_day2, agent_day2 = utils.simulate_data(model_day2, 
+    groupdata_dict_day2, group_behav_df_day2, params_sim_df_day2, agent_day2 = utils.simulate_data(sim_models_day2[md2_idx], 
                                                                           num_agents,
                                                                           group = group,
                                                                           day = day,
@@ -206,7 +237,7 @@ for model_day2 in models_day2:
                                                                           seq_init = seq_counter_day2,
                                                                           errorrates = er_day2)
     
-    agent = utils.init_agent(model_day2, 
+    agent = utils.init_agent(inf_models_day2[md2_idx], 
                              group, 
                              num_agents = num_agents,
                              Q_init = Q_init_day2.detach(),
@@ -228,7 +259,8 @@ for model_day2 in models_day2:
         secondlevel_df = None
         
     firstlevel_df['group'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['group'][0][x])
-    firstlevel_df['model'] = [model_day2]*len(firstlevel_df)
+    firstlevel_df['inf_model'] = [inf_models_day2[md2_idx]]*len(firstlevel_df)
+    firstlevel_df['sim_model'] = [sim_models_day2[md2_idx]]*len(firstlevel_df)
     
     ID_df = group_behav_df_day2.loc[:, ['ag_idx']].drop_duplicates()
     # firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['ID'][0][x])
@@ -243,22 +275,23 @@ for model_day2 in models_day2:
     
     "----- Store results"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    extra_storage = (Q_init_day2,  # initial Q-values
-                     agent.Q[-1].detach(), # final Q-values
-                     2, # day
-                     model_day1, # preceding model
-                     max_log_like,
-                     mle_locs,
-                     seq_counter_day2, # seq counter day 2
-                     filename_day1, # filename day 1
-                     secondlevel_df,
-                     param_names_day2,
-                     'recovery',
-                     halting_rtol,
-                     WAIC,
-                     ll,
-                     predictive_choices,
-                     obs_mask) 
+    extra_storage = (Q_init_day2,  # 1) initial Q-values
+                     agent.Q[-1].detach(), # 2) final Q-values
+                     2, # 3) day
+                     sim_model_day1, # 4) preceding sim model
+                     max_log_like, # 5)
+                     mle_locs, # 6)
+                     seq_counter_day2, # 7) seq counter day 2
+                     filename_day1, # 8) filename day 1
+                     secondlevel_df, # 9)
+                     param_names_day2, # 10)
+                     'recovery', # 11)
+                     halting_rtol, # 12)
+                     WAIC, # 13)
+                     ll, # 14)
+                     predictive_choices, # 15)
+                     obs_mask, # 16)
+                     WAIC_var)
     
     pickle.dump( (firstlevel_df, 
                   group_behav_df_day2, 
@@ -266,6 +299,10 @@ for model_day2 in models_day2:
                   params_sim_df_day2, 
                   agent_elbo_tuple, 
                   extra_storage), 
-                open(f"parameter_recovery/recovery_model2_{model_day2}_model1_{model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
+                open(f"parameter_recovery/recovery_sim_model2_{sim_models_day2[md2_idx]}_inf_model2_{inf_models_day2[md2_idx]}_sim_model1_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
+print("Done.")
+# from IPython import get_ipython
+# get_ipython().run_line_magic("reset", "-f")
 
+# quit()

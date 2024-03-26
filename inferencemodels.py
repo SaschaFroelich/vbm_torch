@@ -650,7 +650,6 @@ class GeneralGroupInference():
         '''
             WAIC
         '''
-        
         conditioned_model = pyro.condition(self.model, 
                                             data = {'locs': self.guide()['locs']})
         
@@ -679,11 +678,20 @@ class GeneralGroupInference():
                     obsmask = val['mask'].type(torch.int)
                     probs = val['fn'].probs
                     
+                    # if '799' in key:
+                    #     print("key:")
+                    #     print(key)
+                    #     print("probs:")
+                    #     print(probs)
+                    
                     choice_probs = probs[0, range(self.num_agents), choices]
                     
                     # if torch.any(choice_probs[0, torch.where(obsmask==1)[1]] == 0):
                     #     ipdb.set_trace()
                     
+                    '''
+                        likelihood function
+                    '''
                     like[i, obsidx] += choice_probs[0, torch.where(obsmask==1)[1]].prod().detach()
                     loglike[i, obsidx] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
                     
@@ -691,7 +699,6 @@ class GeneralGroupInference():
                     #     ipdb.set_trace()
                     
                     obsidx += 1
-                    
                     
             # ipdb.set_trace()
             
@@ -719,7 +726,7 @@ class GeneralGroupInference():
         
         print("Returning WAIC etc.")
         # ipdb.set_trace()
-        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean().detach(), waic_var
+        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean(axis=0).sum().detach(), waic_var
     
     
 class GeneralGroupInferenceSTT():
