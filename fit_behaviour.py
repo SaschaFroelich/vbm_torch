@@ -53,23 +53,28 @@ Modelle:
     Repbias_Conflict_both_onlyseq_nobound
     Repbias_Conflict_both_both
     Repbias_Conflict_both_both_nobound
-
 '''
 
 waithrs = 0
 post_pred = 1
 STT = 0
 
-model_day1 = 'Repbias_Conflict_onlyseq_onlyseq_lr'
-models_day2 = ['Repbias_Conflict_onlyseq_onlyseq_lr']
-num_inf_steps_day1 = 15
+model_day1 = 'Bullshitmodel2'
+models_day2 = ['Bullshitmodel2']
+num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-02 # for MLE estimation
 posterior_pred_samples_day1 = 2
-num_waic_samples = 2
+num_waic_samples_day1 = 3_000
 
 num_inf_steps_day2 = num_inf_steps_day1
 halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
 posterior_pred_samples_day2 = posterior_pred_samples_day1
+num_waic_samples_day2 = num_waic_samples_day1
+
+num_inf_steps_day2 = 1
+halting_rtol_day2 = 1e-02 # for MLE estimation
+posterior_pred_samples_day2 = 1
+num_waic_samples_day2 = 1
 
 #%%
 "Day 1"
@@ -99,7 +104,6 @@ group = exp_behav_dict_day2['group'][0]
 "Make sure same number of participants in each group"
 group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
 assert np.abs(np.diff(group_distro)).sum() == 0
-
 
 '''
     Fit day 1
@@ -148,9 +152,12 @@ firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1[
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples)
+BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples_day1)
 
-"----- Q_init & seqcounter for next day"
+
+'''
+    Q_init & seqcounter for next day
+'''
 seq_counter_day2 = infer.agent.seq_counter.detach()
 
 param_names_day1 = agent.param_names
@@ -175,13 +182,14 @@ if STT:
     Q_init_day2 = None
     
 else:
-    Q_init_day2= torch.zeros((1, num_agents, 4))
+    Q_init_day2 = torch.zeros((1, num_agents, 4))
     idxgenerator = range(10,0,-1)
     for lastidx in idxgenerator:
         print(lastidx)
         Q_init_day2 += sim_agent.Q[-lastidx]/len(idxgenerator)
     
     assert Q_init_day2.ndim == 3
+    assert Q_init_day2.shape[0] == 1
 
 "----- Save parameter names to DataFrame"
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -264,7 +272,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples)
+    BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
