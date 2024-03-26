@@ -115,7 +115,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
     ----------
     data_dir : str
         Directory with data.
-        
+
     getall : bool
         True: Get all data collected so far
         False: Make sure to get the same number of participants in every group
@@ -136,7 +136,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
             group : list, len [num_trials, num_agents]. 0-indexed
             ag_idx
             ID
-            
+
     groupdata_df : DataFrame
 
     '''
@@ -148,7 +148,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
     if not RTAST:
         include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
                '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
-               '6286672d0165aad8f1386c27', '55cca8f81676ab000ff06ef1',
+               '5f0f7fe1d7ad1c000b42d091', '55cca8f81676ab000ff06ef1',
                '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
                '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
                '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
@@ -180,6 +180,8 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
         exclude_errors = [
                       '5e07c976f6191f137214e91f' # (Grp 1)
                       ]
+        
+        exclude_gender = ['6286672d0165aad8f1386c27'] # (Grp 0)
         
         'Exclude because of execution time'
         exclude_time = [# Grp 0
@@ -466,9 +468,10 @@ def get_participant_data(file_day1, group, data_dir, oldpub = False):
     
     if oldpub:
         ID = file_day1.split("/")[-1][4:9] # NicDB
+        
     else:
         ID = file_day1.split("/")[-1][4:28] # Prolific ID
-        ID = file_day1.split("/")[-1][4:10] # PBIDXX for RTAST
+        # ID = file_day1.split("/")[-1][4:10] # PBIDXX for RTAST
 
 
     # print(data_dir)
@@ -1083,7 +1086,8 @@ def init_agent(model,
         newagent = model_class(Q_init = Q_init, 
                                num_agents = num_agents, 
                                seq_init = seq_init,
-                               errorrates = errorrates)
+                               errorrates = errorrates,
+                               group = group)
         
     else:
         for key in params.keys():
@@ -1092,7 +1096,8 @@ def init_agent(model,
         newagent = model_class(Q_init = Q_init, 
                                param_dict = params, 
                                seq_init = seq_init,
-                               errorrates = errorrates)
+                               errorrates = errorrates,
+                               group = group)
         
     return newagent
 
@@ -1276,6 +1281,7 @@ def simulate_data(model,
     params_sim_df['ID'] = params_sim_df['ag_idx']
     # print(len(data['ag_idx']))
     # print(len(data['ID']))
+    print("Returning results.")
     return data, group_behav_df, params_sim_df, newagent
 
 def plot_grouplevel(df1,
@@ -2667,15 +2673,24 @@ def plot_hpcf(df, title=None, post_pred=False):
     
     fig, ax = plt.subplots()
     
-    rename_dtt = ['Cong', 'Incong', 'Rep', 'Rand']
+    rename_dtt = ['Congruent', 'Incongruent', 'Rep', 'Random']
     HPCF_DF['DTTType'] = HPCF_DF['DTTType'].map(lambda x: rename_dtt[x-1])
+    
+    # sns.barplot(data = HPCF_DF, 
+    #             x = 'Day', 
+    #             y = 'HPCF', 
+    #             hue='DTTType',
+    #             hue_order = ['Rand', 'Cong', 'Incong', 'Rep'],
+    #             palette = {'Rand': '#67b798', 'Cong': '#BE54C6', 'Incong': '#7454C7', 'Rep': '#B99DC0'})
     
     sns.barplot(data = HPCF_DF, 
                 x = 'Day', 
                 y = 'HPCF', 
                 hue='DTTType',
-                hue_order = ['Rand', 'Cong', 'Incong', 'Rep'],
-                palette = {'Rand': '#67b798', 'Cong': '#BE54C6', 'Incong': '#7454C7', 'Rep': '#B99DC0'})
+                hue_order = ['Random', 'Congruent', 'Incongruent'],
+                palette = {'Random': '#67b798', 
+                           'Congruent': '#BE54C6', 
+                           'Incongruent': '#7454C7'})
     
     if title is not None:
         plt.title(title)
@@ -2683,8 +2698,8 @@ def plot_hpcf(df, title=None, post_pred=False):
     plt.ylim([0.4, 1])
     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    ax.set_ylabel('HRCF')
-    # plt.savefig(f'behaviour_{title}.svg')
+    ax.set_ylabel('Goal-Directed Responses (%)')
+    plt.savefig(f'/home/sascha/Desktop/Paper_2024/Mar/res_fig4/res_fig4_{title}_python.svg')
     plt.show()
     
     
@@ -2874,7 +2889,8 @@ def post_pred_sim_df(predictive_choices, obs_mask, model, num_agents, inf_mean_d
     groupdata_dict, sim_group_behav_df, params_sim_df, _ = simulate_data(model, 
                                                                         num_agents,
                                                                         group = list(inf_mean_df['group']),
-                                                                        day = day)
+                                                                        day = day,
+                                                                        STT=0)
 
     "Column encodes probability of choosing the 2nd response option"
     sim_group_behav_df['post_pred'] = None
@@ -2963,19 +2979,23 @@ def RT_err_to_m2(data_dict):
     return data_dict
     
 def load_data():
-    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = get_data_from_file()
+    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage_day2 = get_data_from_file()
     post_sample_df_day2['day'] = 2
-    Q_init_day2 = extra_storage[0]
-    param_names = extra_storage[9]
-    if extra_storage[11] >= 1e-03:
-        raise Exception("rhalt too large for IC computation.")
+    Q_init_day2 = extra_storage_day2[0]
+    param_names = extra_storage_day2[9]
+    if extra_storage_day2[11] >= 1e-03:
+        print("rhalt too large for IC computation.")
     
-    day = extra_storage[2]
+    day = extra_storage_day2[2]
+    
+    WAIC = extra_storage_day2[12]
+    print("WAIC is")
+    print(WAIC)
     
     if day != 2:
         raise Exception("Have to load day 2, bruh.")
     
-    print(f"Preceding model is {extra_storage[3]}.")
+    print(f"Preceding model is {extra_storage_day2[3]}.")
     # assert len(param_names) == num_params
     # blocks = extra_storage[2]
     
@@ -3031,7 +3051,6 @@ def load_data():
     import matplotlib.cm as cm
     
     # plt.style.use("seaborn-v0_8-dark")
-    # anal.violin(inf_mean_df_day2, param_names, model)
     
     complete_df_day2 = create_complete_df(inf_mean_df_day2, sociopsy_df, expdata_df_day2, post_sample_df_day2, param_names)
     complete_df_day2['day'] == 2
@@ -3053,7 +3072,7 @@ def load_data():
     er_day2[3, :] = torch.tensor(complete_df_day2['ER_incongruent']) # incongruent
     
     if day == 2:
-        seq_counter_day2 = extra_storage[6]
+        seq_counter_day2 = extra_storage_day2[6]
         groupdata_dict_day2, sim_group_behav_df_day2, params_sim_df_day2, _ = simulate_data(model, 
                                                                                 num_agents,
                                                                                 group = list(inf_mean_df_day2['group']),
@@ -3068,12 +3087,12 @@ def load_data():
         sim_group_behav_df_day2['day'] = 2
         
         print("\n\nCreating and appending dataframe for day 1.")
-        filename_day1 = extra_storage[7]
+        filename_day1 = extra_storage_day2[7]
         
-        if extra_storage[10] == 'recovery':
+        if extra_storage_day2[10] == 'recovery':
             post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
             
-        elif extra_storage[10] == 'behav_fit':
+        elif extra_storage_day2[10] == 'behav_fit':
             post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('behav_fit/'+filename_day1+'.p')    
             
         else:
@@ -3083,7 +3102,7 @@ def load_data():
         # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
         param_names_day1 = extra_storage_day1[9]
         if extra_storage_day1[11] >= 1e-03:
-            raise Exception("rhalt too large for IC computation.")
+            print("rhalt too large for IC computation.")
         
         if 'handedness' in post_sample_df_day1.columns:
             inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
@@ -3139,4 +3158,7 @@ def load_data():
         
         sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
     
-        return complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2
+        print("Violin plots.")
+        anal.violin(inf_mean_df_day1, param_names, model)
+        anal.violin(inf_mean_df_day2, param_names, model)
+        return complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1
