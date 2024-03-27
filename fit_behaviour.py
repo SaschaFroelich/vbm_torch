@@ -59,10 +59,10 @@ waithrs = 0
 post_pred = 1
 STT = 0
 
-model_day1 = 'Bullshitmodel2'
-models_day2 = ['Bullshitmodel2']
+model_day1 = 'Bullshitmodel'
+models_day2 = ['Repbias_Conflict_Repdiff_lr']
 num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-02 # for MLE estimation
+halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 2
 num_waic_samples_day1 = 3_000
 
@@ -152,8 +152,7 @@ firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1[
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples_day1)
-
+BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC = infer.compute_IC(num_samples = num_waic_samples_day1)
 
 '''
     Q_init & seqcounter for next day
@@ -218,7 +217,8 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  ll, # 13
                  predictive_choices, # 14
                  obs_mask, #15
-                 WAIC_var) # 16
+                 WAIC_var,
+                 subject_WAIC) # 16
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
@@ -272,7 +272,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll, WAIC_var = infer.compute_IC(num_samples = num_waic_samples_day2)
+    BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC = infer.compute_IC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -301,7 +301,8 @@ for model_day2 in models_day2:
                      ll,
                      predictive_choices,
                      obs_mask,
-                     WAIC_var)
+                     WAIC_var,
+                     subject_WAIC)
     
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")

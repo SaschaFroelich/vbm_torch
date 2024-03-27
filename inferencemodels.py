@@ -664,6 +664,11 @@ class GeneralGroupInference():
                 
         loglike = torch.zeros(num_samples, num_obs)
         like = torch.zeros(num_samples, num_obs)
+        
+        subject_WAIC = torch.zeros(self.num_agents)
+        subject_WAIC_var = torch.zeros(self.num_agents)
+        subject_loglike = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
+        subject_like = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
         for i in range(num_samples):
             print(f"Iterating to compute WAIC, step {i}.")
             conditioned_model = pyro.condition(self.model, 
@@ -678,16 +683,7 @@ class GeneralGroupInference():
                     obsmask = val['mask'].type(torch.int)
                     probs = val['fn'].probs
                     
-                    # if '799' in key:
-                    #     print("key:")
-                    #     print(key)
-                    #     print("probs:")
-                    #     print(probs)
-                    
                     choice_probs = probs[0, range(self.num_agents), choices]
-                    
-                    # if torch.any(choice_probs[0, torch.where(obsmask==1)[1]] == 0):
-                    #     ipdb.set_trace()
                     
                     '''
                         likelihood function
@@ -695,17 +691,29 @@ class GeneralGroupInference():
                     like[i, obsidx] += choice_probs[0, torch.where(obsmask==1)[1]].prod().detach()
                     loglike[i, obsidx] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
                     
-                    # if torch.isinf(loglike[i, obsidx]):
-                    #     ipdb.set_trace()
+                    for ag_idx in torch.where(obsmask==1)[1]:
+                        subject_like[f'ag_{ag_idx}'][i].append(choice_probs[0, ag_idx].item())
+                        subject_loglike[f'ag_{ag_idx}'][i].append(torch.log(choice_probs[0, ag_idx]).item())
                     
                     obsidx += 1
-                    
-            # ipdb.set_trace()
-            
+
         "effective number of parameters."
-        # pwaic = 2*((torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples).sum())
-        pwaic_vec = (2*torch.log(like.mean(axis=0)/num_samples) - 2*loglike.mean(axis=0)/num_samples)
-        pwaic = (2*torch.log(like.mean(axis=0)/num_samples) - 2*loglike.mean(axis=0)/num_samples).sum()
+        # pwaic_vec = 2*(torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples)
+        pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
+        pwaic = pwaic_vec.sum()
+        
+        subject_pwaic = torch.zeros(self.num_agents)
+        subject_lppd = torch.zeros(self.num_agents)
+        for ag_idx in range(self.num_agents):
+            s_pwaic_vec = 2*(torch.log(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0)) -
+                torch.tensor(subject_loglike[f'ag_{ag_idx}']).mean(axis=0))
+            s_pwaic = s_pwaic_vec.sum()
+            subject_pwaic[ag_idx] = s_pwaic
+            
+            s_lppd_vec = torch.log(torch.tensor(subject_like[f'ag_{ag_idx}'])).mean(axis=0)
+            s_lppd = s_lppd_vec.sum()
+            subject_lppd[ag_idx] = s_lppd
+            subject_WAIC[ag_idx] = s_lppd - s_pwaic
         
         lppd_vec = torch.log(like.mean(axis=0))
         lppd = lppd_vec.sum()
@@ -723,10 +731,9 @@ class GeneralGroupInference():
         assert cov.shape[0] == 2
         assert cov.shape[1] == 2
         waic_var = lppd_var + pwaic_var - 2*cov[0,1]
-        
+            
         print("Returning WAIC etc.")
-        # ipdb.set_trace()
-        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean(axis=0).sum().detach(), waic_var
+        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean(axis=0).sum().detach(), waic_var, subject_WAIC
     
     
 class GeneralGroupInferenceSTT():
