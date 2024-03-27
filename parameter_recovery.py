@@ -77,7 +77,7 @@ if 0:
     
 else:
     inf_model_day1 = 'Bullshitmodel'
-    inf_models_day2 = ['Bullshitmodel']
+    inf_models_day2 = ['Bullshitmode']
 
 num_agents = 60
 num_inf_steps_day1 = 3_000
@@ -115,6 +115,33 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
                                                                       day = day,
                                                                       STT = False,
                                                                       errorrates = er_day1)
+
+#%%
+'''
+    Check that all other models exist
+'''
+_, _, _, _ = utils.simulate_data(inf_model_day1, 
+                                num_agents,
+                                group = group,
+                                day = day,
+                                STT = False,
+                                errorrates = er_day1)
+
+for im2 in inf_models_day2:
+    _, _, _, _ = utils.simulate_data(im2, 
+                                    num_agents,
+                                    group = group,
+                                    day = day,
+                                    STT = False,
+                                    errorrates = er_day1)
+    
+for sm2 in sim_models_day2:
+    _, _, _, _ = utils.simulate_data(sm2, 
+                                    num_agents,
+                                    group = group,
+                                    day = day,
+                                    STT = False,
+                                    errorrates = er_day1)
 
 #%%
 import time
@@ -186,10 +213,17 @@ _, _, _, sim_agent = utils.simulate_data(sim_model_day1,
                                         errorrates = er_day1)
 
 assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
-Q_init_day2 = np.squeeze(np.array(sim_agent.Q))[-10:, :, :].mean(axis=0)
-Q_init_day2 = Q_init_day2[None, ...]
+
+Q_init_day2 = torch.zeros((1, num_agents, 4))
+idxgenerator = range(10,0,-1)
+for lastidx in idxgenerator:
+    print(lastidx)
+    Q_init_day2 += sim_agent.Q[-lastidx]/len(idxgenerator)
+
 assert Q_init_day2.ndim == 3
-Q_init_day2 = torch.tensor(Q_init_day2)
+assert Q_init_day2.shape[0] == 1
+print("Q_init_day2 starting as")
+print(Q_init_day2)
 
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -212,14 +246,16 @@ extra_storage = (Q_init_day1,
                  WAIC_var,
                  subject_WAIC)
 
-filename_day1 = f'recovery_infmodel_{inf_model_day1}_simmodel_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents'
-pickle.dump( (firstlevel_df, 
-              group_behav_df_day1,
-              (infer.loss, None, None), 
-              params_sim_df_day1, 
-              agent_elbo_tuple, 
-              extra_storage), 
-            open(f"parameter_recovery/{filename_day1}.p", "wb" ) )
+filename_day1 = f'recovery_simmodelday1_{sim_model_day1}_infmodelday1_{inf_model_day1}_day{day}_{timestamp}_{num_agents}agents'
+
+if num_inf_steps_day1 > 1:
+    pickle.dump( (firstlevel_df, 
+                  group_behav_df_day1,
+                  (infer.loss, None, None), 
+                  params_sim_df_day1, 
+                  agent_elbo_tuple, 
+                  extra_storage), 
+                open(f"parameter_recovery/{filename_day1}.p", "wb" ) )
 
 '''
     Fit day 2
@@ -300,13 +336,14 @@ for md2_idx in range(len(sim_models_day2)):
                      WAIC_var,
                      subject_WAIC)
     
-    pickle.dump( (firstlevel_df, 
-                  group_behav_df_day2, 
-                  (infer.loss, BIC, AIC), 
-                  params_sim_df_day2, 
-                  agent_elbo_tuple, 
-                  extra_storage), 
-                open(f"parameter_recovery/recovery_sim_model2_{sim_models_day2[md2_idx]}_inf_model2_{inf_models_day2[md2_idx]}_sim_model1_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
+    if num_inf_steps_day2 > 1:
+        pickle.dump( (firstlevel_df, 
+                      group_behav_df_day2, 
+                      (infer.loss, BIC, AIC), 
+                      params_sim_df_day2, 
+                      agent_elbo_tuple, 
+                      extra_storage), 
+                    open(f"parameter_recovery/recovery_simmodelday2_{sim_models_day2[md2_idx]}_infmodelday2_{inf_models_day2[md2_idx]}_simmodel1_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 print("Done.")
 # from IPython import get_ipython
