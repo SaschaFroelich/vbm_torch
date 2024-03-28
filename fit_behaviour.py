@@ -152,7 +152,7 @@ firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1[
 
 "----- MLE & IC"
 max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC = infer.compute_IC(num_samples = num_waic_samples_day1)
+BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day1)
 
 '''
     Q_init & seqcounter for next day
@@ -190,6 +190,9 @@ else:
     assert Q_init_day2.ndim == 3
     assert Q_init_day2.shape[0] == 1
 
+print("Q_init_day2 starting as")
+print(Q_init_day2)
+
 "----- Save parameter names to DataFrame"
 params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
 for col in params_sim_df.columns:
@@ -218,7 +221,9 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  predictive_choices, # 14
                  obs_mask, #15
                  WAIC_var,
-                 subject_WAIC) # 16
+                 subject_WAIC, 
+                 DIC,
+                 subject_DIC)
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
@@ -272,7 +277,7 @@ for model_day2 in models_day2:
     
     "----- MLE & IC"
     max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC = infer.compute_IC(num_samples = num_waic_samples_day2)
+    BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -302,7 +307,9 @@ for model_day2 in models_day2:
                      predictive_choices,
                      obs_mask,
                      WAIC_var,
-                     subject_WAIC)
+                     subject_WAIC, 
+                     DIC, 
+                     subject_DIC)
     
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")
