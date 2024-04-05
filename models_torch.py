@@ -5953,7 +5953,68 @@ class Q_seqimpact_conflict_lr(model_master):
         "Q and"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
         
-class Coinflip_test(model_master):
+class Coinflip_test():
+    param_names = ['heads_p']
+    num_params = len(param_names)
+    
+    def __init__(self, num_agents):
+        self.num_agents = num_agents
+        self.num_particles = 1
+        locs = torch.tensor(np.random.uniform(-2, 2, (self.num_particles, num_agents, self.num_params)))
+        self.param_dict = self.locs_to_pars(locs)
+
+    def locs_to_pars(self, locs):
+        # param_dict = {'heads_p': torch.sigmoid(locs[..., 0])}
+        param_dict = {'heads_p': locs[..., 0]}
+        
+        return param_dict
+    
+    def compute_probs(self, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        
+        # print(self.param_dict['heads_p'].shape)
+        
+        if self.param_dict['heads_p'].shape[0] == 1:
+            probs = torch.cat((self.param_dict['heads_p'].T, 1-self.param_dict['heads_p'].T), axis = 1)
+            
+        else:
+            probs = torch.stack((self.param_dict['heads_p'], 1-self.param_dict['heads_p']), axis = -1)
+            
+        assert probs.shape[-1] == 2
+        if self.param_dict['heads_p'].shape[0] > 1:
+            assert probs.shape[0] == self.num_particles
+            assert probs.shape[1] == self.num_agents
+        
+        return probs
+        
+    def reset(self, locs):
+        self.param_dict = self.locs_to_pars(locs)
+        
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        
+class Coinflip_test_bullshit(model_master):
     param_names = ['heads_p']
     
     num_params = len(param_names)
@@ -5996,10 +6057,11 @@ class Coinflip_test(model_master):
         # print(self.param_dict['heads_p'].shape)
         
         if self.param_dict['heads_p'].shape[0] == 1:
-            probs = torch.cat((self.param_dict['heads_p'].T, 1-self.param_dict['heads_p'].T), axis = 1)
+            probs = torch.cat((self.param_dict['heads_p'].T*0.5, 1-self.param_dict['heads_p'].T*0.5), axis = 1)
             
         else:
-            probs = torch.stack((self.param_dict['heads_p'], 1-self.param_dict['heads_p']), axis = -1)
+            probs = torch.stack((self.param_dict['heads_p']*0.5, 1-self.param_dict['heads_p']*0.5), axis = -1)
+            
             
         assert probs.shape[-1] == 2
         if self.param_dict['heads_p'].shape[0] > 1:

@@ -488,6 +488,8 @@ class GeneralGroupInference():
     def train_mle(self, 
                   max_iter_steps = 8000,
                   halting_rtol = 1e-05):
+        
+        raise Exception("All subsequent posterior samples will be erroneous.")
         '''
             Step 1: Compute MLE
         '''
@@ -547,20 +549,21 @@ class GeneralGroupInference():
             k = number of parameters
             n = number of observations
         '''
-        print(f"Computing ICs with mll = {self.max_log_like.sum()}")
-        
-        assert self.trial_counts.size()[0] == self.num_agents
-        
-        BIC = torch.tensor(self.agent.num_params)*torch.log(self.trial_counts) -\
-            2*self.max_log_like
+        if 0:
+            print(f"Computing ICs with mll = {self.max_log_like.sum()}")
             
-        '''
-            AIC = 2*k - 2*ll --> the lower, the better
-            ll = maximized log-likelihood value
-            k = number of parameters
-        '''
-        AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
-        
+            assert self.trial_counts.size()[0] == self.num_agents
+            
+            BIC = torch.tensor(self.agent.num_params)*torch.log(self.trial_counts) -\
+                2*self.max_log_like
+                
+            '''
+                AIC = 2*k - 2*ll --> the lower, the better
+                ll = maximized log-likelihood value
+                k = number of parameters
+            '''
+            AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
+            
         '''
             WAIC: Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
             Bayesian Data Analysis: Second Edition
@@ -574,11 +577,11 @@ class GeneralGroupInference():
         for key, val in trace.nodes.items():
             if '_observed' in key:
                 num_obs += 1
-                obsmask = val['mask'].type(torch.int)
-                logprobs = val['fn'].probs
-                
-        loglike = torch.zeros(num_samples, num_obs)
-        like = torch.zeros(num_samples, num_obs)
+        
+        like = torch.zeros(num_samples, num_obs, self.num_agents)
+        like[:] = torch.nan
+        loglike = torch.zeros(num_samples, num_obs, self.num_agents)
+        loglike[:] = torch.nan
         
         subject_WAIC = torch.zeros(self.num_agents)
         subject_WAIC_var = torch.zeros(self.num_agents)
@@ -604,8 +607,8 @@ class GeneralGroupInference():
                     '''
                         likelihood function
                     '''
-                    like[i, obsidx] += choice_probs[0, torch.where(obsmask==1)[1]].prod().detach()
-                    loglike[i, obsidx] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
+                    like[i, obsidx, torch.where(obsmask==1)[1]] = choice_probs[0, torch.where(obsmask==1)[1]].detach()
+                    loglike[i, obsidx, torch.where(obsmask==1)[1]] = torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).detach()
                     
                     for ag_idx in torch.where(obsmask==1)[1]:
                         subject_like[f'ag_{ag_idx}'][i].append(choice_probs[0, ag_idx].item())
@@ -614,41 +617,50 @@ class GeneralGroupInference():
                     obsidx += 1
 
         "effective number of parameters."
-        # pwaic_vec = 2*(torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples)
-        pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
-        pwaic = pwaic_vec.sum()
-        
-        subject_pwaic = torch.zeros(self.num_agents)
-        subject_lppd = torch.zeros(self.num_agents)
-        for ag_idx in range(self.num_agents):
-            s_pwaic_vec = 2*(torch.log(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0)) -
-                torch.tensor(subject_loglike[f'ag_{ag_idx}']).mean(axis=0))
-            s_pwaic = s_pwaic_vec.sum()
-            subject_pwaic[ag_idx] = s_pwaic
+        loglike_2D = torch.zeros((num_samples, self.num_agents*num_obs))
+        like_2D = torch.zeros((num_samples, self.num_agents*num_obs))
+        for i in range(num_samples):
+            loglike_2D[i, :] = torch.flatten(loglike[i, :, :])
+            like_2D[i,:] =  torch.flatten(like[i, :, :])
             
-            s_lppd_vec = torch.log(torch.tensor(subject_like[f'ag_{ag_idx}'])).mean(axis=0)
-            s_lppd = s_lppd_vec.sum()
-            subject_lppd[ag_idx] = s_lppd
-            subject_WAIC[ag_idx] = -2*(s_lppd - s_pwaic)
+            
+        pwaic2_vec = loglike_2D.var(axis=0, correction = 0)
+        pwaic2 = pwaic2_vec.nansum()
         
-        lppd_vec = torch.log(like.mean(axis=0))
-        lppd = lppd_vec.sum()
-        WAIC = -2*(lppd - pwaic)
+        if 0: 
+            pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
+            pwaic = pwaic_vec.sum()
         
-        # "Var(aX) = a²*Var(X)"
-        # pwaic_var = 4*(torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples).var()
+        # subject_pwaic = torch.zeros(self.num_agents)
+        # subject_lppd = torch.zeros(self.num_agents)
+        # for ag_idx in range(self.num_agents):
+        #     s_pwaic_vec = 2*(torch.log(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0)) -
+        #         torch.tensor(subject_loglike[f'ag_{ag_idx}']).mean(axis=0))
+        #     s_pwaic = s_pwaic_vec.sum()
+        #     subject_pwaic[ag_idx] = s_pwaic
+            
+        #     s_lppd_vec = torch.log(torch.tensor(subject_like[f'ag_{ag_idx}'])).mean(axis=0)
+        #     s_lppd = s_lppd_vec.sum()
+        #     subject_lppd[ag_idx] = s_lppd
+        #     subject_WAIC[ag_idx] = -2*(s_lppd - s_pwaic)
         
-        "Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)"
-        "Var(X-Y) = Var(X+(-Y)) = Var(X) + Var(-Y) + 2Cov(X,-Y) = Var(X) + Var(Y) - 2*Cov(X,Y)"
-        "Var(aX) = a²Var(X)"
-        lppd_var = lppd_vec.var()
-        pwaic_var = pwaic_vec.var()
-        cov = torch.cov(torch.stack((lppd_vec, pwaic_vec)))
+        lppd_vec = torch.log(like_2D.mean(axis=0))
+        lppd = lppd_vec.nansum()
+        WAIC = -2*(lppd - pwaic2)
+        
+        '''
+            Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)
+            Var(X-Y) = Var(X+(-Y)) = Var(X) + Var(-Y) + 2Cov(X,-Y) = Var(X) + Var(Y) - 2*Cov(X,Y)
+            Var(aX) = a²Var(X)
+        '''
+        lppd_var = lppd_vec[~torch.isnan(lppd_vec)].var(correction = 0)
+        pwaic2_var = pwaic2_vec[~torch.isnan(pwaic2_vec)].var(correction = 0)
+        cov = torch.cov(torch.stack((lppd_vec[~torch.isnan(lppd_vec)], pwaic2_vec[~torch.isnan(pwaic2_vec)])))
         assert cov.ndim == 2
         assert cov.shape[0] == 2
         assert cov.shape[1] == 2
-        waic_var = 4*(lppd_var + pwaic_var - 2*cov[0,1])
-            
+        waic_var = 4*(lppd_var + pwaic2_var - 2*cov[0,1])
+
         print("Finished WAIC")
         
         '''
@@ -669,7 +681,6 @@ class GeneralGroupInference():
         trace = pyro.poutine.trace(conditioned_model).get_trace()
         
         DIC_loglike = 0
-        DIC_subject_loglike = {f'ag_{i}':[] for i in range(self.num_agents)}
         for key, val in trace.nodes.items():
             if '_observed' in key:
                 choices = val['value']
@@ -680,8 +691,6 @@ class GeneralGroupInference():
         
                 DIC_loglike += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
         
-                for ag_idx in torch.where(obsmask==1)[1]:
-                    DIC_subject_loglike[f'ag_{ag_idx}'].append(torch.log(choice_probs[0, ag_idx]).item())
         
         pDIC = 2*(DIC_loglike - loglike.mean(axis=0).sum())
         DIC = -2*DIC_loglike + 2*pDIC
@@ -690,13 +699,8 @@ class GeneralGroupInference():
         for ag_idx in range(self.num_agents):
             subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
-        DIC_subject_loglike = torch.tensor([torch.tensor(DIC_subject_loglike[f'ag_{i}']).sum() for i in range(self.num_agents)])
-        subject_pDIC = torch.tensor(subject_pDIC)
-        
-        subject_DIC = -2*DIC_subject_loglike + 2*subject_pDIC
-        
-        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean(axis=0).sum().detach(), waic_var, subject_WAIC, DIC, subject_DIC
-    
+        print("Finished DIC")
+        return None, None, WAIC.detach(), loglike_2D, waic_var, subject_WAIC, DIC, loglike, pwaic2
     
 class GeneralGroupInferenceSTT():
     
@@ -1155,7 +1159,7 @@ class GeneralGroupInferenceSTT():
                               num_particles = num_particles, 
                               infer = (mle_locs != None)+1,
                               STT = self.STT)
-            
+
         return mll
 
     def guide_mle(self):
@@ -1164,6 +1168,8 @@ class GeneralGroupInferenceSTT():
     def train_mle(self, 
                   max_iter_steps = 8000,
                   halting_rtol = 1e-05):
+        raise Exception("All subsequent posterior samples will be erroneous.")
+        
         '''
             Step 1: Compute MLE
         '''
@@ -1365,12 +1371,11 @@ class GeneralGroupInferenceSTT():
             WAIC = lppd - pwaic
             
             # "Var(aX) = a²*Var(X)"
-            # pwaic_var = 4*(torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples).var()
             
             "Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)"
             "Var(X-Y) = Var(X+(-Y)) = Var(X) + Var(-Y) + 2Cov(X,-Y) = Var(X) + Var(Y) - 2*Cov(X,Y)"
-            lppd_var = lppd_vec.var()
-            pwaic_var = pwaic_vec.var()
+            lppd_var = lppd_vec.var(correction = 0)
+            pwaic_var = pwaic_vec.var(correction = 0)
             cov = torch.cov(torch.stack((lppd_vec, pwaic_vec)))
             assert cov.ndim == 2
             assert cov.shape[0] == 2
@@ -1379,8 +1384,8 @@ class GeneralGroupInferenceSTT():
         
         print("Returning WAIC etc.")
         # ipdb.set_trace()
-        return 0, 0, 0, 0, 0
-        return BIC.detach(), AIC.detach(), WAIC.detach(), loglike.mean().detach(), waic_var
+        
+        return None, None, WAIC.detach(), loglike.mean().detach(), waic_var
 
 class CoinflipGroupInference():
     
@@ -1391,21 +1396,12 @@ class CoinflipGroupInference():
         agent : obj
             Initialization of agent class with num_agents parallel agents.
 
-        groupdata : dict
-            Contains experimental data.
-            Keys
-                trialsequence : nested list, 'shape' [num_trials, num_agents]
-                choices : nested list, 'shape' [num_trials, num_agents]
-                outcomes : nested list, 'shape' [num_trials, num_agents]
-                blocktype : nested list, 'shape' [num_trials, num_agents]
-                blockidx : nested list, 'shape' [num_trials, num_agents]
-                RT : nested list, 'shape' [num_trials, num_agents]
-                group : list, len [num_agents]
+        groupdata : tensor, shape [num_agents, num_trials]
                 
         '''
         
         self.agent = agent
-        self.trials = agent.trials # length of experiment
+        self.trials = group_data.shape[-1] # length of experiment
         self.num_agents = agent.num_agents # no. of participants
         self.data = group_data # dict of lists
         self.num_trials = self.data.shape[-1]
@@ -1413,6 +1409,7 @@ class CoinflipGroupInference():
         self.num_params = len(self.agent.param_names) # number of parameters
         self.loss = []
 
+                
     def model(self, *args):
         # define hyper priors over model parameters
         # prior over sigma of a Gaussian is a Gamma distribution
@@ -1453,21 +1450,19 @@ class CoinflipGroupInference():
             # pyro.deterministic('agent_params', self.agent.param_dict)
             
             num_particles = locs.shape[0]
-            # print("MAKING A ROUND WITH %d PARTICLES"%num_particles)
             
             t = 0
             for trial in range(self.num_trials):
                 probs = self.agent.compute_probs()
-                # print("HALLO")
-                # print(t)
-                # print(probs)
-                # print(self.data[:, trial])
-                # dfgh
                 pyro.sample('res_{}'.format(t), 
                             dist.Categorical(probs = probs),
                             obs = self.data[:, t])
 
                 t+=1
+            print("\n\nModel")
+            print(locs.shape)
+            print(probs.shape)
+            
 
     def guide(self, *args):
         # biject_to(constraint) looks up a bijective Transform from constraints.real 
@@ -1478,13 +1473,13 @@ class CoinflipGroupInference():
         # define mean vector and covariance matrix of multivariate normal
         m_hyp = pyro.param('m_hyp', torch.zeros(2*self.num_params))
         st_hyp = pyro.param('scale_tril_hyp',
-                       torch.eye(2*self.num_params),
-                       constraint=dist.constraints.lower_cholesky)
+                        torch.eye(2*self.num_params),
+                        constraint=dist.constraints.lower_cholesky)
 
         # scale_tril (Tensor) – lower-triangular factor of covariance, with positive-valued diagonal
         hyp = pyro.sample('hyp',
-                     dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
-                     infer={'is_auxiliary': True})
+                      dist.MultivariateNormal(m_hyp, scale_tril=st_hyp),
+                      infer={'is_auxiliary': True})
 
         # mu & tau unconstrained
         unc_mu = hyp[..., :self.num_params]
@@ -1509,6 +1504,9 @@ class CoinflipGroupInference():
         with pyro.plate('ag_idx', self.num_agents):
             locs = pyro.sample("locs", dist.MultivariateNormal(m_locs, scale_tril=st_locs))
 
+        print("\n\nGUIDE")
+        print(locs.shape)
+
         return {'tau': tau, 'mu': mu, 'locs': locs, 'm_locs': m_locs, 'st_locs': st_locs}
 
     def guide_mle(self):
@@ -1528,7 +1526,7 @@ class CoinflipGroupInference():
             else:
                 raise Exception("Sum'thin' wrong.")
             
-            print(f"locs = {locs}")
+            # print(f"locs = {locs}")
             
             # print(locs.shape)
             "locs is either of shape [num_agents, num_params] or of shape [num_particles, num_agents, num_params]"
@@ -1548,7 +1546,7 @@ class CoinflipGroupInference():
             for trial in range(self.num_trials):
                 probs = self.agent.compute_probs()
                 
-                log_like += torch.log(probs[range(60), self.data[:,t]])
+                log_like += torch.log(probs[range(self.num_agents), self.data[:,t]])
                 # dfgh
                 
                 pyro.sample('res_{}'.format(t), 
@@ -1586,83 +1584,46 @@ class CoinflipGroupInference():
 
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
 
-    def sample_posterior(self, n_samples = 1_000, locs = False):
+    def sample_posterior(self, n_samples = 1_000):
         '''
 
         Parameters
         ----------
         n_samples : int, optional
             The number of samples from each posterior. The default is 1_000.
-
-        locs : bool, optional
-            0 : return parameters in DataFrame
-            1 : return locs as dictionary
-            The default is False.
+            
 
         Returns
         -------
         TYPE
             DESCRIPTION.
+
         '''
-        # keys = ["lamb_pi", "lamb_r", "h", "dec_temp"]
 
-        # param_names = self.agent.param_names
+        param_names = self.agent.param_names
+        'Original Code'
+        sample_dict = {param: [] for param in param_names}
+        sample_dict["ag_idx"] = []
+        for i in range(n_samples):
+            sample = self.guide()
+            for key in sample.keys():
+                sample.setdefault(key, torch.ones(1))
 
-        # 'Original Code'
-        # sample_dict = {param: [] for param in param_names}
-        # sample_dict["ag_idx"] = []
+            par_sample = self.agent.locs_to_pars(sample["locs"])
 
-        # for i in range(n_samples):
-        #     sample = self.guide()
-        #     for key in sample.keys():
-        #         sample.setdefault(key, torch.ones(1))
+            for param in param_names:
+                sample_dict[param].extend(list(par_sample[param].detach().numpy()))
 
-        #     par_sample = self.agent.locs_to_pars(sample["locs"])
+            sample_dict["ag_idx"].extend(range(self.num_agents))
 
-        #     for param in param_names:
-        #         sample_dict[param].extend(list(par_sample[param].detach().numpy()))
-
-        #     sample_dict["ag_idx"].extend(list(range(self.num_agents)))
-
-        # sample_df = pd.DataFrame(sample_dict)
-        
-        from pyro.infer import Predictive
-        print("BEGINNING PREDICTIVE.")
-        firstlevel_dict = {param:[] for param in self.agent.param_names}
-
-        secondlevel_dict = {param + '_mu':[] for param in self.agent.param_names}
-        for param in self.agent.param_names:
-            secondlevel_dict[param + '_sig'] = []
-
-        predictive_svi = Predictive(model = self.model,  
-                                    guide = self.guide, 
-                                    num_samples=n_samples)()
-
-        grouplevel_loc = predictive_svi['mu']
-        grouplevel_stdev = predictive_svi['sig']
-        predictive_locs = predictive_svi['locs']
-        
-        predictive_model_params = self.agent.locs_to_pars(predictive_locs)
-        
-        "1st-level DataFrame"
-        for param_name in self.agent.param_names:
-            for agidx in range(self.num_agents):
-                firstlevel_dict[param_name].append(predictive_model_params[param_name][:, agidx])
-        
-        "2nd-level DataFrame"
-        for param_name_idx in len(self.agent.param_dict.keys()):
-            secondlevel_dict[self.agent.param_dict.keys()[param_name_idx] + '_mu'].append(grouplevel_loc[:, ..., param_name_idx])
-            secondlevel_dict[self.agent.param_dict.keys()[param_name_idx] + '_sig'].append(grouplevel_loc[:, ..., param_name_idx])
-
-
-        firstlevel_df = pd.DataFrame(data = firstlevel_dict)
-        secondlevel_df = pd.DataFrame(data = secondlevel_dict)
-            
-        return firstlevel_df, secondlevel_df
+        firstlevel_df = pd.DataFrame(sample_dict)
+        return firstlevel_df
     
     def train_mle(self, 
                   iter_steps = 1000,
                   halting_rtol = 1e-09):
+        
+        raise Exception("All subsequent posterior samples will be erroneous.")
         '''
             Step 1: Compute MLE
         '''
@@ -1711,34 +1672,203 @@ class CoinflipGroupInference():
         
         return self.max_log_like, pyro.param('locs')
 
-    def compute_IC(self):
+    def compute_IC(self, num_samples):
         '''
             Compute information criteria for each participant individually.
-        
-            BIC = k*ln(n) - 2*ll --> the lower, the better
-            ll = maximized log-likelihood value
-            k = number of parameters
-            n = number of observations
         '''
+
+        '''
+            WAIC: Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
+            Bayesian Data Analysis: Second Edition
+        '''
+        conditioned_model = pyro.condition(self.model, 
+                                            data = {'locs': self.guide()['locs']})
         
-        print(f"Computing ICs with mll = {self.max_log_like.sum()}")
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
         
-        BIC = torch.tensor(self.agent.num_params)*torch.log(torch.tensor(self.num_trials)) -\
-            2*self.max_log_like
+        num_obs = 0
+        for key, val in trace.nodes.items():
+            if 'res' in key and 'is_observed' in val and val['is_observed'] == True:
+                num_obs += 1
+           
+        all_post_loc_samples = torch.zeros(num_samples, self.num_agents, self.agent.num_params)
+        all_post_samples = {param: torch.zeros(1, num_samples, self.num_agents) for param in self.agent.param_names}
+        loglike = torch.zeros(num_samples, num_obs, self.num_agents)
+        loglike_complete = torch.zeros(num_samples, self.num_agents, num_obs)
+        like = torch.zeros(num_samples, num_obs, self.num_agents)
+        
+        subject_loglike = {f'ag_{i}': [[] for _ in range(num_samples)] for i in range(self.num_agents)}
+        subject_like = {f'ag_{i}': [[] for _ in range(num_samples)] for i in range(self.num_agents)}
+        for i in range(num_samples):
+            if i % 100 == 0:
+                print(f"Iterating to compute WAIC, step {i}.")
             
-        # print(f"BIC is {BIC}")
-        
-        '''
-            AIC = 2*k - 2*ll --> the lower, the better
-            ll = maximized log-likelihood value
-            k = number of parameters
-        '''
+            locs = torch.clone((self.guide()['locs']))
+            conditioned_model = pyro.condition(self.model, 
+                                                data = {'locs': locs})
             
-        AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
-        # print(f"AIC is {AIC}")
+            outdict = self.agent.locs_to_pars(locs)
+            for j in range(self.num_agents):
+                for param in self.agent.param_names:
+                    all_post_samples[param][0, i, j] = outdict[param][j].item()
+            
+            for j in range(self.agent.num_params):
+                all_post_loc_samples[i, :, j] = locs[:, j]
+                
+            
+            trace = pyro.poutine.trace(conditioned_model).get_trace()
+            
+            obsidx = 0
+            for key, val in trace.nodes.items():
+                if 'res' in key and 'is_observed' in val and val['is_observed'] == True:
+                    choices = val['value']
+                    # obsmask = val['mask'].type(torch.int)
+                    probs = val['fn'].probs
+                    
+                    choice_probs = probs[range(self.num_agents), choices]
+                    
+                    '''
+                        likelihood function
+                    '''
+                    like[i, obsidx, :] += choice_probs.detach()
+                    loglike[i, obsidx, :] += torch.log(choice_probs).detach()
+                    loglike_complete[i, :, obsidx] = torch.log(choice_probs).detach()
+                    
+                    for ag_idx in range(self.num_agents):
+                        subject_like[f'ag_{ag_idx}'][i].append(choice_probs[ag_idx].item())
+                        subject_loglike[f'ag_{ag_idx}'][i].append(torch.log(choice_probs[ag_idx]).item())
+                    
+                    obsidx += 1
+
         
-        return BIC, AIC
+        loglike_2D = torch.zeros((num_samples, self.num_agents*self.num_trials))
+        like_2D = torch.zeros((num_samples, self.num_agents*self.num_trials))
+        for i in range(num_samples):
+            loglike_2D[i, :] = torch.flatten(loglike[i, :, :])
+            like_2D[i,:] =  torch.flatten(like[i, :, :])
+            
+        "effective number of parameters."
+        pwaic2_vec = loglike_2D.var(axis=0, correction = 0)
+        # print("\npwaic2 is %.2f"%pwaic2_vec.sum())
+        pwaic2 = pwaic2_vec.sum()
         
+        # pwaic2_vec = loglike.var(axis=0)
+        # pwaic2 = pwaic2_vec.sum()
+        # print("\npwaic2 is %.2f"%pwaic2)
+        print("Better use pwaic2 as recommended by Gelman et al.")
+        
+        if 0:
+            pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
+            pwaic = pwaic_vec.sum()
+            print("\npwaic is %.2f"%pwaic)
+        
+        # subject_WAIC = torch.zeros(self.num_agents)
+        # subject_pwaic = torch.zeros(self.num_agents)
+        # subject_pwaic2 = torch.zeros(self.num_agents)
+        # subject_lppd = torch.zeros(self.num_agents)
+        # for ag_idx in range(self.num_agents):
+        #     s_pwaic_vec = 2*(torch.log(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0)) -
+        #         torch.tensor(subject_loglike[f'ag_{ag_idx}']).mean(axis=0))
+            
+        #     s_pwaic2_vec = torch.tensor(subject_like[f'ag_{ag_idx}']).var(axis=0, correction = 0)
+        #     s_pwaic2 = s_pwaic2_vec.sum()
+        #     subject_pwaic2[ag_idx] = s_pwaic2
+            
+        #     s_pwaic = s_pwaic_vec.sum()
+        #     subject_pwaic[ag_idx] = s_pwaic
+            
+        #     s_lppd_vec = torch.log(torch.tensor(subject_like[f'ag_{ag_idx}'])).mean(axis=0)
+        #     s_lppd = s_lppd_vec.sum()
+        #     subject_lppd[ag_idx] = s_lppd
+        #     subject_WAIC[ag_idx] = -2*(s_lppd - s_pwaic)
+        
+        lppd_vec = torch.log(like_2D.mean(axis=0))
+        lppd = lppd_vec.sum()
+        WAIC = -2*(lppd - pwaic2)
+        
+        print(f"lppd is {lppd}")
+        # "Var(aX) = a²*Var(X)"
+        # pwaic_var = 4*(torch.log(like.mean(axis=0)/num_samples) - loglike.mean(axis=0)/num_samples).var()
+        
+        "Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)"
+        "Var(X-Y) = Var(X+(-Y)) = Var(X) + Var(-Y) + 2*Cov(X,-Y) = Var(X) + Var(Y) - 2*Cov(X,Y)"
+        "Var(aX) = a²Var(X)"
+        lppd_var = lppd_vec.var(correction = 0)
+        pwaic_var = pwaic2_vec.var(correction = 0)
+        cov = torch.cov(torch.stack((lppd_vec, pwaic2_vec)))
+        assert cov.ndim == 2
+        assert cov.shape[0] == 2
+        assert cov.shape[1] == 2
+        waic_var = 4*(lppd_var + pwaic_var - 2*cov[0,1])
+            
+        # dfgh
+        print("Finished WAIC")
+        
+        '''
+            DIC (Deviance information criterion) Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
+            Bayesian Data Analysis: Second Edition
+            Effective number of parameters pD = 2*(log p(y|θ_Bayes) - E_post[log p(y|θ)])
+            θ_Bayes : mean of posterior
+            E_post[log p(y|θ)] : mean of log p(y|θ) under the posterior of θ
+        '''
+        loc_samples = torch.zeros((self.num_agents, self.num_params, num_samples))
+        for sample in range(num_samples):
+            loc_samples[..., sample] = self.guide()['locs'].detach()
+        
+        loc_samples_mean = loc_samples.mean(axis=-1)
+        
+        conditioned_model = pyro.condition(self.model, 
+                                            data = {'locs': loc_samples_mean})
+        trace = pyro.poutine.trace(conditioned_model).get_trace()
+        
+        DIC_loglike = 0
+        DIC_subject_loglike = {f'ag_{i}':[] for i in range(self.num_agents)}
+        for key, val in trace.nodes.items():
+            if '_observed' in key:
+                choices = val['value']
+                # obsmask = val['mask'].type(torch.int)
+                probs = val['fn'].probs
+        
+                choice_probs = probs[0, range(self.num_agents), choices]
+        
+                DIC_loglike += torch.log(choice_probs).sum().detach()
+        
+                for ag_idx in range(self.num_agents):
+                    DIC_subject_loglike[f'ag_{ag_idx}'].append(torch.log(choice_probs[ag_idx]).item())
+        
+        pDIC = 2*(DIC_loglike - loglike.mean(axis=0).sum())
+        DIC = -2*DIC_loglike + 2*pDIC
+        
+        subject_pDIC = []
+        for ag_idx in range(self.num_agents):
+            subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
+        
+        DIC_subject_loglike = torch.tensor([torch.tensor(DIC_subject_loglike[f'ag_{i}']).sum() for i in range(self.num_agents)])
+        subject_pDIC = torch.tensor(subject_pDIC)
+        
+        subject_DIC = -2*DIC_subject_loglike + 2*subject_pDIC
+        
+        print("Finished DIC")
+        return None, None, WAIC.detach(), loglike, waic_var, subject_WAIC, DIC, subject_DIC, all_post_loc_samples, all_post_samples, loglike_complete
+    
+    # def compute_IC_test(self, num_samples):
+    #     '''
+    #         Compute information criteria for each participant individually.
+    #     '''
+
+    #     '''
+    #         WAIC: Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
+    #         Bayesian Data Analysis: Second Edition
+    #     '''
+    #     all_locs = torch.zeros((num_samples, self.num_agents))
+    #     for i in range(num_samples):
+    #         if i % 100 == 0:
+    #             print(f"Iterating to compute WAIC, step {i}.")
+            
+    #         # print("Assigning")
+    #         all_locs[i, :] = torch.squeeze(torch.clone((self.guide()['locs'])))
+    
+    #     return all_locs
     
 class BC():
     "Bayesian Correlation"
@@ -1971,3 +2101,79 @@ class BC():
             
             return sample_df
     
+class CoinflipGroupInference_flat(CoinflipGroupInference):
+    
+    def model(self, *args):
+        # define hyper priors over model parameters
+        # prior over sigma of a Gaussian is a Gamma distribution
+        alpha = pyro.param('alpha', dist.Gamma(torch.ones(self.num_agents), torch.ones(self.num_agents)), constraint=dist.constraints.positive)
+        beta = pyro.param('beta', dist.Gamma(torch.ones(self.num_agents), torch.ones(self.num_agents)), constraint=dist.constraints.positive)
+        # class Gamma(concentration, rate, validate_args=None)
+        # For Gamma distribution(shape, rate), mean is shape/rate, thus 
+        # Gamma(a, a/lam) -> mean = lam
+
+        # print("\n\nMODEL")
+        # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
+        # you embed what should be done for each subject into the "with pyro.plate" context
+        # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
+        # i.e. p1 below will have the length num_agents
+        with pyro.plate('ag_idx', self.num_agents):
+            
+            locs = pyro.sample('locs', dist.Beta(alpha, beta))
+            # print(locs.shape)
+            
+            if locs.ndim == 1:
+                locs = locs[None,:,None]
+                
+            if locs.ndim == 2 and locs.shape[0] == 10 and locs.shape[1] == self.num_agents:
+                locs = locs[..., None]
+                
+            if locs.ndim == 2 and locs.shape[1] == 1 and locs.shape[0] == self.num_agents:
+                locs = locs[None, ...]
+
+                
+            'Shape of phead must be [num_particles, num_agents, num_parameters]'
+            self.agent.reset(locs)
+            
+            num_particles = locs.shape[0]
+            assert locs.shape[1] == self.num_agents
+            assert locs.shape[-1] == 1
+            assert locs.shape[0] == 1 or locs.shape[0] == 10
+            
+            t = 0
+            for trial in range(self.num_trials):
+                # print("\n\nCHECK")
+                probs = self.agent.compute_probs()
+                
+                # print("probs")
+                # print(probs.shape)
+                # print(probs.shape)
+                # print(probs)
+                # print(probs.sum(dim=-1))
+                # print(f"Sampling with {num_particles} particles.")
+                # print(probs)
+                # print(probs.sum(dim=-1))
+                pyro.sample('res_{}'.format(t), 
+                            dist.Categorical(probs = probs),
+                            obs = self.data[:, t])
+                t+=1
+                
+    def guide(self, *args):
+        alpha = pyro.param('alpha', dist.Gamma(torch.ones(self.num_agents), torch.ones(self.num_agents)), constraint=dist.constraints.positive)
+        beta = pyro.param('beta', dist.Gamma(torch.ones(self.num_agents), torch.ones(self.num_agents)), constraint=dist.constraints.positive)
+        # class Gamma(concentration, rate, validate_args=None)
+        # For Gamma distribution(shape, rate), mean is shape/rate, thus 
+        # Gamma(a, a/lam) -> mean = lam
+
+        # in order to implement groups, where each subject is independent of the others, pyro uses so-called plates.
+        # you embed what should be done for each subject into the "with pyro.plate" context
+        # the plate vectorizes subjects and adds an additional dimension onto all arrays/tensors
+        # i.e. p1 below will have the length num_agents
+        with pyro.plate('ag_idx', self.num_agents):
+            
+            locs = pyro.sample('locs', dist.Beta(alpha, beta))
+            
+            if locs.ndim == 1:
+                locs = locs[..., None]
+
+        return {'alpha': alpha, 'beta': beta, 'locs': locs}

@@ -66,9 +66,9 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 0
+waithrs = 10
 post_pred = 0
-sim_model_day1 = 'Repbias_Conflict_Repdiff_lr'
+sim_model_day1 = 'Repbias_lr'
 sim_models_day2 = ['Repbias_Conflict_Repdiff_lr']
 
 if 0:
@@ -80,15 +80,15 @@ else:
     inf_models_day2 = ['OnlyQ_Qdiff_onlyseq_lr']
 
 num_agents = 60
-num_inf_steps_day1 = 3
-halting_rtol_day1 = 1e-02 # for MLE estimation
-posterior_pred_samples_day1 = 2
-num_waic_samples_day1 = 12
+num_inf_steps_day1 = 3_000
+halting_rtol_day1 = 1e-07 # for MLE estimation
+posterior_pred_samples_day1 = 1
+num_waic_samples_day1 = 3_000
 
-num_inf_steps_day2 = 2
+num_inf_steps_day2 = 1
 halting_rtol_day2 = 1e-02 # for MLE estimation
-posterior_pred_samples_day2 = 2
-num_waic_samples_day2 = 2
+posterior_pred_samples_day2 = 1
+num_waic_samples_day2 = 1
 
 #%%
 '''
@@ -101,7 +101,7 @@ group.extend([2]*(num_agents//4))
 group.extend([3]*(num_agents//4))
 
 # utils.plot_grouplevel(group_behav_df)
-#%%
+
 '''
     Simulate Data Day 1
 '''
@@ -116,7 +116,7 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
                                                                       STT = False,
                                                                       errorrates = er_day1)
 
-#%%
+
 '''
     Check that all other models exist
 '''
@@ -143,8 +143,8 @@ for sm2 in sim_models_day2:
                                     STT = False,
                                     errorrates = er_day1)
 
-#%%
 
+print("\n\n")
 print("Sim Model for day 1 is")
 print(sim_model_day1)
 print("Inf Model for day 1 is")
@@ -159,7 +159,7 @@ for im2 in inf_models_day2:
     print(sm2)
 import time
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-print(f"Waiting for {waithrs} hours, starting at {timestamp}.")
+print(f"\n\nWaiting for {waithrs} hours, starting at {timestamp}.")
 time.sleep(waithrs*3600)
 
 
@@ -204,8 +204,8 @@ firstlevel_df['inf_model'] = [inf_model_day1]*len(firstlevel_df)
 ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
 "----- MLE & IC"
-max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day1)
+# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
+_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day1)
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -244,8 +244,8 @@ extra_storage = (Q_init_day1,
                  agent.Q[-1].detach(),
                  1, # day
                  'no preceding model',
-                max_log_like,
-                mle_locs,
+                '',
+                '',
                  '',
                  '',
                  secondlevel_df,
@@ -259,7 +259,7 @@ extra_storage = (Q_init_day1,
                  WAIC_var,
                  subject_WAIC, 
                  DIC, 
-                 subject_DIC)
+                 pwaic)
 
 filename_day1 = f'recovery_simmodelday1_{sim_model_day1}_infmodelday1_{inf_model_day1}_day{day}_{timestamp}_{num_agents}agents'
 
@@ -323,8 +323,8 @@ for md2_idx in range(len(sim_models_day2)):
     # firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['ID'][0][x])
     
     "----- MLE & IC"
-    max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day2)
+    # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
+    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day2)
     
     # "----- Q_init for next day"
     # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
@@ -336,8 +336,8 @@ for md2_idx in range(len(sim_models_day2)):
                      agent.Q[-1].detach(), # 2) final Q-values
                      2, # 3) day
                      sim_model_day1, # 4) preceding sim model
-                     max_log_like, # 5)
-                     mle_locs, # 6)
+                     '', # 5)
+                     '', # 6)
                      seq_counter_day2, # 7) seq counter day 2
                      filename_day1, # 8) filename day 1
                      secondlevel_df, # 9)
@@ -351,7 +351,7 @@ for md2_idx in range(len(sim_models_day2)):
                      WAIC_var, # 17
                      subject_WAIC, # 18 
                      DIC, # 19
-                     subject_DIC) # 20
+                     pwaic) # 20
     
     if num_inf_steps_day2 > 1:
         pickle.dump( (firstlevel_df, 
