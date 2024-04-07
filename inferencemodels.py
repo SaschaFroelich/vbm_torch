@@ -700,7 +700,7 @@ class GeneralGroupInference():
             subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
         print("Finished DIC")
-        return None, None, WAIC.detach(), loglike_2D, waic_var, subject_WAIC, DIC, loglike, pwaic2
+        return None, None, WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, subject_WAIC, DIC, loglike, pwaic2
     
 class GeneralGroupInferenceSTT():
     

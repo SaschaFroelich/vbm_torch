@@ -66,9 +66,9 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 10
+waithrs = 12
 post_pred = 0
-sim_model_day1 = 'Repbias_lr'
+sim_model_day1 = 'OnlyQ_Qdiff_onlyseq_lr'
 sim_models_day2 = ['Repbias_Conflict_Repdiff_lr']
 
 if 0:
@@ -76,17 +76,17 @@ if 0:
     inf_models_day2 = sim_models_day2
     
 else:
-    inf_model_day1 = 'OnlyQ_Qdiff_onlyseq_lr'
+    inf_model_day1 = 'Repbias_lr'
     inf_models_day2 = ['OnlyQ_Qdiff_onlyseq_lr']
 
 num_agents = 60
 num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-07 # for MLE estimation
+# halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 1
 num_waic_samples_day1 = 3_000
 
 num_inf_steps_day2 = 1
-halting_rtol_day2 = 1e-02 # for MLE estimation
+# halting_rtol_day2 = 1e-02 # for MLE estimation
 posterior_pred_samples_day2 = 1
 num_waic_samples_day2 = 1
 
@@ -205,7 +205,7 @@ ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
 "----- MLE & IC"
 # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day1)
+_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day1)
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -235,8 +235,8 @@ for lastidx in idxgenerator:
 
 assert Q_init_day2.ndim == 3
 assert Q_init_day2.shape[0] == 1
-print("Q_init_day2 starting as")
-print(Q_init_day2)
+# print("Q_init_day2 starting as")
+# print(Q_init_day2)
 
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -251,7 +251,7 @@ extra_storage = (Q_init_day1,
                  secondlevel_df,
                  param_names_day1,
                  'recovery',
-                 halting_rtol_day1,
+                 '',
                  WAIC,
                  ll,
                  predictive_choices,
@@ -324,7 +324,7 @@ for md2_idx in range(len(sim_models_day2)):
     
     "----- MLE & IC"
     # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day2)
+    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day2)
     
     # "----- Q_init for next day"
     # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
@@ -343,7 +343,7 @@ for md2_idx in range(len(sim_models_day2)):
                      secondlevel_df, # 9)
                      param_names_day2, # 10)
                      'recovery', # 11)
-                     halting_rtol_day2, # 12)
+                     '', # 12)
                      WAIC, # 13)
                      ll, # 14)
                      predictive_choices, # 15)
@@ -356,14 +356,14 @@ for md2_idx in range(len(sim_models_day2)):
     if num_inf_steps_day2 > 1:
         pickle.dump( (firstlevel_df, 
                       group_behav_df_day2, 
-                      (infer.loss, BIC, AIC), 
+                      (infer.loss, None, None), 
                       params_sim_df_day2, 
                       agent_elbo_tuple, 
                       extra_storage), 
                     open(f"parameter_recovery/recovery_simmodelday2_{sim_models_day2[md2_idx]}_infmodelday2_{inf_models_day2[md2_idx]}_simmodel1_{sim_model_day1}_day{day}_{timestamp}_{num_agents}agents.p", "wb" ) )
 
 print("Done.")
-# from IPython import get_ipython
-# get_ipython().run_line_magic("reset", "-f")
+from IPython import get_ipython
+get_ipython().run_line_magic("reset", "-f")
 
-# quit()
+quit()
