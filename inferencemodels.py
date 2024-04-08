@@ -692,12 +692,12 @@ class GeneralGroupInference():
                 DIC_loglike += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
         
         
-        pDIC = 2*(DIC_loglike - loglike.mean(axis=0).sum())
+        pDIC = 2*(DIC_loglike - loglike.mean(axis=0).nansum())
         DIC = -2*DIC_loglike + 2*pDIC
         
-        subject_pDIC = []
-        for ag_idx in range(self.num_agents):
-            subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
+        # subject_pDIC = []
+        # for ag_idx in range(self.num_agents):
+        #     subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
         print("Finished DIC")
         return None, None, WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, subject_WAIC, DIC, loglike, pwaic2
