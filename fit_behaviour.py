@@ -59,20 +59,20 @@ waithrs = 0
 post_pred = 1
 STT = 0
 
-model_day1 = 'Bullshitmodel'
+model_day1 = 'Repbias_lr'
 models_day2 = ['Repbias_Conflict_Repdiff_lr']
 num_inf_steps_day1 = 3_000
-halting_rtol_day1 = 1e-07 # for MLE estimation
+# halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 2
 num_waic_samples_day1 = 3_000
 
 num_inf_steps_day2 = num_inf_steps_day1
-halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
+# halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
 posterior_pred_samples_day2 = posterior_pred_samples_day1
 num_waic_samples_day2 = num_waic_samples_day1
 
 num_inf_steps_day2 = 1
-halting_rtol_day2 = 1e-02 # for MLE estimation
+# halting_rtol_day2 = 1e-07 # for MLE estimation
 posterior_pred_samples_day2 = 1
 num_waic_samples_day2 = 1
 
@@ -151,8 +151,40 @@ ID_df = expdata_df_day1.loc[:, ['ID', 'ag_idx']].drop_duplicates()
 firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['ID'][0][x])
 
 "----- MLE & IC"
-max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day1)
+# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
+_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic = infer.compute_IC(num_samples = num_waic_samples_day1)
+
+'''
+    Compute WAIC with arviz
+'''
+import numpy as np
+import arviz as az
+import xarray as xr
+
+if 0:
+    loglike = loglike.reshape((30,804*60))
+    
+    # Step 1: Check for NaN values
+    isnan = torch.isnan(loglike)
+    
+    # Step 2: Determine columns that contain any NaN values
+    cols_with_nan = isnan.any(dim=0)
+    cols_without_nan = ~cols_with_nan
+    clean_tensor = loglike[:, cols_without_nan]
+    
+    log_likelihood_xr = xr.Dataset({
+        "log_likelihood": (("chain", "draw", "observation_dim_0"), clean_tensor[None, ...])
+    }, coords={"chain": [0], 
+                "draw": np.arange(clean_tensor.shape[0]),
+                "observation_dim_0": np.arange(clean_tensor.shape[1])})
+    
+    idata = az.InferenceData(log_likelihood=log_likelihood_xr)
+    
+    print(az.waic(idata))
+    waic_result = az.waic(idata, scale="log")
+    
+    waic = -2*az.waic(idata)['elpd_waic']
+
 
 '''
     Q_init & seqcounter for next day
@@ -208,14 +240,14 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  agent.Q[-1].detach(), # 1 (Q-final)
                  1, # day # 2 (day)
                  'no preceding model', # 3 (preceding model)
-                max_log_like, # 4 (Maximum Log Likelihood)
-                mle_locs, # 5 (MLE estimates)
+                '', # 4 (Maximum Log Likelihood)
+                '', # 5 (MLE estimates)
                  '', # 6 (initial seq_counter - only for day 2)
                  '', # 7 (filename day 1 - only for day 2)
                  secondlevel_df, # 8
                  param_names_day1, # 9
                  'behav_fit', # 10
-                 halting_rtol_day1, # 11 (halting r_tol)
+                 '', # 11 (halting r_tol)
                  WAIC, # 12
                  ll, # 13
                  predictive_choices, # 14
@@ -223,14 +255,14 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  WAIC_var,
                  subject_WAIC, 
                  DIC,
-                 subject_DIC)
+                 pwaic)
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
     print("Storing results for day 1.")
     pickle.dump( (firstlevel_df, 
                   expdata_df_day1,
-                  (infer.loss, BIC, AIC), 
+                  (infer.loss, None, None), 
                   params_sim_df, 
                   agent_elbo_tuple, 
                   extra_storage), 
@@ -276,8 +308,8 @@ for model_day2 in models_day2:
     firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['ID'][0][x])
     
     "----- MLE & IC"
-    max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    BIC, AIC, WAIC, ll, WAIC_var, subject_WAIC, DIC, subject_DIC = infer.compute_IC(num_samples = num_waic_samples_day2)
+    # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
+    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic = infer.compute_IC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -301,21 +333,21 @@ for model_day2 in models_day2:
                      secondlevel_df,
                      param_names_day2,
                      'behav_fit',
-                     halting_rtol_day2, # halting r_tol
+                     '', # halting r_tol
                      WAIC,
                      ll,
                      predictive_choices,
                      obs_mask,
                      WAIC_var,
                      subject_WAIC, 
-                     DIC, 
-                     subject_DIC)
+                     DIC,
+                     pwaic)
     
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")
         pickle.dump( (firstlevel_df, 
                       expdata_df_day2,
-                      (infer.loss, BIC, AIC), 
+                      (infer.loss, None, None),
                       params_sim_df, 
                       agent_elbo_tuple, 
                       extra_storage), 
