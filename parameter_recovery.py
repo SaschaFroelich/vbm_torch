@@ -66,7 +66,7 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 12
+waithrs = 0
 post_pred = 0
 sim_model_day1 = 'OnlyQ_Qdiff_onlyseq_lr'
 sim_models_day2 = ['Repbias_Conflict_Repdiff_lr']
@@ -76,17 +76,17 @@ if 0:
     inf_models_day2 = sim_models_day2
     
 else:
-    inf_model_day1 = 'Repbias_lr'
+    inf_model_day1 = 'Repbias_Conflict_Repdiff_lr'
     inf_models_day2 = ['OnlyQ_Qdiff_onlyseq_lr']
 
 num_agents = 60
 num_inf_steps_day1 = 3_000
-# halting_rtol_day1 = 1e-07 # for MLE estimation
+halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 1
 num_waic_samples_day1 = 3_000
 
 num_inf_steps_day2 = 1
-# halting_rtol_day2 = 1e-02 # for MLE estimation
+halting_rtol_day2 = 1e-02 # for MLE estimation
 posterior_pred_samples_day2 = 1
 num_waic_samples_day2 = 1
 
@@ -117,6 +117,7 @@ groupdata_dict_day1, group_behav_df_day1, params_sim_df_day1, agent_day1 = utils
                                                                       errorrates = er_day1)
 
 
+#%%
 '''
     Check that all other models exist
 '''
@@ -185,7 +186,7 @@ Q_init_day1 = agent.Q_init
 print("\n\n===== Starting inference of day 1 =====\n\n")
 "----- Start Inference"
 infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day1)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
+agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
@@ -203,9 +204,8 @@ firstlevel_df['inf_model'] = [inf_model_day1]*len(firstlevel_df)
 
 ID_df = group_behav_df_day1.loc[:, ['ag_idx']].drop_duplicates()
 
-"----- MLE & IC"
-# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day1)
+"----- WAIC & DIC"
+WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
 
 "----- Q_init & seqcounter for next day"
 seq_counter_day2 = infer.agent.seq_counter.detach()
@@ -238,35 +238,41 @@ assert Q_init_day2.shape[0] == 1
 # print("Q_init_day2 starting as")
 # print(Q_init_day2)
 
+'''
+    Compute MLE & AIC, BIC
+'''
+max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
+BIC, AIC = infer.compute_BIC_AIC()
+
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-extra_storage = (Q_init_day1,
-                 agent.Q[-1].detach(),
-                 1, # day
-                 'no preceding model',
-                '',
-                '',
-                 '',
-                 '',
-                 secondlevel_df,
-                 param_names_day1,
-                 'recovery',
-                 '',
-                 WAIC,
-                 ll,
-                 predictive_choices,
-                 obs_mask,
-                 WAIC_var,
-                 subject_WAIC, 
-                 DIC, 
-                 pwaic)
+extra_storage = (Q_init_day1, # 0 
+                 agent.Q[-1].detach(), # 1
+                 1, # 2) day
+                 'no preceding model', # 3
+                '', # 4
+                '', # 5
+                 '', # 6
+                 '', # 7
+                 secondlevel_df, # 8
+                 param_names_day1, # 9
+                 'recovery', # 10
+                 '', # 11
+                 WAIC, # 12
+                 ll, # 13
+                 predictive_choices, # 14
+                 obs_mask, # 15
+                 WAIC_var, # 16
+                 subject_WAIC, # 17
+                 DIC, # 18
+                 pwaic) # 19
 
 filename_day1 = f'recovery_simmodelday1_{sim_model_day1}_infmodelday1_{inf_model_day1}_day{day}_{timestamp}_{num_agents}agents'
 
 if num_inf_steps_day1 > 1:
     pickle.dump( (firstlevel_df, 
                   group_behav_df_day1,
-                  (infer.loss, None, None), 
+                  (infer.loss, BIC, AIC), 
                   params_sim_df_day1, 
                   agent_elbo_tuple, 
                   extra_storage), 
@@ -305,7 +311,7 @@ for md2_idx in range(len(sim_models_day2)):
     print("\n\n===== Starting inference of day 2 =====\n\n")
     "----- Start Inference"
     infer = inferencemodels.GeneralGroupInference(agent, groupdata_dict_day2)
-    agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
+    agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
     
     "----- Sample parameter estimates from posterior and add information to DataFrame"
     if post_pred:
@@ -322,13 +328,18 @@ for md2_idx in range(len(sim_models_day2)):
     ID_df = group_behav_df_day2.loc[:, ['ag_idx']].drop_duplicates()
     # firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: groupdata_dict_day2['ID'][0][x])
     
-    "----- MLE & IC"
-    # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic =  infer.compute_IC(num_samples = num_waic_samples_day2)
+    "----- WAIC & DIC"
+    WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
     
     # "----- Q_init for next day"
     # Q_init_day2 = agent.Q[-1].detach().mean(axis=0)[None, ...]
     
+    
+    '''
+        Compute MLE & AIC, BIC
+    '''
+    max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
+    BIC, AIC = infer.compute_BIC_AIC()
     
     "----- Store results"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -356,7 +367,7 @@ for md2_idx in range(len(sim_models_day2)):
     if num_inf_steps_day2 > 1:
         pickle.dump( (firstlevel_df, 
                       group_behav_df_day2, 
-                      (infer.loss, None, None), 
+                      (infer.loss, BIC, AIC), 
                       params_sim_df_day2, 
                       agent_elbo_tuple, 
                       extra_storage), 

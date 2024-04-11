@@ -171,6 +171,8 @@ class GeneralGroupInference():
                         iter_steps = 1_000,
                         num_particles = 10,
                         optim_kwargs = {'lr': .01}):  # Adam learning rate
+        import pyro.poutine as poutine
+    
         """Perform SVI over free model parameters."""
 
         pyro.clear_param_store()
@@ -191,24 +193,49 @@ class GeneralGroupInference():
             pbar.set_description("Mean ELBO %6.2f" % torch.tensor(loss[-20:]).mean())
             if torch.isnan(loss[-1]):
                 break
-
+            
         self.loss += [l.cpu() for l in loss] # = -ELBO (Plotten!)
 
-        if 0:
-            print("\nComputing first-level ELBOs.")
-            num_iters = 10
-            ELBOs = torch.zeros(num_iters, self.agent.num_agents)
-            for i in range(num_iters):
-                print(f"Iteration {i} of {num_iters}")
-                ELBOs[i, :] = svi.step_agent_elbos()
-                # ELBOs[i, :] = self.step_agent_elbos(svi)
+        '''
+            Compute individual ELBOs
+        '''
+        num_elbosteps = 10
+        elbo_all = torch.zeros(num_elbosteps, self.num_agents)
+        for elbostep in range(num_elbosteps):
+            conditioned_model = pyro.condition(self.model, 
+                                                data = {'locs' : self.guide()['locs']})
+    
+            guide_tr = poutine.trace(self.guide).get_trace()
+            model_tr = poutine.trace(poutine.replay(conditioned_model, trace=guide_tr)).get_trace()
+            # monte_carlo_elbo = model_tr.log_prob_sum() - guide_tr.log_prob_sum()
+    
+            model_log_probs = torch.zeros(self.num_agents)
+            trace_log_probs = torch.zeros(self.num_agents)
+    
+            for name, site in model_tr.nodes.items():
+                if site["type"] == "sample" and ("observed" in site["name"] or "locs" in site["name"]):
+                    # print(site)
+                    # ipdb.set_trace()
+                    # print(site['fn'].log_prob(site['value']).shape)
+                    if site['mask'] is not None:
+                        model_log_probs += torch.squeeze(site['fn'].log_prob(site['value'])*site['mask'].type(torch.int))
+                    else:
+                        model_log_probs += torch.squeeze(site['fn'].log_prob(site['value']))
+    
+            for name, site in guide_tr.nodes.items():
+                if site["type"] == "sample" and ("observed" in site["name"] or "locs" in site["name"]):
+                    # print(site)
+                    # ipdb.set_trace()
+                    # print(site['fn'].log_prob(site['value']).shape)
+                    if site['mask'] is not None:
+                        trace_log_probs += torch.squeeze(site['fn'].log_prob(site['value'])*site['mask'].type(torch.int))
+                    else:
+                        trace_log_probs += torch.squeeze(site['fn'].log_prob(site['value']))
+    
+            elbo = model_log_probs - trace_log_probs
+            elbo_all[elbostep, :] = elbo.detach()
             
-            elbos = ELBOs.mean(dim=0)
-            std = ELBOs.std(dim=0)
-            
-            return (elbos.detach(), std.detach())
-        
-        return (torch.zeros(60), torch.zeros(60))
+        return (elbo_all.detach().mean(axis=0), elbo_all.detach().std(axis=0)), loss
     
     def sample_posterior(self, n_samples = 1_000):
         '''
@@ -489,7 +516,7 @@ class GeneralGroupInference():
                   max_iter_steps = 8000,
                   halting_rtol = 1e-05):
         
-        raise Exception("All subsequent posterior samples will be erroneous.")
+        print("All subsequent posterior samples will be erroneous.")
         '''
             Step 1: Compute MLE
         '''
@@ -540,30 +567,7 @@ class GeneralGroupInference():
         
         return self.max_log_like.detach(), pyro.param('locs').detach()
     
-    def compute_IC(self, num_samples):
-        '''
-            Compute information criteria for each participant individually.
-        
-            BIC = k*ln(n) - 2*ll --> the lower, the better
-            ll = maximized log-likelihood value
-            k = number of parameters
-            n = number of observations
-        '''
-        if 0:
-            print(f"Computing ICs with mll = {self.max_log_like.sum()}")
-            
-            assert self.trial_counts.size()[0] == self.num_agents
-            
-            BIC = torch.tensor(self.agent.num_params)*torch.log(self.trial_counts) -\
-                2*self.max_log_like
-                
-            '''
-                AIC = 2*k - 2*ll --> the lower, the better
-                ll = maximized log-likelihood value
-                k = number of parameters
-            '''
-            AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
-            
+    def compute_WAIC_DIC(self, num_samples):
         '''
             WAIC: Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
             Bayesian Data Analysis: Second Edition
@@ -700,7 +704,33 @@ class GeneralGroupInference():
         #     subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
         print("Finished DIC")
-        return None, None, WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, subject_WAIC, DIC, loglike, pwaic2
+        return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, subject_WAIC, DIC, loglike, pwaic2
+    
+    def compute_BIC_AIC(self):
+        '''
+            Compute information criteria for each participant individually.
+        
+            BIC = k*ln(n) - 2*ll --> the lower, the better
+            ll = maximized log-likelihood value
+            k = number of parameters
+            n = number of observations
+        '''
+        
+        print(f"Computing ICs with mll = {self.max_log_like.sum()}")
+        
+        assert self.trial_counts.size()[0] == self.num_agents
+        
+        BIC = torch.tensor(self.agent.num_params)*torch.log(self.trial_counts) -\
+            2*self.max_log_like
+            
+        '''
+            AIC = 2*k - 2*ll --> the lower, the better
+            ll = maximized log-likelihood value
+            k = number of parameters
+        '''
+        AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
+        
+        return BIC.detach(), AIC.detach()
     
 class GeneralGroupInferenceSTT():
     

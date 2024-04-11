@@ -59,27 +59,27 @@ waithrs = 0
 post_pred = 1
 STT = 0
 
-model_day1 = 'Repbias_lr'
+model_day1 = 'Repbias_Conflict_onlyseq_onlyseq_lr'
 models_day2 = ['Repbias_Conflict_Repdiff_lr']
 num_inf_steps_day1 = 3_000
-# halting_rtol_day1 = 1e-07 # for MLE estimation
+halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 2
 num_waic_samples_day1 = 3_000
 
 num_inf_steps_day2 = num_inf_steps_day1
-# halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
+halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
 posterior_pred_samples_day2 = posterior_pred_samples_day1
 num_waic_samples_day2 = num_waic_samples_day1
 
 num_inf_steps_day2 = 1
-# halting_rtol_day2 = 1e-07 # for MLE estimation
+halting_rtol_day2 = 1e-01 # for MLE estimation
 posterior_pred_samples_day2 = 1
 num_waic_samples_day2 = 1
 
 #%%
 "Day 1"
 exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
-exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day1)
+exp_behav_dict_day1 = utils.RT_err_to_m2(exp_behav_dict_day1)
 
 num_agents = len(expdata_df_day1['ag_idx'].unique())
 group = exp_behav_dict_day1['group'][0]
@@ -132,7 +132,9 @@ if STT:
     
 else:
     infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
-agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
+    
+agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
+
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
@@ -150,18 +152,16 @@ firstlevel_df['model'] = [model_day1]*len(firstlevel_df)
 ID_df = expdata_df_day1.loc[:, ['ID', 'ag_idx']].drop_duplicates()
 firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['ID'][0][x])
 
-"----- MLE & IC"
-# max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
-_, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic = infer.compute_IC(num_samples = num_waic_samples_day1)
+"----- WAIC & DIC"
+WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
 
 '''
     Compute WAIC with arviz
 '''
-import numpy as np
-import arviz as az
-import xarray as xr
-
 if 0:
+    import numpy as np
+    import arviz as az
+    import xarray as xr
     loglike = loglike.reshape((30,804*60))
     
     # Step 1: Check for NaN values
@@ -234,6 +234,13 @@ params_sim_df['ag_idx']  = None
 params_sim_df['group']  = None
 params_sim_df['model']  = model_day1
 
+
+'''
+    Compute MLE & AIC, BIC
+'''
+max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
+BIC, AIC = infer.compute_BIC_AIC()
+
 "----- Store results"
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 extra_storage = (Q_init_day1, # 0 (Q_init))
@@ -262,7 +269,7 @@ if num_inf_steps_day1 > 1:
     print("Storing results for day 1.")
     pickle.dump( (firstlevel_df, 
                   expdata_df_day1,
-                  (infer.loss, None, None), 
+                  (loss, BIC, AIC), 
                   params_sim_df, 
                   agent_elbo_tuple, 
                   extra_storage), 
@@ -289,7 +296,7 @@ for model_day2 in models_day2:
     else:
         infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
         
-    agent_elbo_tuple = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
+    agent_elbos, loss = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
     if post_pred:
@@ -307,9 +314,8 @@ for model_day2 in models_day2:
     ID_df = expdata_df_day2.loc[:, ['ID', 'ag_idx']].drop_duplicates()
     firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['ID'][0][x])
     
-    "----- MLE & IC"
-    # max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
-    _, _, WAIC, ll, WAIC_var, subject_WAIC, DIC, loglike, pwaic = infer.compute_IC(num_samples = num_waic_samples_day2)
+    "----- WAIC & DIC"
+    WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -319,6 +325,12 @@ for model_day2 in models_day2:
     params_sim_df['ag_idx']  = None
     params_sim_df['group']  = None
     params_sim_df['model']  = model_day2
+    
+    '''
+        Compute MLE & AIC, BIC
+    '''
+    max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day2)
+    BIC, AIC = infer.compute_BIC_AIC()
     
     "----- Store results"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -347,7 +359,7 @@ for model_day2 in models_day2:
         print("Storing results for day two.")
         pickle.dump( (firstlevel_df, 
                       expdata_df_day2,
-                      (infer.loss, None, None),
+                      (loss, BIC, AIC),
                       params_sim_df, 
                       agent_elbo_tuple, 
                       extra_storage), 
