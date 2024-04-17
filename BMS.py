@@ -51,6 +51,8 @@ AICs = np.zeros((num_agents, num_models))
 BICs = np.zeros((num_agents, num_models))
 WAIC = np.zeros(num_models)
 WAIC_var = np.zeros(num_models)
+individual_WAIC = np.zeros((num_agents, num_models))
+DIC = np.zeros(num_models)
 log_likelihood = np.zeros(num_models)
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
 # 'behav_fit_model_Bhand_2023-11-28 23:25:11.p',
@@ -61,25 +63,33 @@ log_likelihood = np.zeros(num_models)
 # 'behav_fit_model_SeqConflictHand_2023-12-03 05:39:36_60agents.p',
 # 'behav_fit_model_SeqHand_2023-12-02 13:21:27_60agents.p']
 model_names = []
+sim_models = []
+inf_models = []
 
 participants = pd.DataFrame()
 
 for model in range(num_models):
-    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage = utils.get_data_from_file()
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage, filename = utils.get_data_from_file()
     elbos[:, model] = (-agent_elbo_tuple[0]).tolist()
     elbos_2nd_lvl[model] = -np.array(loss[-10:]).mean()
     AICs[:, model] = np.squeeze(AIC.detach().numpy())
     BICs[:, model] = np.squeeze(BIC.detach().numpy())
     WAIC[model] = np.squeeze(extra_storage[12])
+    # log_likelihood[model] = np.squeeze(extra_storage[13])
     WAIC_var[model] = np.squeeze(extra_storage[16])
-    log_likelihood[model] = np.squeeze(extra_storage[13])
-    if len(extra_storage) >= 10:
-        if extra_storage[11] >= 1e-03:
-            raise Exception("rhalt too large for IC computation.")
+    individual_WAIC[:, model] = np.squeeze(extra_storage[17])
+    DIC[model] = np.squeeze(extra_storage[18])
+    # if len(extra_storage) >= 10:
+    #     if extra_storage[11] >= 1e-03:
+    #         print("rhalt too large for IC computation.")
     
     day = extra_storage[2]
     
-    model_names.append(post_sample_df['model'][0])
+    if 'model' in post_sample_df.columns:
+        model_names.append(post_sample_df['model'][0])
+        
+    else:
+        model_names.append(post_sample_df['inf_model'][0])
 
     "Check that all models have the same ag_idx -> ID mapping."    
     if model == 1:
@@ -87,7 +97,48 @@ for model in range(num_models):
         
     elif model >= 2:
         assert np.all(participants == expdata_df.loc[:, ['ag_idx', 'ID']].drop_duplicates(subset=['ID', 'ag_idx']))
-    
+        
+    if 'recovery' in filename:
+        strlist = filename.split('/')[-1].split('_')
+        simname = strlist[2]
+        
+        if day == 1:
+            stridx = strlist.index('infmodelday1')
+            stridx2 = strlist.index('day1')
+            infname = strlist[stridx + 1]
+            
+            for idx in range(3, stridx):
+                simname += '_' + strlist[idx]
+                
+            for idx in range(stridx+2, stridx2):
+                infname += '_' + strlist[idx]
+            
+            sim_models.append(simname)
+            inf_models.append(infname)
+        
+    elif 'behav_fit' in filename:
+        strlist = filename.split('/')[-1].split('_')
+        
+        if day == 1:
+            stridx = strlist.index('day1')
+            infname = strlist[stridx + 1]
+            
+            for idx in range(stridx+2, len(strlist)-2):
+                infname += '_' + strlist[idx]
+            
+            inf_models.append(infname)
+
+#%%
+import csv
+
+with open('IC.csv', 'w', newline='') as csvfile:
+
+    for midx in range(len(sim_models)):
+
+        spamwriter = csv.writer(csvfile, delimiter=' ',
+                                quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        spamwriter.writerow([f'{sim_models[midx]},', f'{inf_models[midx]},', '%.0f,'%WAIC[midx], '%.0f,'%DIC[midx]])
+
 #%%
 with pm.Model() as BMS:
     tau = pm.HalfCauchy('hyper_tau', beta=1.0)
@@ -139,6 +190,145 @@ plt.show()
 import pickle
 
 # pickle.dump((model_names, posteriorsModelProbs), open(f"BMS/{num_models}_models_{figname}.p", "wb"))
+#%%
+'''
+    Compute Bayes Factors
+    BF = p(y_A)/p(y_B) = exp[log p(y_A) - log p(y_B)] = exp[elbo_A - elbo_B]
+'''
+
+compidx = model_names.index('Bullshitmodel')
+
+num_comparisons = num_models - 1
+
+BF = np.zeros((num_comparisons, num_agents))
+BF_2nd_lvl = np.zeros(num_comparisons)
+
+compnumb = 0
+for i in range(num_models):
+    if i != compidx:
+        BF[compnumb, :] = np.exp(elbos[:, compidx] - elbos[:, i])
+        BF_2nd_lvl[compnumb] = np.exp(elbos_2nd_lvl[compidx] - elbos_2nd_lvl[i])
+        # BF[compnumb, :] = np.exp(elbos[:, compidx]) / np.exp(elbos[:, i])
+        compnumb += 1
+        
+#%%
+'''
+    Plot WAIC
+'''
+
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.errorbar(range(num_models), 
+            WAIC, 
+            yerr=WAIC_var, 
+            fmt='o', 
+            ecolor='r', 
+            capsize=5, 
+            linestyle='None', 
+            label='Data points')
+    
+# ax.legend()
+ax.title.set_text(f'WAIC (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/WAIC_day{day}.svg')
+plt.show()
+
+#%%
+'''
+    Plot DIC
+'''
+
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.errorbar(range(num_models), 
+            DIC, 
+            # yerr=WAIC_var, 
+            fmt='o', 
+            ecolor='r', 
+            capsize=5, 
+            linestyle='None', 
+            label='Data points')
+    
+# ax.legend()
+ax.title.set_text(f'DIC (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/DIC_day{day}.svg')
+plt.show()
+
+#%%
+from scipy import stats
+model1idx = 2
+model2idx = 4
+
+print("Check these formulas")
+# Pooled variance
+sp2 = ((60 - 1) * WAIC_var[model1idx] + (60 - 1) * WAIC_var[model2idx]) / (60 + 60 - 2)
+
+# t-value
+t_value = (WAIC[model1idx] - WAIC[model2idx]) / np.sqrt(sp2 * (1/60 + 1/60))
+print(f"t={t_value}")
+
+# Degrees of freedom
+df = 60 + 60 - 2
+
+# p-value
+p_value = 2 * stats.t.sf(np.abs(t_value), df)  # Two-tailed test
+print(f'p-value: {p_value}')
+
+#%%
+'''
+    Plot log-likelihood
+'''
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.scatter(range(num_models), log_likelihood)
+    
+# ax.legend()
+ax.title.set_text(f'Log-Likelihood (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/loglike_day{day}.svg')
+plt.show()
+
+
+#%%
+'''
+    Plot 2nd-level ELBOS
+'''
+fig, ax = plt.subplots(1, figsize = (10, 5))
+# ax.scatter(range(num_models), WAIC)
+ax.scatter(range(num_models), elbos_2nd_lvl)
+    
+# ax.legend()
+ax.title.set_text(f'ELBO (day {day})')
+ax.set_xlabel('Model no.')
+ax.set_xticks(range(num_models))
+ax.set_xticklabels(model_names)
+# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('BMS/loglike_day{day}.svg')
+plt.show()
 
 #%%
 '''
@@ -181,84 +371,49 @@ plt.tight_layout()
 plt.savefig('BMS/ICs.png')
 plt.show()
 
-#%%
-'''
-    Compute Bayes Factors
-    BF = p(y_A)/p(y_B) = exp[log p(y_A) - log p(y_B)] = exp[elbo_A - elbo_B]
-'''
-
-compidx = model_names.index('Bullshitmodel')
-
-num_comparisons = num_models - 1
-
-BF = np.zeros((num_comparisons, num_agents))
-BF_2nd_lvl = np.zeros(num_comparisons)
-
-compnumb = 0
-for i in range(num_models):
-    if i != compidx:
-        BF[compnumb, :] = np.exp(elbos[:, compidx] - elbos[:, i])
-        BF_2nd_lvl[compnumb] = np.exp(elbos_2nd_lvl[compidx] - elbos_2nd_lvl[i])
-        # BF[compnumb, :] = np.exp(elbos[:, compidx]) / np.exp(elbos[:, i])
-        compnumb += 1
+if AICs.shape[1] == 2:
+    '''
+        Sort AIC & BIC
+    '''
+    AIC_diff = AICs[:, 0] - AICs[:, 1]
+    AIC_sort_idxs = np.argsort(AIC_diff)
+    AIC_diff_argmin_idx = np.abs(AIC_diff[AIC_sort_idxs]).argmin()
+    
+    BIC_diff = BICs[:, 0] - BICs[:, 1]
+    BIC_sort_idxs = np.argsort(BIC_diff)
+    BIC_diff_argmin_idx = np.abs(BIC_diff[BIC_sort_idxs]).argmin()
+    
+    fig, ax = plt.subplots(1,2, sharey = True, figsize = (15,5))
+    for midx in range(num_models):
+        # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+        ax[0].scatter(range(num_agents), AICs[AIC_sort_idxs, midx], 
+                      marker=markershapes[midx], 
+                      edgecolor=colors[midx], 
+                      facecolors='none', 
+                      linewidth=1, 
+                      label=model_names[midx])
         
-#%%
-'''
-    Plot WAIC
-'''
+    ax[0].axvline(AIC_diff_argmin_idx)
+    ax[0].legend()
+    ax[0].title.set_text(f'AIC (day {day})')
+    ax[0].set_xlabel('Agent no.')
+    ax[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
 
-markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
-colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
 
-fig, ax = plt.subplots(1, figsize = (10, 5))
-# ax.scatter(range(num_models), WAIC)
-ax.errorbar(range(num_models), WAIC, yerr=WAIC_var, fmt='o', ecolor='r', capsize=5, linestyle='None', label='Data points')
-
+    for midx in range(num_models):
+        ax[1].scatter(range(num_agents), BICs[BIC_sort_idxs, midx], 
+                      marker=markershapes[midx], 
+                      edgecolor=colors[midx], 
+                      facecolors='none', 
+                      linewidth=1, 
+                      label=model_names[midx])
     
-# ax.legend()
-ax.title.set_text(f'WAIC (day {day})')
-ax.set_xlabel('Model no.')
-ax.set_xticks(range(num_models))
-ax.set_xticklabels(model_names)
-# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.tight_layout()
+    ax[1].axvline(BIC_diff_argmin_idx)
+    ax[1].legend()
+    ax[1].title.set_text(f'BIC (day {day})')
+    ax[1].set_xlabel('Agent no.')
+    ax[1].legend(loc='upper left', bbox_to_anchor=(1, 1))
+    plt.tight_layout()
 
-plt.savefig('BMS/WAIC_day{day}.svg')
-plt.show()
-
-from scipy import stats
-model1idx = 2
-model2idx = 4
-
-print("Check these formulas")
-# Pooled variance
-sp2 = ((60 - 1) * WAIC_var[model1idx] + (60 - 1) * WAIC_var[model2idx]) / (60 + 60 - 2)
-
-# t-value
-t_value = (WAIC[model1idx] - WAIC[model2idx]) / np.sqrt(sp2 * (1/60 + 1/60))
-print(f"t={t_value}")
-
-# Degrees of freedom
-df = 60 + 60 - 2
-
-# p-value
-p_value = 2 * stats.t.sf(np.abs(t_value), df)  # Two-tailed test
-print(f'p-value: {p_value}')
-
-'''
-    Plot log-likelihood
-'''
-fig, ax = plt.subplots(1, figsize = (10, 5))
-# ax.scatter(range(num_models), WAIC)
-ax.scatter(range(num_models), log_likelihood)
-    
-# ax.legend()
-ax.title.set_text(f'Log-Likelihood (day {day})')
-ax.set_xlabel('Model no.')
-ax.set_xticks(range(num_models))
-ax.set_xticklabels(model_names)
-# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.tight_layout()
-
-plt.savefig('BMS/loglike_day{day}.svg')
-plt.show()
+    # plt.savefig('BMS/ICs.png')
+    plt.show()
