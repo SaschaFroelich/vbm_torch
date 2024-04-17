@@ -55,11 +55,13 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 0
+waithrs = 6
 post_pred = 1
 STT = 0
 
-model_day1 = 'Repbias_Conflict_onlyseq_onlyseq_lr'
+import sys
+
+model_day1 = 'Repbias_lr'
 models_day2 = ['Repbias_Conflict_Repdiff_lr']
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
@@ -78,7 +80,7 @@ num_waic_samples_day2 = 1
 
 #%%
 "Day 1"
-exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/preproc_data_day1.p", "rb" ))
+exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/mixed_sim_data_2_day1.p", "rb" ))
 exp_behav_dict_day1 = utils.RT_err_to_m2(exp_behav_dict_day1)
 
 num_agents = len(expdata_df_day1['ag_idx'].unique())
@@ -153,7 +155,7 @@ ID_df = expdata_df_day1.loc[:, ['ID', 'ag_idx']].drop_duplicates()
 firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['ID'][0][x])
 
 "----- WAIC & DIC"
-WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
+WAIC, ll, WAIC_var, individual_WAIC, DIC, _, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
 
 '''
     Compute WAIC with arviz
@@ -258,11 +260,12 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  WAIC, # 12
                  ll, # 13
                  predictive_choices, # 14
-                 obs_mask, #15
-                 WAIC_var,
-                 subject_WAIC, 
-                 DIC,
-                 pwaic)
+                 obs_mask, # 15
+                 WAIC_var, # 16
+                 individual_WAIC, # 17
+                 DIC, # 18
+                 pwaic, # 19
+                 individual_DIC) # 20
 
 filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
@@ -315,7 +318,7 @@ for model_day2 in models_day2:
     firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['ID'][0][x])
     
     "----- WAIC & DIC"
-    WAIC, ll, WAIC_var, subject_WAIC, DIC, _, pwaic = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day2)
+    WAIC, ll, WAIC_var, individual_WAIC, DIC, _, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -351,9 +354,10 @@ for model_day2 in models_day2:
                      predictive_choices,
                      obs_mask,
                      WAIC_var,
-                     subject_WAIC, 
+                     individual_WAIC,
                      DIC,
-                     pwaic)
+                     pwaic,
+                     individual_DIC)
     
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")
@@ -364,8 +368,7 @@ for model_day2 in models_day2:
                       agent_elbo_tuple, 
                       extra_storage), 
                     open(f"behav_fit/behav_fit_model_day2_{model_day2}_model1_{model_day1}_{timestamp}_{num_agents}agents.p", "wb" ) )
-        
-        
+
 from IPython import get_ipython
 get_ipython().run_line_magic("reset", "-f")
 

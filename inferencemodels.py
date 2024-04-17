@@ -587,8 +587,8 @@ class GeneralGroupInference():
         loglike = torch.zeros(num_samples, num_obs, self.num_agents)
         loglike[:] = torch.nan
         
-        subject_WAIC = torch.zeros(self.num_agents)
-        subject_WAIC_var = torch.zeros(self.num_agents)
+        # subject_WAIC = torch.zeros(self.num_agents)
+        # subject_WAIC_var = torch.zeros(self.num_agents)
         subject_loglike = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
         subject_like = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
         for i in range(num_samples):
@@ -627,9 +627,11 @@ class GeneralGroupInference():
             loglike_2D[i, :] = torch.flatten(loglike[i, :, :])
             like_2D[i,:] =  torch.flatten(like[i, :, :])
             
-            
         pwaic2_vec = loglike_2D.var(axis=0, correction = 0)
         pwaic2 = pwaic2_vec.nansum()
+        
+        individual_pwaic2_vec = loglike.var(axis=0, correction = 0)
+        individual_pwaic2 = individual_pwaic2_vec.nansum(axis=0)
         
         if 0: 
             pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
@@ -651,6 +653,10 @@ class GeneralGroupInference():
         lppd_vec = torch.log(like_2D.mean(axis=0))
         lppd = lppd_vec.nansum()
         WAIC = -2*(lppd - pwaic2)
+        
+        individual_lppd_vec = torch.log(like.mean(axis=0))
+        individual_lppd = individual_lppd_vec.nansum(axis = 0)
+        individual_WAIC = -2*(individual_lppd - individual_pwaic2)
         
         '''
             Var(X+Y) = Var(X) + Var(Y) + 2Cov(X,Y)
@@ -685,6 +691,7 @@ class GeneralGroupInference():
         trace = pyro.poutine.trace(conditioned_model).get_trace()
         
         DIC_loglike = 0
+        individual_DIC_loglike = torch.zeros(self.num_agents)
         for key, val in trace.nodes.items():
             if '_observed' in key:
                 choices = val['value']
@@ -694,17 +701,20 @@ class GeneralGroupInference():
                 choice_probs = probs[0, range(self.num_agents), choices]
         
                 DIC_loglike += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
-        
+                individual_DIC_loglike[torch.where(obsmask==1)[1]] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).detach()
         
         pDIC = 2*(DIC_loglike - loglike.mean(axis=0).nansum())
         DIC = -2*DIC_loglike + 2*pDIC
+        
+        individual_pDIC = 2*(individual_DIC_loglike - loglike.mean(axis=0).nansum(axis=0))
+        individual_DIC = -2*individual_DIC_loglike + 2*individual_pDIC
         
         # subject_pDIC = []
         # for ag_idx in range(self.num_agents):
         #     subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
         print("Finished DIC")
-        return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, subject_WAIC, DIC, loglike, pwaic2
+        return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
     
     def compute_BIC_AIC(self):
         '''
