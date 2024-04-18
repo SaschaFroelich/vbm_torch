@@ -25,9 +25,10 @@ import arviz as az
 
 from sklearn.linear_model import LinearRegression
 import scipy
+import statsmodels as sm
 import itertools
 
-complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, _, _, _ = utils.load_data()
+complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, _, _, _, extra_storage_day2, extra_storage_day1 = utils.load_data()
 model = complete_df_all['model'].unique()[0]
 hue_order = ['Random', 'Congruent', 'Incongruent']
 
@@ -39,6 +40,29 @@ elif 'theta_repcong' in param_names:
     param1 = 'theta_repcong'
     param2 = 'theta_repinc'
     
+elif 'theta_Q_congdiff' in param_names:
+    param1 = 'theta_Q_congdiff'
+    param2 = 'theta_Q_conflict'
+
+#%%
+'''
+    Plot behaviour both days
+'''
+
+# HPCF_DF = complete_df_all.loc[:, ['hpcf_cong', 'hpcf_incong',
+#                                   'hpcf_seq', 'hpcf_rand', 'day', 'ID']]
+
+utils.plot_hpcf(complete_df_all, title='Experiment')
+
+hpcf_day1 = utils.compute_hpcf(sim_df[sim_df['day']==1])
+hpcf_day1['day'] = 1
+hpcf_day2 = utils.compute_hpcf(sim_df[sim_df['day']==2])
+hpcf_day2['day'] = 2
+
+hpcf_df_all = pd.concat((hpcf_day1, hpcf_day2), ignore_index = True)
+
+utils.plot_hpcf(hpcf_df_all, title=f'{model}', post_pred = False)
+
 #%%
 '''
     ER ~ Condition, Day
@@ -107,6 +131,10 @@ print(f"t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Random')]['RT'], 
                             RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Repeating')]['RT'])
+print(f"t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Random')]['RT']) - np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Repeating')]['RT']),
+                            np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Random')]['RT']) - np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Repeating')]['RT']))
 print(f"t={t}, p={p}")
 
 #%%
@@ -188,15 +216,28 @@ plt.show()
 
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC All, Rand vs Cong, Day 1: t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC All, Rand vs Incong, Day 1: t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC All, Cong vs Incong, Day 1: t={t}, p={p}")
+
+
+t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
+                            hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Random')]['HRC'])
+print(f"HRC All, Rand vs Cong, Day 1: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'], 
+                            hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'])
+print(f"HRC All, Rand vs Incongruent, Day 1: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'], 
+                            hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
+print(f"HRC All, Congruent vs Incongruent, Day 1: t={t}, p={p}")
 
 '''
     ANOVA
@@ -213,35 +254,86 @@ aov = pg.rm_anova(dv = 'HRC',
 
 print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
 
+RT_all.to_csv('RT_stt.csv')
+ER_all.to_csv('ER_stt.csv')
+complete_df_all.to_csv('complete_df.csv')
+
+#%%
+'''
+    Do spreads significantly differ between days?
+'''
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day'] == 1]['CRspread'], 
+                            complete_df_all[complete_df_all['day'] == 2]['CRspread'])
+print(f"CR spread day 1 vs day 2: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day'] == 1]['CIspread'], 
+                            complete_df_all[complete_df_all['day'] == 2]['CIspread'])
+print(f"CI spread day 1 vs day 2: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day'] == 1]['RIspread'], 
+                            complete_df_all[complete_df_all['day'] == 2]['RIspread'])
+print(f"RI spread day 1 vs day 2: t={t}, p={p}")
+
+
+'''
+    Does ΔRT and ΔER significantly differ between days?
+    Do they correlate
+'''
+
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day'] == 1]['ER_diff_stt'], 
+                            complete_df_all[complete_df_all['day'] == 2]['ER_diff_stt'])
+print(f"ΔER day 1 vs day 2: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day'] == 1]['RT_diff_stt'], 
+                            complete_df_all[complete_df_all['day'] == 2]['RT_diff_stt'])
+print(f"ΔRT day 1 vs day 2: t={t}, p={p}")
+
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 1]['ER_diff_stt'], 
+                            complete_df_all[complete_df_all['day'] == 1]['RT_diff_stt'])
+print(f"ΔER & ΔRT Correlation Day 1: r={t}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_diff_stt'], 
+                            complete_df_all[complete_df_all['day'] == 2]['RT_diff_stt'])
+print(f"ΔER & ΔRT Correlation Day 2: r={t}, p={p}")
+
+
 #%%
 '''
     Corr RT ~ ΔCI
 '''
-r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==1]['RT_diff_stt'], complete_df_all[complete_df_all['day']==1]['CIspread'])
-print(f"r={r}, p={p}")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==1]['RT_diff_stt'], 
+                           complete_df_all[complete_df_all['day']==1]['CIspread'])
+print(f"Correlation ΔRT vs CIspread, Day 1: r={r}, p={p}")
 
-r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==2]['RT_diff_stt'], complete_df_all[complete_df_all['day']==2]['CIspread'])
-print(f"r={r}, p={p}")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==2]['RT_diff_stt'], 
+                           complete_df_all[complete_df_all['day']==2]['CIspread'])
+print(f"Correlation ΔRT vs CIspread, Day 2: r={r}, p={p}")
 
 "ΔRT Day 1 vs Day 2"
-t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['RT_diff_stt'], complete_df_all[complete_df_all['day']==2]['RT_diff_stt'])
-print(f"r={t}, p={p}")
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['RT_diff_stt'], 
+                            complete_df_all[complete_df_all['day']==2]['RT_diff_stt'])
+print(f"ΔRT Day 1 vs Day 2, t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['CIspread'], complete_df_all[complete_df_all['day']==2]['CIspread'])
-print(f"r={t}, p={p}")
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['CIspread'], 
+                            complete_df_all[complete_df_all['day']==2]['CIspread'])
+print(f"ΔCI Day 1 vs Day 2, t={t}, p={p}")
 
 '''
     Corr ER ~ ΔCI
 '''
-r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==1]['ER_diff_stt'], complete_df_all[complete_df_all['day']==1]['CIspread'])
-print(f"r={r}, p={p}")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==1]['ER_diff_stt'], 
+                           complete_df_all[complete_df_all['day']==1]['CIspread'])
+print(f"Correlation ΔER vs CIspread, Day 1: r={r}, p={p}")
 
-r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==2]['ER_diff_stt'], complete_df_all[complete_df_all['day']==2]['CIspread'])
-print(f"r={r}, p={p}")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==2]['ER_diff_stt'], 
+                           complete_df_all[complete_df_all['day']==2]['CIspread'])
+print(f"Correlation ΔER vs CIspread, Day 2: r={r}, p={p}")
 
 "ΔER Day 1 vs Day 2"
-t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['ER_diff_stt'], complete_df_all[complete_df_all['day']==2]['ER_diff_stt'])
-print(f"r={t}, p={p}")
+t,p = scipy.stats.ttest_rel(complete_df_all[complete_df_all['day']==1]['ER_diff_stt'], 
+                            complete_df_all[complete_df_all['day']==2]['ER_diff_stt'])
+print(f"ΔER Day 1 vs Day 2: t={t}, p={p}")
 
 
 #%%
@@ -253,15 +345,20 @@ print(f"r={t}, p={p}")
     GD Responders
     Modulators
 '''
+print("===================================")
+print("STRONG VS WEAK HABIT LEARNERS")
 
 expdata_df_day1 = expdata_df_all[expdata_df_all['day'] == 1]
 expdata_df_day2 = expdata_df_all[expdata_df_all['day'] == 2]
 
+print("===================================")
+print("DAY 1")
 seqlearners_df_day1, notseqlearners_df_day1, seqlearn_df_day1 = anal.find_seqlearners(expdata_df_day1,
                                                           day = 1,
                                                           correctp = True)
 
-
+print("===================================")
+print("DAY 2")
 seqlearners_df_day2, notseqlearners_df_day2, seqlearn_df_day2 = anal.find_seqlearners(expdata_df_day2,
                                                           day = 2,
                                                           correctp = True)
@@ -357,7 +454,29 @@ ax[1].get_legend().set_visible(False)
 plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig1/res_fig1_python.svg')
 plt.show()
 
-"===== Strong learners"
+# fig, ax = plt.subplots()
+# sns.barplot(ax = ax,
+#             data = seq_combined[seq_combined['day'] == 2],
+#             x = 'type',
+#             y = 'choices_GD',
+#             hue = 'DTT Types',
+#             hue_order = hue_order,
+#             palette = colors1,
+#             errorbar = ('se', 1))
+# ax.set_title('Day 2', fontsize = 18)
+# ax.tick_params(axis='x', labelsize=15)  # For x-axis tick labels
+# ax.tick_params(axis='y', labelsize=15)  # For x-axis tick labels
+# ax.set_xlabel('', fontsize = 18)
+# ax.set_ylabel('Goal-Directed Responses (%)', fontsize = 18)
+# ax.set_ylim([60, 100])
+# ax.set_xticklabels(['strong habit learners', 'weak habit learners'])
+# custom_labels = ["Random", "Congruent", "Incongruent"]  # Define your custom labels here
+# handles, labels = ax.get_legend_handles_labels()
+# ax.legend(handles, custom_labels, fontsize = 15, loc='upper left', bbox_to_anchor=(1, 1), title= '')
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig1/res_fig1_python.svg')
+# plt.show()
+
+"===== Strong learners Day 1"
 t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Random')]['choices_GD'], 
                             seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Congruent')]['choices_GD'])
 print(f"Rand-Cong, t={t}, p={p}")
@@ -370,7 +489,7 @@ t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 1) & (seq_combi
                             seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Incongruent')]['choices_GD'])
 print(f"Rand-Inc, t={t}, p={p}")
 
-"===== Strong learners"
+"===== Weak learners Day 1"
 t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'weak sequence learner') & (seq_combined['DTT Types'] == 'Random')]['choices_GD'], 
                             seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'weak sequence learner') & (seq_combined['DTT Types'] == 'Congruent')]['choices_GD'])
 print(f"Rand-Cong, t={t}, p={p}")
@@ -383,8 +502,7 @@ t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 1) & (seq_combi
                             seq_combined[(seq_combined['day'] == 1) & (seq_combined['type'] == 'weak sequence learner') & (seq_combined['DTT Types'] == 'Incongruent')]['choices_GD'])
 print(f"Rand-Inc, t={t}, p={p}")
 
-
-"===== Strong learners"
+"===== Strong learners Day 2"
 t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 2) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Random')]['choices_GD'], 
                             seq_combined[(seq_combined['day'] == 2) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Congruent')]['choices_GD'])
 print(f"Rand-Cong, t={t}, p={p}")
@@ -397,7 +515,7 @@ t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 2) & (seq_combi
                             seq_combined[(seq_combined['day'] == 2) & (seq_combined['type'] == 'strong sequence learner') & (seq_combined['DTT Types'] == 'Incongruent')]['choices_GD'])
 print(f"Rand-Inc, t={t}, p={p}")
 
-"===== Strong learners"
+"===== Weak learners Day 2"
 t,p = scipy.stats.ttest_rel(seq_combined[(seq_combined['day'] == 2) & (seq_combined['type'] == 'weak sequence learner') & (seq_combined['DTT Types'] == 'Random')]['choices_GD'], 
                             seq_combined[(seq_combined['day'] == 2) & (seq_combined['type'] == 'weak sequence learner') & (seq_combined['DTT Types'] == 'Congruent')]['choices_GD'])
 print(f"Rand-Cong, t={t}, p={p}")
@@ -462,8 +580,12 @@ df_day2 = expdata_df_all[expdata_df_all['day'] == 2].loc[:, ['ID',
                         'jokertypes',
                         'day']]
 
-IDs, ps_cr, ps_ri, ps_ci, _, _, _ = anal.hpcf_within(df_day2)
-df_ps_day2 = pd.DataFrame({'ID':IDs, 'ps_cr':ps_cr, 'ps_ri':ps_ri, 'ps_ci': ps_ci})
+IDs, ps_cr, ps_ri, ps_ci, chis_cr, chis_ri, chis_ci = anal.hpcf_within(df_day2)
+df_ps_day2 = pd.DataFrame({'ID':IDs, 
+                           'ps_cr':ps_cr, 
+                           'ps_ri':ps_ri, 
+                           'ps_ci': ps_ci,
+                           'chis_ri': chis_ri})
 df_ps_day2['day'] = 2
 
 hrc_df_day2_temp = hrc_df_day2_temp.rename(columns={"hpcf_cong": "Congruent", 
@@ -490,14 +612,19 @@ if 0:
     GD_mask_day2 =  hrc_df_day2['median'] == 'lower_half'
     
 else:
-    hab_mask_day1 = hrc_df_day2['ps_ri'] < 0.05
-    GD_mask_day1 = hrc_df_day2['ps_ri'] > 0.05
+    hab_mask_day1 = hrc_df_day1['ps_ri'] < 0.05
+    GD_mask_day1 = hrc_df_day1['ps_ri'] > 0.05
 
     hab_mask_day2 = hrc_df_day2['ps_ri'] < 0.05
     GD_mask_day2 = hrc_df_day2['ps_ri'] > 0.05
 
 "------"
 
+'''
+    Figure
+    Left: Negative efffect of habit
+    Right: No negative effeect of habit
+'''
 fig, ax = plt.subplots(1,2, sharey=True)
 sns.barplot(ax = ax[0],
             data = hrc_df_day2[hab_mask_day2],
@@ -507,52 +634,76 @@ sns.barplot(ax = ax[0],
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[0].set_ylim([60, 100])
+ax[0].set_ylim([40, 100])
 ax[0].set_title("Negative effect of habit")
 ax[0].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 custom_labels = ["Random", "Congruent", "Incongruent"]  # Define your custom labels here
 handles, labels = ax[0].get_legend_handles_labels()
 ax[0].legend(handles, custom_labels, fontsize = 12, loc='upper left', bbox_to_anchor=(1, 1))
 
-" ==== HRC Differences within Group?"
-t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+sns.stripplot(ax = ax[0],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data=hrc_df_day2[hab_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
 
-t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+handles, labels = ax[0].get_legend_handles_labels()
+ax[0].legend(handles[:-3], labels[:-3], title='Trial Type')
 
 sns.barplot(ax = ax[1],
             data = hrc_df_day2[GD_mask_day2],
-            # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[1].set_ylim([60, 100])
+
+sns.stripplot(ax = ax[1],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data=hrc_df_day2[GD_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
+handles, labels = ax[1].get_legend_handles_labels()
+ax[1].legend(handles[:-3], labels[:-3], title='Trial Type')
+
+ax[1].set_ylim([40, 100])
 ax[1].set_ylabel("Goal-Directed Responses (%)", fontsize = 20)
 ax[1].set_title("No negative effect of habit")
 plt.savefig("/home/sascha/Desktop/Paper_2024/Mar/res_fig3/hab_vs_GD_python.svg")
 plt.show()
 
 " ==== HRC Differences within Group?"
+t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"HRC Random vs Incongruent, Negative habit effect, Day 2: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
+print(f"HRC Random vs Congruent, Negative habit effect, Day 2: t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day2[(hrc_df_day2['ps_ri'] < 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"HRC Congruent vs Incongruent, Negative habit effect, Day 2: t={t}, p={p}")
+
+" ==== HRC Differences within Group?"
 t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
                             hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC Random vs Incongruent, No negative habit effect, Day 2: t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
                             hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC Random vs Congruent, No negative habit effect, Day 2: t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
                             hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+print(f"HRC Congruent vs Incongruent, No negative habit effect, Day 2: t={t}, p={p}")
 
 " ==== HRC Differences between Groups?"
 t,p = scipy.stats.ttest_ind(hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
@@ -560,16 +711,16 @@ t,p = scipy.stats.ttest_ind(hrc_df_day2[(hrc_df_day2['ps_ri'] > 0.05) & (hrc_df_
 print(f"t={t}, p={p}")
 
 
-print(f"There are {len(hrc_df_day2[hab_mask_day2]['ID'].unique())} participants in the 'habitual' group")
-print(f"There are {len(hrc_df_day2[GD_mask_day2]['ID'].unique())}  participants in the 'GD' group")
+print(f"There are {len(hrc_df_day2[hab_mask_day2]['ID'].unique())} participants in the 'habitual' group on day 2.")
+print(f"There are {len(hrc_df_day2[GD_mask_day2]['ID'].unique())}  participants in the 'GD' group on day 2.")
 
 #%%
 '''
     Exploiters vs Suppressers Day 1
 '''
 
-exploit_mask = GD_mask_day1 & (hrc_df_day1['ps_cr'] < 0.05)
-suppress_mask = GD_mask_day1 & (hrc_df_day1['ps_cr'] > 0.05)
+exploit_mask_day1 = GD_mask_day1 & (hrc_df_day1['ps_cr'] < 0.05)
+suppress_mask_day1 = GD_mask_day1 & (hrc_df_day1['ps_cr'] > 0.05)
     
 fig, ax = plt.subplots(2,2, sharey=True, figsize = (8,8))
 
@@ -581,6 +732,20 @@ sns.barplot(ax = ax[0,0],
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
+
+sns.stripplot(ax = ax[0,0],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day1[hab_mask_day1], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
+handles, labels = ax[0,0].get_legend_handles_labels()
+ax[0,0].legend(handles[:-3], labels[:-3], title='Trial Type')
+
+
 ax[0,0].tick_params(axis='both', labelsize=14)
 ax[0,0].set_title("Negative effect of habit")
 ax[0,0].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
@@ -593,91 +758,120 @@ sns.barplot(ax = ax[0,1],
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[0,1].set_ylim([60, 100])
+ax[0,1].set_ylim([40, 100])
 ax[0,1].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[0,1].set_title("No negative effect of habit")
 
+sns.stripplot(ax = ax[0,1],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day1[GD_mask_day1], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
 sns.barplot(ax = ax[1,0],
-            data = hrc_df_day1[exploit_mask],
+            data = hrc_df_day1[exploit_mask_day1],
             # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[1,0].set_ylim([60, 100])
+ax[1,0].set_ylim([40, 100])
 ax[1,0].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[1,0].set_title('"Adapters"')
 ax[1,0].tick_params(axis='both', labelsize=14)
 # plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/hrc_python.svg")
 # plt.title(f"Habedahabeda 2 (N={len(hrc_df_day1[hrc_df_day1['ps_ri'] < 0.05])/3})")
 
+sns.stripplot(ax = ax[1,0],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day1[exploit_mask_day1], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
+
 "===== Differences within group"
-t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
 sns.barplot(ax = ax[1,1],
-            data = hrc_df_day1[suppress_mask],
+            data = hrc_df_day1[suppress_mask_day1],
             # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[1,1].set_ylim([60, 100])
+ax[1,1].set_ylim([40, 100])
 ax[1,1].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[1,1].set_title('"Inhibitors"')
 ax[1,1].get_legend().set_visible(False)
 ax[1,0].get_legend().set_visible(False)
 ax[0,1].get_legend().set_visible(False)
+
+sns.stripplot(ax = ax[1,1],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day1[suppress_mask_day1], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
 # plt.savefig("/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg")
 plt.show()
 
 "===== Differences within group"
-t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
 "===== Differences between groups"
-t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Random')]['HRC'])
 print(f"Random Type, between groups: t={t}, p={p}")
 
-t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Congruent')]['HRC'])
 print(f"Congruent Type, between groups: t={t}, p={p}")
 
-t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'], 
-                            hrc_df_day1[exploit_mask & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day1[suppress_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'], 
+                            hrc_df_day1[exploit_mask_day1 & (hrc_df_day1['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"Incongruent Type, between groups: t={t}, p={p}")
 
-print(f"There are {len(hrc_df_day1[exploit_mask]['ID'].unique())} participants in the exploit group")
-print(f"There are {len(hrc_df_day1[suppress_mask]['ID'].unique())} participants in the suppress group")
+print(f"There are {len(hrc_df_day1[exploit_mask_day1]['ID'].unique())} participants in the exploit group on day 1.")
+print(f"There are {len(hrc_df_day1[suppress_mask_day1]['ID'].unique())} participants in the suppress group on day 1.")
 
 #%%
 '''
     Exploiters vs Suppressers Day 2
 '''
 
-exploit_mask = GD_mask_day2 & (hrc_df_day2['ps_cr'] < 0.05)
-suppress_mask = GD_mask_day2 & (hrc_df_day2['ps_cr'] > 0.05)
+exploit_mask_day2 = GD_mask_day2 & (hrc_df_day2['ps_cr'] < 0.05)
+suppress_mask_day2 = GD_mask_day2 & (hrc_df_day2['ps_cr'] > 0.05)
     
 fig, ax = plt.subplots(2,2, sharey=True, figsize = (8,8))
 
@@ -693,6 +887,15 @@ ax[0,0].tick_params(axis='both', labelsize=14)
 ax[0,0].set_title("Negative effect of habit")
 ax[0,0].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 
+sns.stripplot(ax = ax[0, 0],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day2[hab_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
 sns.barplot(ax = ax[0,1],
             data = hrc_df_day2[GD_mask_day2],
             # x = 'Trial Type',
@@ -701,89 +904,125 @@ sns.barplot(ax = ax[0,1],
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[0,1].set_ylim([60, 100])
+ax[0,1].set_ylim([40, 100])
 ax[0,1].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[0,1].set_title("No negative effect of habit")
 
+sns.stripplot(ax = ax[0, 1],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day2[GD_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
+
 sns.barplot(ax = ax[1,0],
-            data = hrc_df_day2[exploit_mask],
+            data = hrc_df_day2[exploit_mask_day2],
             # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[1,0].set_ylim([60, 100])
+ax[1,0].set_ylim([40, 100])
 ax[1,0].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[1,0].set_title('"Adapters"')
 ax[1,0].tick_params(axis='both', labelsize=14)
 # plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/hrc_python.svg")
 # plt.title(f"Habedahabeda 2 (N={len(hrc_df_day2[hrc_df_day2['ps_ri'] < 0.05])/3})")
 
-"===== Differences within group"
-t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
+sns.stripplot(ax = ax[1, 0],
+    y="HRC", 
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day2[exploit_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
 
 sns.barplot(ax = ax[1,1],
-            data = hrc_df_day2[suppress_mask],
+            data = hrc_df_day2[suppress_mask_day2],
             # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
             hue_order = ['Random', 'Congruent', 'Incongruent'],
             palette = colors1,
             errorbar = ('se', 1))
-ax[1,1].set_ylim([60, 100])
+ax[1,1].set_ylim([40, 100])
 ax[1,1].set_ylabel("Goal-Directed Responses (%)", fontsize = 16)
 ax[1,1].set_title('"Inhibitors"')
 ax[1,1].get_legend().set_visible(False)
 ax[1,0].get_legend().set_visible(False)
 ax[0,1].get_legend().set_visible(False)
-plt.savefig("/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg")
+
+sns.stripplot(ax = ax[1, 1],
+    y="HRC",
+    hue="Trial Type", 
+    hue_order = ['Random', 'Congruent', 'Incongruent'],
+    palette = colors1,
+    data = hrc_df_day2[suppress_mask_day2], dodge=True, alpha=0.6,
+    edgecolor = 'k', linewidth = 1,
+)
+
+handles, labels = ax[1,1].get_legend_handles_labels()
+ax[1,1].legend(handles[:-3], labels[:-3], title='Trial Type')
+
+plt.savefig("/home/sascha/Desktop/Paper_2024/Mar/res_fig2/res_fig2_python.svg")
 plt.show()
 
 "===== Differences within group"
-t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_rel(hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+"===== Differences within group"
+t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
 "===== Differences between groups"
-t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Random')]['HRC'])
 print(f"Random Type, between groups: t={t}, p={p}")
 
-t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Congruent')]['HRC'])
 print(f"Congruent Type, between groups: t={t}, p={p}")
 
-t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'], 
-                            hrc_df_day2[exploit_mask & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
+t,p = scipy.stats.ttest_ind(hrc_df_day2[suppress_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'], 
+                            hrc_df_day2[exploit_mask_day2 & (hrc_df_day2['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"Incongruent Type, between groups: t={t}, p={p}")
 
-print(f"There are {len(hrc_df_day2[exploit_mask]['ID'].unique())} participants in the exploit group")
-print(f"There are {len(hrc_df_day2[suppress_mask]['ID'].unique())} participants in the suppress group")
+print(f"There are {len(hrc_df_day2[exploit_mask_day2]['ID'].unique())} participants in the exploit group on day 2.")
+print(f"There are {len(hrc_df_day2[suppress_mask_day2]['ID'].unique())} participants in the suppress group on day 2.")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CRspread'], 
                            complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
 
+print(f"Pearson corr CR vs HRC Baseline: r={r}, p={p}.")
+
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RIspread'], 
                            complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+
+print(f"Pearson corr RI vs HRC Baseline: r={r}, p={p}.")
 
 #%%
 '''
@@ -812,12 +1051,23 @@ df['ri_0'] = df['ps_ri'].map(lambda x: 'yes' if x > 0.05 else 'no')
 
 df['exploit_score'] = df.apply(lambda row: row[f'{param2}']/row[f'{param1}'], axis=1)
 
+#%%
 '''
     Fig
     Adaptation score
 '''
+
+limit_to_ssl = 0 # limit to strong sequence learners?
+
+if limit_to_ssl:
+    dfadapt = df[df['ID'].isin(seqlearners_df_day2['ID'].unique())]
+    
+else:
+    dfadapt = df
+    
+
 fig, ax = plt.subplots(1,2, sharey=True, sharex = True, figsize = (8,4))
-sns.scatterplot(df,
+sns.scatterplot(dfadapt,
                 x = f'{param1}',
                 y = f'{param2}',
                 # palette = ['r', 'b'],
@@ -830,20 +1080,23 @@ handles, labels = ax[0].get_legend_handles_labels()
 ax[0].legend(handles, custom_labels, fontsize = 15, loc='upper left', bbox_to_anchor=(1, 1))
 ax[0].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
 ax[0].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
-sns.scatterplot(df,
+sns.scatterplot(dfadapt,
                 x = f'{param1}',
                 y = f'{param2}',
                 # palette = ['r', 'b'],
                 hue = 'exploit_score',
                 ax = ax[1])
+
 ax[1].legend(title='Adaptation Score', loc='upper left', bbox_to_anchor=(1, 1))
 ax[1].get_legend().get_title().set_fontsize(14)
 # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
 # plt.plot([0, 2.5], [0, 1.1])
-ax[1].set_xlim([0, 2.5])
-ax[1].set_ylim([0, 2.5])
+if param1 == 'theta_rep':
+    ax[1].set_xlim([0.25, 2])
+    # ax[1].set_ylim([0, 2.5])
 ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
 ax[1].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
 plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
 plt.show()
 
@@ -854,68 +1107,244 @@ plt.show()
 # plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig5b/res_fig5b_b_python.svg', bbox_inches = 'tight')
 
 #%%
+
+dfadapt['seqlearner'] = dfadapt['ID'].map(lambda x: 'strong' if x in seqlearners_df_day2['ID'].unique() else 
+                                          'weak' if x in notseqlearners_df_day2['ID'].unique() else
+                                          'None')
+
+dfadapt['strategy'] = dfadapt['ID'].map(lambda x: 'Inhibitor' if x in hrc_df_day2[suppress_mask_day2]['ID'].unique() else 
+                                          'Adapter' if x in hrc_df_day2[exploit_mask_day2]['ID'].unique() else
+                                          'negative effect of habit' if x in hrc_df_day2[hab_mask_day2]['ID'].unique() else
+                                          'None')
+
+fig, ax = plt.subplots()
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                hue = 'seqlearner',
+                # hue_order = ['weak', 'strong'],
+                ax = ax)
+# custom_labels = ["weak habit learner", "strong habit learner"]  # Define your custom labels here
+# handles, labels = ax.get_legend_handles_labels()
+
+# ax.legend(handles, custom_labels, fontsize = 15, loc='upper left', bbox_to_anchor=(1, 1))
+ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
+plt.show()
+
+fig, ax = plt.subplots()
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                palette = ['g', 'y', 'm'],
+                hue = 'strategy',
+                # hue_order = ['weak', 'strong'],
+                ax = ax)
+# custom_labels = ["weak habit learner", "strong habit learner"]  # Define your custom labels here
+# handles, labels = ax.get_legend_handles_labels()
+
+# ax.legend(handles, custom_labels, fontsize = 15, loc='upper left', bbox_to_anchor=(1, 1))
+ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
+plt.show()
+
+
+fig, ax = plt.subplots(1,3, sharey=True, sharex = True, figsize = (12,4))
+"Ax[0]"
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                hue = 'ri_0',
+                hue_order = ['yes', 'no'],
+                palette = {'yes': '#d62728', 'no': '#1f77b4'},
+                ax = ax[0])
+custom_labels = ["no negative effect of habit", "negative effect of habit"]  # Define your custom labels here
+handles, labels = ax[0].get_legend_handles_labels()
+# ax[0].plot(np.arange(0.5,2),np.arange(0.5,2)-0.8, color='k')
+ax[0].legend(handles, custom_labels, fontsize = 13, loc='upper left', bbox_to_anchor=(1, 1))
+
+ax[0].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax[0].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
+"Ax[1]"
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                hue = 'strategy',
+                hue_order = ['Adapter', 'Inhibitor', 'negative effect of habit'],
+                palette = {'negative effect of habit': '#1f77b4', 
+                           'Adapter': '#e377c2', 'Inhibitor': '#9467bd'},
+                ax = ax[1])
+
+ax[1].legend(title='', fontsize = 13)
+# plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+# plt.plot([0, 2.5], [0, 1.1])
+if param1 == 'theta_rep':
+    ax[1].set_xlim([0.25, 2])
+    # ax[1].set_ylim([0, 2.5])
+ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax[1].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
+"Ax[2]"
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                hue = 'exploit_score',
+                ax = ax[2])
+
+ax[2].legend(title='Adaptation Score', loc='upper left', bbox_to_anchor=(1, 1))
+ax[2].get_legend().get_title().set_fontsize(13)
+# plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+# plt.plot([0, 2.5], [0, 1.1])
+if param1 == 'theta_rep':
+    ax[2].set_xlim([0.25, 2])
+    # ax[2].set_ylim([0, 2.5])
+ax[2].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax[2].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+
+plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
+plt.show()
+
+#%%
+'''
+    Annotate
+'''
+for rowidx in range(60):
+    x = dfadapt.iloc[rowidx,:]['theta_rep']
+    y = dfadapt.iloc[rowidx,:]['theta_conflict']
+    # z = dfadapt.iloc[rowidx,:]['theta_Q']
+    z = dfadapt.iloc[rowidx,:]['ID']
+    
+    fig, ax = plt.subplots()
+    sns.scatterplot(dfadapt,
+                    x = f'{param1}',
+                    y = f'{param2}',
+                    # palette = ['r', 'b'],
+                    hue = 'strategy',
+                    hue_order = ['Adapter', 'Inhibitor', 'negative effect of habit'],
+                    palette = {'negative effect of habit': '#1f77b4', 
+                               'Adapter': '#e377c2', 'Inhibitor': '#9467bd'},
+                    ax = ax)
+    
+    plt.annotate(f'{z}',
+                 xy=(x, y),
+                 xytext=(x+0.1, y+0.1),
+                 arrowprops=dict(facecolor='blue', shrink=0.05))
+    
+    
+    ax.legend(title='', fontsize = 13)
+    # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+    # plt.plot([0, 2.5], [0, 1.1])
+    if param1 == 'theta_rep':
+        ax.set_xlim([0.25, 2])
+        # ax[1].set_ylim([0, 2.5])
+    ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+    ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+    
+    ax.legend(title='', fontsize = 13)
+    # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
+    # plt.plot([0, 2.5], [0, 1.1])
+    if param1 == 'theta_rep':
+        ax.set_xlim([0.25, 2])
+        # ax[1].set_ylim([0, 2.5])
+    ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+    ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+    ax.get_legend().set_visible(False)
+    plt.show()
+#%%
 '''
     Histogram of Habit Exploitation Score
 '''
-fig, ax = plt.subplots()
-sns.histplot(data = df, x='exploit_score', bins = 9, binrange=[0.2, 1.5], ax = ax)
+fig, ax = plt.subplots(figsize = (6,6))
+# sns.histplot(data = df, x='exploit_score', bins = 9, binrange=[0.2, 1.5], ax = ax)
+sns.histplot(data = dfadapt, x='exploit_score', ax = ax)
 ax.set_xlabel('Adaptation Score')
+ax.set_ylabel('Count', fontsize = 20)
+ax.set_xlabel('Adaptation Score', fontsize = 20)
+ax.tick_params(axis='both', labelsize=14)
 plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
 plt.title(f"{model}")
 ax2 = ax.twinx()
-sns.kdeplot(data = df, x='exploit_score', ax = ax2)
+sns.kdeplot(data = dfadapt, x='exploit_score', ax = ax2)
 ax2.grid(False)
 ax2.get_yaxis().set_visible(False)
 plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3c_python.svg', bbox_inches = 'tight')
 plt.show()
 
+fig, ax = plt.subplots()
+# sns.histplot(data = dfadapt, x='exploit_score', bins = 9, binrange=[0.2, 1.5], ax = ax)
+sns.scatterplot(data = dfadapt, x='exploit_score', y='theta_rep')
+ax.set_xlabel('Adaptation Score')
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.title(f"{model}")
+# plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3c_python.svg', bbox_inches = 'tight')
+plt.show()
+
+
 #%%
-'''
-    2 Example participants, from 3 sections each
-'''
-IDs = ['60a3f8075b013de7b5518e96', '57deda2591b7fc0001493e95', 
-       '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e', 
-       '63174af7d57182f9bf90c094', '58aca85e0da7f10001de92d4', '596f961cfe061d00011e3e03']
-
-# Exploit scores > 1 and hpcf_rand < 0.9
-IDs = ['5eaadc0a7adeb404eea9c3c0', '5b5e0e86902ad10001cfcc59', '62c97799bd8ab72a531abde0']
-
-for ID in df.sort_values(by='exploit_score')['ID'].unique():
-    utils.plot_hpcf(complete_df_all[complete_df_all['ID'] == ID], title='score = %.2f, ID %s'%(df[df['ID'] == ID]['exploit_score'], ID))
-
+if 0:
+    '''
+        2 Example participants, from 3 sections each
+    '''
+    IDs = ['60a3f8075b013de7b5518e96', '57deda2591b7fc0001493e95', 
+           '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e', 
+           '63174af7d57182f9bf90c094', '58aca85e0da7f10001de92d4', '596f961cfe061d00011e3e03']
+    
+    # Exploit scores > 1 and hpcf_rand < 0.9
+    IDs = ['5eaadc0a7adeb404eea9c3c0', '5b5e0e86902ad10001cfcc59', '62c97799bd8ab72a531abde0']
+    
+    for ID in dfadapt.sort_values(by='exploit_score')['ID'].unique():
+        utils.plot_hpcf(complete_df_all[complete_df_all['ID'] == ID], title='score = %.2f, ID %s'%(dfadapt[dfadapt['ID'] == ID]['exploit_score'], ID))
 
 #%%
 '''
     Ideally, theta_Q does not correlate with the other model params.
 '''
-r,p = scipy.stats.pearsonr(df[f'{param1}'], df['theta_Q'])
+r,p = scipy.stats.pearsonr(dfadapt[f'{param1}'], dfadapt['theta_Q'])
 print(f"{param1} vs theta_Q: r={r}, p={p}")
 
-r,p = scipy.stats.pearsonr(df[f'{param2}'], df['theta_Q'])
+r,p = scipy.stats.pearsonr(dfadapt[f'{param2}'], dfadapt['theta_Q'])
 print(f"{param2} vs theta_Q: r={r}, p={p}")
 
-r,p = scipy.stats.pearsonr(df['exploit_score'], df['theta_Q'])
+r,p = scipy.stats.pearsonr(dfadapt['exploit_score'], dfadapt['theta_Q'])
 print(f"exploit_score vs theta_Q: r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['exploit_score'], dfadapt['chis_ri'])
+print(f"exploit_score vs chis_ri: r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['exploit_score'], dfadapt['chis_cr'])
+print(f"exploit_score vs chis_cr: r={r}, p={p}")
 
 #%%
 '''
-    Does exploit score depend on group?
+    Correlations of exploit score
+'''
+
+'''
+    Group
 '''
 
 expl_means = []
-expl_means.append(df[df['group']==0]['exploit_score'].mean())
-expl_means.append(df[df['group']==1]['exploit_score'].mean())
-expl_means.append(df[df['group']==2]['exploit_score'].mean())
-expl_means.append(df[df['group']==3]['exploit_score'].mean())
-
+expl_means.append(dfadapt[dfadapt['group']==0]['exploit_score'].mean())
+expl_means.append(dfadapt[dfadapt['group']==1]['exploit_score'].mean())
+expl_means.append(dfadapt[dfadapt['group']==2]['exploit_score'].mean())
+expl_means.append(dfadapt[dfadapt['group']==3]['exploit_score'].mean())
 
 expl_stdevs = []
-expl_stdevs.append(df[df['group']==0]['exploit_score'].std())
-expl_stdevs.append(df[df['group']==1]['exploit_score'].std())
-expl_stdevs.append(df[df['group']==2]['exploit_score'].std())
-expl_stdevs.append(df[df['group']==3]['exploit_score'].std())
+expl_stdevs.append(dfadapt[dfadapt['group']==0]['exploit_score'].std())
+expl_stdevs.append(dfadapt[dfadapt['group']==1]['exploit_score'].std())
+expl_stdevs.append(dfadapt[dfadapt['group']==2]['exploit_score'].std())
+expl_stdevs.append(dfadapt[dfadapt['group']==3]['exploit_score'].std())
 
-sns.barplot(data=df,
+sns.barplot(data=dfadapt,
             y='exploit_score',
             x='group',
             errorbar=('se', 1))
@@ -923,34 +1352,96 @@ sns.barplot(data=df,
 import pingouin as pg
 aov = pg.anova(dv = 'exploit_score',
                   between = ['group'], 
-                  data = df, 
+                  data = dfadapt, 
                   detailed = True,
                   effsize = 'np2')
 
 # print(aov)
 print(aov.loc[:, ['Source', 'F', 'p-unc', 'np2']])
 
+dfadapt['blockordergroup'] = dfadapt['group'].map(lambda x: 1 if (x == 0 or x == 2) else 2 if x == 1 or x == 3 else 4)
+
+fig, ax = plt.subplots()
+sns.barplot(data=dfadapt,
+            y='exploit_score',
+            x='blockordergroup',
+            errorbar=('se', 1))
+
+sns.stripplot(data=dfadapt,
+            y='exploit_score',
+            x='blockordergroup')
+ax.set_ylabel('Adaptation score', fontsize = 20)
+ax.set_xlabel('Block order', fontsize = 20)
+plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/adapt_by_group_python.svg')
+plt.show()
+
+t,p = scipy.stats.ttest_ind(dfadapt[dfadapt['blockordergroup'] == 1]['exploit_score'],
+                            dfadapt[dfadapt['blockordergroup'] == 2]['exploit_score'])
+
+print(f"t={t}, p={p}")
+
 '''
-    Does exploit score depend on age?
+    Age
 '''
-r,p = scipy.stats.pearsonr(df['age'], df['exploit_score'])
+r,p = scipy.stats.pearsonr(dfadapt['age'], dfadapt['exploit_score'])
 print(f"r={r}, p={p}")
 fig, ax = plt.subplots()
-sns.regplot(data=df,
+sns.regplot(data=dfadapt,
            x='age',
            y='exploit_score')
 ax.text(45, 1.4, "r=%.2f, p=%.2f"%(r,p))
 plt.show()
 
 '''
-    Does exploit score depend on noticing a sequence?
+    Noticing a sequence
 '''
 from scipy.stats import chi2_contingency
-t,p = scipy.stats.ttest_ind(df[df['q_notice_a_sequence']==0]['exploit_score'], 
-                            df[df['q_notice_a_sequence']==1]['exploit_score'])
+t,p = scipy.stats.ttest_ind(dfadapt[dfadapt['q_notice_a_sequence']==0]['exploit_score'], 
+                            dfadapt[dfadapt['q_notice_a_sequence']==1]['exploit_score'])
 
-_ = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(df[df['q_notice_a_sequence']==0]['ID'].unique())], plot_single = False)
-_ = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(df[df['q_notice_a_sequence']==1]['ID'].unique())], plot_single = False)
+print(f"t={t}, p={p}")
+# _ = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(df[df['q_notice_a_sequence']==0]['ID'].unique())], plot_single = False)
+# _ = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(df[df['q_notice_a_sequence']==1]['ID'].unique())], plot_single = False)
+
+'''
+    Model parameter Q
+'''
+r,p = scipy.stats.pearsonr(dfadapt['theta_Q'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['theta_rep'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+'''
+    Performance
+'''
+r,p = scipy.stats.pearsonr(dfadapt['points'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['points_dtt'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['points_stt'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['hpcf_rand'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['hpcf_cong'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['hpcf_incong'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['CRspread'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(dfadapt['RIspread'], dfadapt['exploit_score'])
+print(f"r={r}, p={p}")
+
+fig, ax = plt.subplots()
+sns.regplot(data=dfadapt, x='RIspread', y='exploit_score')
+plt.show()
 
 #%%
 '''
@@ -958,7 +1449,7 @@ _ = utils.plot_grouplevel(expdata_df_day2[expdata_df_day2['ID'].isin(df[df['q_no
 '''
 
 hrc_df_day2 = complete_df_all[complete_df_all['day'] == 2].loc[:, ['ID', 'hpcf_rand', 'hpcf_cong', 'hpcf_incong']]
-hrc_df_day2 = pd.merge(hrc_df_day2, df.loc[:, ['ID', 'exploit_score']], on = 'ID')
+hrc_df_day2 = pd.merge(hrc_df_day2, dfadapt.loc[:, ['ID', 'exploit_score']], on = 'ID')
 hrc_df_day2['exploit'] = hrc_df_day2['exploit_score'].map(lambda x: 'upper_half' if x > hrc_df_day2['exploit_score'].median() else
                                                           'lower_half')
 
@@ -1014,3 +1505,162 @@ print(f"exploit_score median split, upper vs lower half, Congruent DTT:  t={t}, 
 t,p=scipy.stats.ttest_ind(hrc_df_day2[(hrc_df_day2['exploit'] == 'lower_half') & (hrc_df_day2['variable'] == 'Incongruent')]['value'],
 hrc_df_day2[(hrc_df_day2['exploit'] == 'upper_half') & (hrc_df_day2['variable'] == 'Incongruent')]['value'])
 print(f"exploit_score median split, upper vs lower half, Incongruent DTT:  t={t}, p={p}")
+
+#%%
+'''
+    Model parameters correlate with participant behaviour.
+'''
+print("===========================")
+print("Correlation Model Parameters & Spreads resp HRC.")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
+                           complete_df_all[complete_df_all['day'] == 2]['CRspread'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_conflict'],
+                           complete_df_all[complete_df_all['day'] == 2]['RIspread'])
+print(f"r={r}, p={p}")
+
+'''
+    Model parameters do not correlate with each other.
+'''
+print("===========================")
+print("Correlation among Model Parameters.")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q'],
+                           complete_df_all[complete_df_all['day'] == 2]['theta_rep'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q'],
+                           complete_df_all[complete_df_all['day'] == 2]['theta_conflict'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
+                           complete_df_all[complete_df_all['day'] == 2]['theta_conflict'])
+print(f"r={r}, p={p}")
+
+complete_df_all['comb'] = complete_df_all['theta_rep']  - complete_df_all['theta_conflict'] 
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['comb'],
+                           complete_df_all[complete_df_all['day'] == 2]['theta_Q'])
+print(f"r={r}, p={p}")
+
+print("===========================")
+print("Correlation Model Parameters & Spreads, resp HRC.")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CRspread'],
+                           complete_df_all[complete_df_all['day'] == 2]['theta_conflict'])
+print(f"r={r}, p={p}")
+
+# r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q'],
+#                            complete_df_all[complete_df_all['day'] == 2]['comb'])
+# print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_conflict'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
+'''
+    Age effects
+'''
+print("===========================")
+print("Age effects")
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_cong'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_incong'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CRspread'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RIspread'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CIspread'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['points'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_dtt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_stt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_diff_stt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_stt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_dtt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_diff_stt'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+'''
+    Noticed a sequence effect
+'''
+print("===========================")
+print("Noticed a sequence effects")
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['age'])
+print(f"t={t}, p={p}")
+
+t,p,df = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age'],
+                                        complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['age'])
+print(f"t={t}, p={p}, df={df}")
+
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['hpcf_rand'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['hpcf_rand'])
+print(f"t={t}, p={p}")
+
+t,p,df = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['hpcf_rand'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['hpcf_rand'])
+print(f"t={t}, p={p}, df={df}")
+
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread'])
+print(f"t={t}, p={p}")
+
+t,p,df = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread'])
+print(f"t={t}, p={p}, df={df}")
+
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['RIspread'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['RIspread'])
+print(f"t={t}, p={p}")
+
+t,p,df = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['RIspread'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['RIspread'])
+print(f"t={t}, p={p}, df={df}")
+
+t,p = scipy.stats.ttest_ind(dfadapt[(dfadapt['day'] == 2) & (dfadapt['q_notice_a_sequence'] == 1)]['exploit_score'],
+                           dfadapt[(dfadapt['day'] == 2) & (dfadapt['q_notice_a_sequence'] == 0)]['exploit_score'])
+print(f"t={t}, p={p}")
+
+
