@@ -544,9 +544,9 @@ print(f"There are {len(hrc_df_pooled[hrc_df_pooled['ps_ri'] > 0.05])/3} particip
     Exploiters vs Suppressers
 '''
 
-fig, ax = plt.subplots(1,2, sharey=True, figsize=(4, 4))
+fig, ax = plt.subplots(1,2, sharey=True)
 sns.barplot(ax = ax[0],
-            data = hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05) & (hrc_df_pooled['ps_cr'] < 0.05)],
+            data = hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05) & (hrc_df_pooled['ps_cr'] > 0.05)],
             # x = 'Trial Type',
             y = 'HRC',
             hue = 'Trial Type',
@@ -558,33 +558,6 @@ ax[0].set_ylabel("High-Reward Choices (%)")
 # plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/hrc_python.svg")
 # plt.title(f"Habedahabeda 2 (N={len(hrc_df_pooled[hrc_df_pooled['ps_ri'] < 0.05])/3})")
 
-t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Random')]['HRC'], 
-                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Congruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Congruent')]['HRC'], 
-                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
-print(f"t={t}, p={p}")
-
-sns.barplot(ax = ax[1],
-            data = hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05) & (hrc_df_pooled['ps_cr'] > 0.05)],
-            # x = 'Trial Type',
-            y = 'HRC',
-            hue = 'Trial Type',
-            hue_order = ['Random', 'Congruent', 'Incongruent'],
-            palette = colors1,
-            errorbar = ('se', 1))
-ax[1].set_ylim([60, 100])
-ax[1].set_ylabel("High-Reward Choices (%)")
-# plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/GD_vs_adapt_python.svg")
-# plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/Appendix/GD_vs_adapt_BHcorrect_python.svg")
-# plt.title(f"Habedahabeda 2 (N={len(hrc_df_pooled[hrc_df_pooled['ps_ri'] > 0.05])/3})")
-plt.show()
-
 t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] > 0.05) & (hrc_df_pooled['Trial Type'] == 'Random')]['HRC'], 
                             hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] > 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
@@ -595,6 +568,33 @@ print(f"t={t}, p={p}")
 
 t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] > 0.05) & (hrc_df_pooled['Trial Type'] == 'Congruent')]['HRC'], 
                             hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] > 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+sns.barplot(ax = ax[1],
+            data = hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05) & (hrc_df_pooled['ps_cr'] < 0.05)],
+            # x = 'Trial Type',
+            y = 'HRC',
+            hue = 'Trial Type',
+            hue_order = ['Random', 'Congruent', 'Incongruent'],
+            palette = colors1,
+            errorbar = ('se', 1))
+ax[1].set_ylim([60, 100])
+ax[1].set_ylabel("High-Reward Choices (%)")
+plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/GD_vs_adapt_python.svg")
+# plt.savefig("/home/sascha/Desktop/Nextcloud/work/presentations/AST/2024_03_Weimar/Appendix/GD_vs_adapt_BHcorrect_python.svg")
+# plt.title(f"Habedahabeda 2 (N={len(hrc_df_pooled[hrc_df_pooled['ps_ri'] > 0.05])/3})")
+plt.show()
+
+t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Random')]['HRC'], 
+                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Congruent')]['HRC'])
+print(f"t={t}, p={p}")
+
+t,p = scipy.stats.ttest_rel(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Congruent')]['HRC'], 
+                            hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05) & (hrc_df_pooled['Trial Type'] == 'Incongruent')]['HRC'])
 print(f"t={t}, p={p}")
 
 print(f"There are {len(hrc_df_pooled[(hrc_df_pooled['ps_ri'] > 0.05)& (hrc_df_pooled['ps_cr'] < 0.05)])/3} participants in the 'adapter' group.")
