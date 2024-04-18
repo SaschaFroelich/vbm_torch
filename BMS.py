@@ -43,7 +43,7 @@ def sweep_probs(samples, index):
         c_point += c_sign * step_size
     return (samples[:, index] >= c_point).sum() / samples.shape[0]
 
-num_models = 2
+num_models = 15
 num_agents = 60
 elbos_2nd_lvl = np.zeros(num_models)
 elbos = np.zeros((num_agents, num_models))
@@ -53,6 +53,7 @@ WAIC = np.zeros(num_models)
 WAIC_var = np.zeros(num_models)
 individual_WAIC = np.zeros((num_agents, num_models))
 DIC = np.zeros(num_models)
+individual_DIC = np.zeros((num_agents, num_models))
 log_likelihood = np.zeros(num_models)
 # model_files = ['behav_fit_model_B_2023-11-25_60agents.p',
 # 'behav_fit_model_Bhand_2023-11-28 23:25:11.p',
@@ -79,6 +80,7 @@ for model in range(num_models):
     WAIC_var[model] = np.squeeze(extra_storage[16])
     individual_WAIC[:, model] = np.squeeze(extra_storage[17])
     DIC[model] = np.squeeze(extra_storage[18])
+    individual_DIC[:, model] = np.squeeze(extra_storage[20])
     # if len(extra_storage) >= 10:
     #     if extra_storage[11] >= 1e-03:
     #         print("rhalt too large for IC computation.")
@@ -156,6 +158,7 @@ with pm.Model() as BMS:
 az.summary(BMSinferenceData)
 
 #%%
+
 posteriorsModelProbs = az.extract(data=BMSinferenceData, var_names=['model_probs']).to_numpy().T
 exceedance_probability(posteriorsModelProbs)
 
@@ -213,7 +216,7 @@ for i in range(num_models):
         
 #%%
 '''
-    Plot WAIC
+    Group-Level WAIC
 '''
 
 markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
@@ -243,7 +246,64 @@ plt.show()
 
 #%%
 '''
-    Plot DIC
+    Individual WAIC 
+'''
+
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(sharey = True, figsize = (15,5))
+for midx in range(num_models):
+    # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+    ax.scatter(range(num_agents), individual_WAIC[:, midx], 
+                  marker=markershapes[midx], 
+                  edgecolor=colors[midx], 
+                  facecolors='none', 
+                  linewidth=1, 
+                  label=model_names[midx])
+    
+ax.legend()
+ax.title.set_text(f'WAIC (day {day})')
+ax.set_xlabel('Agent no.')
+ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+plt.tight_layout()
+
+plt.savefig('BMS/ICs.png')
+plt.show()
+
+if AICs.shape[1] == 2:
+    '''
+        Sort WAIC
+    '''
+    WAIC_diff = individual_WAIC[:, 0] - individual_WAIC[:, 1]
+    WAIC_sort_idxs = np.argsort(WAIC_diff)
+    WAIC_diff_argmin_idx = np.abs(WAIC_diff[WAIC_sort_idxs]).argmin()
+    
+    fig, ax = plt.subplots(sharey = True, figsize = (15,5))
+    for midx in range(num_models):
+        # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+        ax.scatter(range(num_agents), individual_WAIC[WAIC_sort_idxs, midx], 
+                      marker=markershapes[midx], 
+                      edgecolor=colors[midx], 
+                      facecolors='none', 
+                      linewidth=1, 
+                      label=model_names[midx])
+        
+    ax.axvline(WAIC_diff_argmin_idx)
+    ax.legend()
+    ax.title.set_text(f'WAIC (day {day})')
+    ax.set_xlabel('Agent no.')
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+    plt.tight_layout()
+
+    # plt.savefig('BMS/ICs.png')
+    plt.show()
+
+#%%
+'''
+    Group-Level DIC
 '''
 
 markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
@@ -272,63 +332,120 @@ plt.savefig('BMS/DIC_day{day}.svg')
 plt.show()
 
 #%%
-from scipy import stats
-model1idx = 2
-model2idx = 4
-
-print("Check these formulas")
-# Pooled variance
-sp2 = ((60 - 1) * WAIC_var[model1idx] + (60 - 1) * WAIC_var[model2idx]) / (60 + 60 - 2)
-
-# t-value
-t_value = (WAIC[model1idx] - WAIC[model2idx]) / np.sqrt(sp2 * (1/60 + 1/60))
-print(f"t={t_value}")
-
-# Degrees of freedom
-df = 60 + 60 - 2
-
-# p-value
-p_value = 2 * stats.t.sf(np.abs(t_value), df)  # Two-tailed test
-print(f'p-value: {p_value}')
-
-#%%
 '''
-    Plot log-likelihood
+    Individual DIC 
 '''
-fig, ax = plt.subplots(1, figsize = (10, 5))
-# ax.scatter(range(num_models), WAIC)
-ax.scatter(range(num_models), log_likelihood)
+
+markershapes = ['o', 'D', '^', '>', '*', '+', 'D', 'x']
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'black']
+
+fig, ax = plt.subplots(sharey = True, figsize = (15,5))
+for midx in range(num_models):
+    # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+    ax.scatter(range(num_agents), individual_DIC[:, midx], 
+                  marker=markershapes[midx], 
+                  edgecolor=colors[midx], 
+                  facecolors='none', 
+                  linewidth=1, 
+                  label=model_names[midx])
     
-# ax.legend()
-ax.title.set_text(f'Log-Likelihood (day {day})')
-ax.set_xlabel('Model no.')
-ax.set_xticks(range(num_models))
-ax.set_xticklabels(model_names)
-# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+ax.legend()
+ax.title.set_text(f'DIC (day {day})')
+ax.set_xlabel('Agent no.')
+ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
 plt.tight_layout()
 
-plt.savefig('BMS/loglike_day{day}.svg')
+plt.savefig('BMS/ICs.png')
 plt.show()
+
+if AICs.shape[1] == 2:
+    '''
+        Sort DIC
+    '''
+    DIC_diff = individual_DIC[:, 0] - individual_DIC[:, 1]
+    DIC_sort_idxs = np.argsort(DIC_diff)
+    DIC_diff_argmin_idx = np.abs(DIC_diff[DIC_sort_idxs]).argmin()
+    
+    fig, ax = plt.subplots(sharey = True, figsize = (15,5))
+    for midx in range(num_models):
+        # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
+        ax.scatter(range(num_agents), individual_DIC[DIC_sort_idxs, midx], 
+                      marker=markershapes[midx], 
+                      edgecolor=colors[midx], 
+                      facecolors='none', 
+                      linewidth=1, 
+                      label=model_names[midx])
+        
+    ax.axvline(DIC_diff_argmin_idx)
+    ax.legend()
+    ax.title.set_text(f'DIC (day {day})')
+    ax.set_xlabel('Agent no.')
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+    plt.tight_layout()
+
+    # plt.savefig('BMS/ICs.png')
+    plt.show()
+
+#%%
+# from scipy import stats
+# model1idx = 2
+# model2idx = 4
+
+# print("Check these formulas")
+# # Pooled variance
+# sp2 = ((60 - 1) * WAIC_var[model1idx] + (60 - 1) * WAIC_var[model2idx]) / (60 + 60 - 2)
+
+# # t-value
+# t_value = (WAIC[model1idx] - WAIC[model2idx]) / np.sqrt(sp2 * (1/60 + 1/60))
+# print(f"t={t_value}")
+
+# # Degrees of freedom
+# df = 60 + 60 - 2
+
+# # p-value
+# p_value = 2 * stats.t.sf(np.abs(t_value), df)  # Two-tailed test
+# print(f'p-value: {p_value}')
+
+#%%
+# '''
+#     Plot log-likelihood
+# '''
+# fig, ax = plt.subplots(1, figsize = (10, 5))
+# # ax.scatter(range(num_models), WAIC)
+# ax.scatter(range(num_models), log_likelihood)
+    
+# # ax.legend()
+# ax.title.set_text(f'Log-Likelihood (day {day})')
+# ax.set_xlabel('Model no.')
+# ax.set_xticks(range(num_models))
+# ax.set_xticklabels(model_names)
+# # ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+# plt.tight_layout()
+
+# plt.savefig('BMS/loglike_day{day}.svg')
+# plt.show()
 
 
 #%%
-'''
-    Plot 2nd-level ELBOS
-'''
-fig, ax = plt.subplots(1, figsize = (10, 5))
-# ax.scatter(range(num_models), WAIC)
-ax.scatter(range(num_models), elbos_2nd_lvl)
+# '''
+#     Plot 2nd-level ELBOS
+# '''
+# fig, ax = plt.subplots(1, figsize = (10, 5))
+# # ax.scatter(range(num_models), WAIC)
+# ax.scatter(range(num_models), elbos_2nd_lvl)
     
-# ax.legend()
-ax.title.set_text(f'ELBO (day {day})')
-ax.set_xlabel('Model no.')
-ax.set_xticks(range(num_models))
-ax.set_xticklabels(model_names)
-# ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-plt.tight_layout()
+# # ax.legend()
+# ax.title.set_text(f'ELBO (day {day})')
+# ax.set_xlabel('Model no.')
+# ax.set_xticks(range(num_models))
+# ax.set_xticklabels(model_names)
+# # ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+# plt.tight_layout()
 
-plt.savefig('BMS/loglike_day{day}.svg')
-plt.show()
+# plt.savefig('BMS/loglike_day{day}.svg')
+# plt.show()
 
 #%%
 '''
