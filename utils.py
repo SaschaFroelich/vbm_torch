@@ -1943,18 +1943,6 @@ def get_data_from_file(file_dir = None):
     AIC = res[2][2]
     post_sample_df, expdata_df, _, params_df, agent_elbo_tuple, extra_storage = res
     
-    # try:
-    #     print("BIC = %.2f"%BIC)
-        
-    # except:
-    #     pass
-    
-    # try:
-    #     print("AIC = %.2f"%AIC)
-        
-    # except:
-    #     pass
-    
     if 'ag_idx' not in params_df.columns:
         params_df['ag_idx'] = None
         
@@ -1979,7 +1967,7 @@ def get_data_from_file(file_dir = None):
     elif 'recovery'  in filenames[0]:
         sociopsy_df = None
         
-    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage
+    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage, filenames[0]
         
 def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names):
     '''
@@ -2968,13 +2956,15 @@ def RT_err_to_m2(data_dict):
         2) Remove RT > 2000 and turn them into errors
     '''
     
-    for trialidx in range(len(data_dict["RT"])):
-        for agidx in range(len(data_dict["RT"][0])):
-            if data_dict["choices"][trialidx][agidx] == -2:
-                data_dict["RT"][trialidx][agidx] = -2
-                
-            if data_dict["RT"][trialidx][agidx] > 2000:
-                data_dict["RT"][trialidx][agidx] = -2
+    if 'RT' in data_dict.keys():
+        print("Setting -2 to RT for errors.")
+        for trialidx in range(len(data_dict["RT"])):
+            for agidx in range(len(data_dict["RT"][0])):
+                if data_dict["choices"][trialidx][agidx] == -2:
+                    data_dict["RT"][trialidx][agidx] = -2
+                    
+                if data_dict["RT"][trialidx][agidx] > 2000:
+                    data_dict["RT"][trialidx][agidx] = -2
                 
     return data_dict
     

@@ -29,10 +29,14 @@ from sklearn.linear_model import LinearRegression
 import scipy
 import itertools
 
-complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names,  Q_init_day2, seq_counter_day2, er_day2 = utils.load_data()
+complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1 = utils.load_data()
 
 model = complete_df_all['model'][0]
+model_day2 = model
+model_day1 = model
 
+num_params = len(param_names)
+num_agents = len(complete_df_all['ID'].unique())
 #%%
 '''
     Plot behaviour both days
@@ -1072,10 +1076,13 @@ anal.violin(df_day2[df_day2['ID'].isin(test_df['ID'])], param_names, model)
     Responses from posterior predictives
 '''
 
-predictive_choices = extra_storage[14]
-obs_mask = extra_storage[15]
+inf_mean_df_day1 = inf_mean_df_all[inf_mean_df_all['day'] == 1]
+inf_mean_df_day2 = inf_mean_df_all[inf_mean_df_all['day'] == 2]
 
-df_pp_day2 = utils.post_pred_sim_df(predictive_choices, obs_mask, model, num_agents, inf_mean_df, day = 2)
+predictive_choices_day2 = extra_storage_day2[14]
+obs_mask_day2 = extra_storage_day2[15]
+
+df_pp_day2 = utils.post_pred_sim_df(predictive_choices_day2, obs_mask_day2, model_day2, num_agents, inf_mean_df_day2, day = 2)
 
 
 predictive_choices_day1 = extra_storage_day1[14]

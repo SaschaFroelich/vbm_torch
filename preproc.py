@@ -36,13 +36,18 @@ for key in exp_behav_dict.keys():
 
 pickle.dump((exp_behav_dict_day2, expdata_df[expdata_df['blockidx'] > 5]), open("behav_data/preproc_data_day2.p", "wb" ) )
 
-#%% Published data
+#%%
+'''
+    Published data
+'''
 exp_behav_dict, expdata_df = utils.get_old_groupdata('/home/sascha/Desktop/vbm_torch/behav_data/published/Data/', getall = True, oldpub = True)
 
 pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_old_published_all.p", "wb" ) )
 
-#%% RT AST
-
+#%% 
+'''
+    RT AST
+'''
 exp_behav_dict, expdata_df = utils.get_groupdata('/home/sascha/proni/AST/AST2/AST2RT_Online/data/', getall = False, RTAST = True)
 pickle.dump((exp_behav_dict, expdata_df), open("behav_data/preproc_data_RTAST.p", "wb" ) )
 

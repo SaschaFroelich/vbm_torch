@@ -20,8 +20,6 @@ import utils
 
 def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
     '''
-    
-    
     Parameters
     ----------
     k : int

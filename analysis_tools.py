@@ -63,80 +63,11 @@ def violin(df,
 
     '''
     
-    # model = df['model'].unique()[0]
-    
-    # if 'ID' in df.columns:
-    #     df = df.drop(['ID'], axis = 1)
-
-    # if 'handedness' in df.columns:
-    #     df = df.drop(['handedness'], axis = 1)
-        
-    # df = df.drop(['model', 'ag_idx', 'group', 'ID', 'handedness'], axis = 1)
-    
     num_params = len(param_names)
-    print(num_params)
+    print(f"Number of parameters: {num_params}")
     
     fig, ax = plt.subplots(len(df['day'].unique()), num_params, figsize=(15,5), sharey=0)
     
-    # if model == 'B':
-    #     ylims = [[0, 0.04], # lr
-    #               [0.5, 7.5], # theta_Q
-    #               [0., 2.], # theta_rep
-    #               [0, 0.04], # lr
-    #               [0.5, 7.5], # theta_Q
-    #               [0., 2]] # theta_rep
-        
-    # elif model == 'Conflict':
-    #     ylims = [[0, 0.04], # lr
-    #               [0, 8], # theta_Q
-    #               [0.5, 5], # theta_rep
-    #               [0, 3], # conflict param
-    #               [0, 0.04], # lr
-    #               [0, 8], # theta_Q
-    #               [0.5, 5], # theta_rep
-    #               [0, 3]] # conflict param
-        
-    # elif model == 'Seqparam' or model == 'Seqboost':
-    #     ylims = [[0, 0.04], # lr
-    #               [0., 8], # theta_Q
-    #               [0., 2], # theta_rep
-    #               [-2, 2], # seqparam
-    #               [0, 0.04], # lr
-    #               [0., 8], # theta_Q
-    #               [0., 2], # theta_rep
-    #               [-2, 2]] # seqparam
-        
-    # elif model == 'Bhand':
-    #     if num_params == 7:
-    #         ylims = [[0, 0.04], # lr
-    #                   [0., 8], # theta_Q
-    #                   [0., 2], # theta_rep
-    #                   [0, 0.04], # lr
-    #                   [0., 8], # theta_Q
-    #                   [0., 2], # theta_rep
-    #                   [-2.5, 2.5]] # hand_param
-        
-    #     elif num_params == 8:
-    #         ylims = [[0, 0.04], # lr
-    #                   [0., 8], # theta_Q
-    #                   [0., 2], # theta_rep
-    #                   [-2.5, 2.5], # hand_param
-    #                   [0, 0.04], # lr
-    #                   [0., 8], # theta_Q
-    #                   [0., 2], # theta_rep
-    #                   [-2.5, 2.5]] # hand_param
-         
-    # elif model == 'sociopsy':
-    #     ylims = [[20, 65], # Age
-    #               [0., 0.2], # ER_stt
-    #               [0., 0.2], # ER_dtt
-    #               [290, 480], # RT
-    #               [2750, 3800]] # points
-            
-    # else:
-    #     ylims == None
-    #
-
     for par in range(num_params):
         "ax[0]"
         dataseries = (df.melt()[df.melt()['variable'] == param_names[par]])
@@ -165,21 +96,6 @@ def violin(df,
                           chartBox.y0,
                           chartBox.width,
                           chartBox.height])
-        
-        # if ylims is not None:
-        #     ax[par].set_ylim(ylims[par])
-    
-        "Colorbar"
-        # variance = df[params_df.columns[par]].std()**2
-        
-        # normalize = mcolors.TwoSlopeNorm(vcenter=(min(variance)+max(variance))/2, 
-        #                                  vmin=min(variance), 
-        #                                  vmax=max(variance))
-        
-        # colormap = cm.coolwarm
-        # scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
-        # scalarmappaple.set_array(variance)
-        # plt.colorbar(scalarmappaple, ax = ax[par])
             
     plt.show()
 
@@ -352,7 +268,6 @@ def cluster_analysis(df, title= ''):
     plt.title(f"Similarity matrix ({title})")
     plt.gca().set_ylabel('leavnode idx')
     plt.show()
-    # dfgh
     # "----- With spc"
     # pdist = spc.distance.pdist(pd.DataFrame(corr_dict))
     # "Linkage matrix"
@@ -983,6 +898,9 @@ def find_seqlearners(expdata_df,
 
     notseqlearners_df : DataFrame
         DESCRIPTION.
+        
+    new_df : DataFrame
+        Contains all participants, simply added columns for p_compound_adjusted and chi_compound
 
     '''
     
@@ -1007,7 +925,10 @@ def find_seqlearners(expdata_df,
     chis = []
     ps = []
     r_minus_s_er = []
-
+    
+    fishers_statistic = []
+    fishers_p = []
+    
     for ID in df['ID'].unique():
         df_ag = df[df['ID'] == ID]
         
@@ -1024,16 +945,26 @@ def find_seqlearners(expdata_df,
         ps.append(p_value)
         r_minus_s_er.append(rand_er[0] - seq_er[0]) # difference in number of errors
         
-        print(f"Chi-square Statistic: {chi2}")
-        print(f"P-value: {p_value}")
-        print(f"{rand_er[0] - seq_er[0]}")
         
+        table = np.zeros((2,2), dtype = int)
+        table[:,0] = seq_er
+        table[:,1] = rand_er
+        
+        fs, fp = scipy.stats.fisher_exact(table, alternative = 'less')
+        
+        fishers_statistic.append(fs)
+        fishers_p.append(fp)
         
     chi_er_df = pd.DataFrame({'ID': IDs, 
                            'chi': chis,
                            'p_chi': ps,
                            'Difference_ER': r_minus_s_er})
         
+    
+    fisher_df = pd.DataFrame({'ID': IDs, 
+                           'fisher_statistic': fishers_statistic,
+                           'p_fisher': fishers_p,
+                           'Difference_ER': r_minus_s_er})
         
     '''
         t-test for Reaction times
@@ -1065,11 +996,21 @@ def find_seqlearners(expdata_df,
     
     # scipy.stats.pearsonr(ps_er, ps_rt)
     
-    new_df = pd.merge(chi_er_df, t_rt_df, on = 'ID')
+    new_df = pd.merge(fisher_df, t_rt_df, on = 'ID')
     
-    print(new_df['p_chi'].corr(new_df['p_t']))
+    '''
+        Fisher's combined probability test
+        χ² = -2 (ln p_1 + ln p_2)
+        
+        Only for independent measures
+    '''
+    r,p = scipy.stats.pearsonr(new_df['p_fisher'], new_df['p_t'])
+    print("Correlation of p-values for Fisher's method: r=%.4f, p=%.4f"%(r,p))
     
-    chisquared = -2 * (np.log(new_df['p_chi']) + np.log(new_df['p_t']))
+    r,p = scipy.stats.pearsonr(new_df['fisher_statistic'], new_df['t'])
+    print("Correlation of test-statistics for Fisher's method: r=%.4f, p=%.4f"%(r,p))
+    
+    chisquared = -2 * (np.log(new_df['p_fisher']) + np.log(new_df['p_t']))
     newp = 1-scipy.stats.chi2.cdf(chisquared, 4)
     
     if correctp:
@@ -1079,32 +1020,52 @@ def find_seqlearners(expdata_df,
         ps_adjusted = newp
     
     
-    
     new_df['p_compound_adjusted'] = ps_adjusted
     new_df['chi_compound'] = chisquared
     
-    seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
-                            (new_df['Difference_ER'] > 0) & 
-                            (new_df['Difference_RT'] > 0)]
-    
-    print(f"{len(seqlearners_df)} strong sequence learners with RT & ER > 0.")
-    
-    seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
-                            (new_df['Difference_RT'] > 0)]
-    
-    print(f"{len(seqlearners_df)} strong sequence learners with RT > 0.")
-    
-    seqlearners_df = new_df[new_df['p_compound_adjusted'] < 0.05]
-    
-    print(f"{len(seqlearners_df)} strong sequence learners.")
-    
-    if 'day' in seqlearners_df.columns:
-        seqlearners_df = seqlearners_df[seqlearners_df['day'] == day]
+    if 0:
+        seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
+                                (new_df['Difference_ER'] > 0) & 
+                                (new_df['Difference_RT'] > 0)]
+        
+        print(f"{len(seqlearners_df)} strong sequence learners with RT & ER > 0.")
+        
+        seqlearners_df = new_df[(new_df['p_compound_adjusted'] < 0.05) & 
+                                (new_df['Difference_RT'] > 0)]
+        
+        print(f"{len(seqlearners_df)} strong sequence learners with RT > 0.")
+        
+        seqlearners_df = new_df[new_df['p_compound_adjusted'] < 0.05]
+        
+        print(f"{len(seqlearners_df)} strong sequence learners.")
+        
+        if 'day' in seqlearners_df.columns:
+            seqlearners_df = seqlearners_df[seqlearners_df['day'] == day]
+            
+        else:
+            seqlearners_df['day'] = day
+        
+        notseqlearners_df = new_df[new_df['p_compound_adjusted'] > 0.05]
         
     else:
-        seqlearners_df['day'] = day
-    
-    notseqlearners_df = new_df[new_df['p_compound_adjusted'] > 0.05]
+        seqlearners_df_ER = new_df[new_df['p_fisher'] < 0.05]
+        print(f"{len(seqlearners_df_ER)} strong sequence learners when from ER.")
+        
+        seqlearners_df_RT = new_df[new_df['p_t'] < 0.05]
+        print(f"{len(seqlearners_df_RT)} strong sequence learners when from RT.")
+        
+        print(f"Of the RT results, there are {len(seqlearners_df_RT[seqlearners_df_RT['ID'].isin(seqlearners_df_ER['ID'].unique())])} participants also in the ER results.")
+        
+        seqlearners_df = seqlearners_df_RT
+        
+        if 'day' in seqlearners_df.columns:
+            seqlearners_df = seqlearners_df[seqlearners_df['day'] == day]
+            
+        else:
+            seqlearners_df['day'] = day
+        
+        notseqlearners_df = new_df[new_df['p_t'] >= 0.05]
+        
     
     if 'day' in notseqlearners_df.columns:
         notseqlearners_df = notseqlearners_df[notseqlearners_df['day'] == day]
@@ -1112,7 +1073,7 @@ def find_seqlearners(expdata_df,
     else:
         notseqlearners_df['day'] = day
     
-    return seqlearners_df, notseqlearners_df, new_df
+    return seqlearners_df.drop(['p_compound_adjusted', 'chi_compound'], axis = 1), notseqlearners_df.drop(['p_compound_adjusted', 'chi_compound'], axis = 1), new_df.drop(['p_compound_adjusted', 'chi_compound'], axis = 1)
 
 def hpcf_within(expdata_df, correctp = False):
     '''

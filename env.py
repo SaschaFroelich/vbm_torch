@@ -258,7 +258,7 @@ class Env():
                                                                  current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                         self.choices.append(current_choice.tolist())
                         self.outcomes.append(outcome.tolist())
-                    
+
                 if infer > 0 and any(trial > 10) and not STT:
                     "Dual-Target Trial Inference"
                     "Retrieve probs before updating"
