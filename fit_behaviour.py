@@ -55,7 +55,7 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 6
+waithrs = 0
 post_pred = 1
 STT = 0
 
@@ -80,7 +80,8 @@ num_waic_samples_day2 = 1
 
 #%%
 "Day 1"
-exp_behav_dict_day1, expdata_df_day1 = pickle.load(open("behav_data/mixed_sim_data_2_day1.p", "rb" ))
+datafile_day1 = 'preproc_data_day1.p'
+exp_behav_dict_day1, expdata_df_day1 = pickle.load(open(f"behav_data/{datafile_day1}", "rb" ))
 exp_behav_dict_day1 = utils.RT_err_to_m2(exp_behav_dict_day1)
 
 num_agents = len(expdata_df_day1['ag_idx'].unique())
@@ -98,7 +99,8 @@ group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
 assert np.abs(np.diff(group_distro)).sum() == 0
 
 "Day 2"
-exp_behav_dict_day2, expdata_df_day2 = pickle.load(open("behav_data/preproc_data_day2.p", "rb" ))
+datafile_day2 = 'preproc_data_day2.p'
+exp_behav_dict_day2, expdata_df_day2 = pickle.load(open(f"behav_data/{datafile_day2}", "rb" ))
 exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day2)
 num_agents = len(expdata_df_day2['ag_idx'].unique())
 group = exp_behav_dict_day2['group'][0]
@@ -114,7 +116,7 @@ assert np.abs(np.diff(group_distro)).sum() == 0
 '''
     Inference
 '''
-print(f"Starting inference of model {model_day1} for day 1 for {num_agents} agents.")
+print(f"Starting inference of model {model_day1} for day 1 (datafiles {datafile_day1} and {datafile_day2}) for {num_agents} agents.")
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model_day1, 
                          group, 
