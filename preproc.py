@@ -27,6 +27,8 @@ exp_behav_dict_day1= {}
 for key in exp_behav_dict.keys():   
     exp_behav_dict_day1[key] = exp_behav_dict[key][0:2886]
 
+utils.check_debriefing_quest(expdata_df)
+
 pickle.dump((exp_behav_dict_day1, expdata_df[expdata_df['blockidx'] <= 5]), open("behav_data/preproc_data_day1.p", "wb" ) )
 
 "Day 2"

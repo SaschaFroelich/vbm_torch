@@ -277,14 +277,13 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
                             
                             q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                             q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
-                            # q_sequence_repro.append(participant_day2['q3'][0,1][0])
+                            q_sequence_repro.append(participant_day2['q3'][0,1][0])
                             # q_sequence_repro_with_help.append(participant_day2['q4'][0,1][0])
                             
                 else:
                     groupdata.append(data)
                     group.append(grp)
                     IDs_included.append(ID)
-                    
         
     if file_exists:
         q_sometimes_easier = [1 if q=='Yes' else (0 if q == 'No' else 2) for q in q_sometimes_easier]
@@ -301,7 +300,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
         newgroupdata['gender'] = [gender]*num_trials
         newgroupdata['q_sometimes_easier'] = [q_sometimes_easier]*num_trials
         newgroupdata['q_notice_a_sequence'] = [q_notice_a_sequence]*num_trials
-        # newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
+        newgroupdata['q_sequence_repro'] = [q_sequence_repro]*num_trials
         # newgroupdata['q_sequence_repro_with_help'] = [q_sequence_repro_with_help]*num_trials
     
     newgroupdata['ID'] = [IDs_included]*num_trials
@@ -1427,6 +1426,7 @@ def plot_grouplevel(df1,
                             palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'})
                 plt.title(f'agent {agent_df_1["ID"].unique()}, model {model_1}')
                 # ax.get_legend().remove()
+                plt.savefig(f'/home/sascha/Downloads/{agent_df_1["ID"].unique()}')
                 plt.show()
     
     
@@ -1497,6 +1497,9 @@ def plot_grouplevel(df1,
     
     grouped_df_1 = grouped_df_1[grouped_df_1['jokertypes'] != 'no joker']
     if df2 is not None:
+        '''
+            Lineplots
+        '''
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
         sns.lineplot(x = 'blocknum', 
                     y = 'choices_GD', 
@@ -1507,7 +1510,7 @@ def plot_grouplevel(df1,
                     ax = ax1)
         ax1.set_xticks(np.arange(1, 8), minor = True)
         ax1.set_xlabel('Block no.')
-        ax1.set_ylabel('HRCF (%)')
+        ax1.set_ylabel('HRC (%)')
         ax1.grid(which='minor', alpha=0.5)
         ax1.set_title(f'Model {model_1}')
         ax1.axvline(3.5, color='k', linewidth=0.5)
@@ -1526,10 +1529,46 @@ def plot_grouplevel(df1,
         ax2.set_title(f'Model {model_2}')
         # ax2.get_legend().remove()
         ax2.set_xlabel('Block no.')
-        ax2.set_ylabel('HRCF (%)')
+        ax2.set_ylabel('HRC (%)')
         ax2.axvline(3.5, color='k', linewidth=0.5)
         plt.savefig('/home/sascha/Downloads/exp_vs_sim.tiff', dpi=600)
         plt.show()      
+
+        '''
+            Barplots
+        '''
+        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+        sns.barplot(y = 'choices_GD', 
+                    hue = 'jokertypes', 
+                    hue_order = ['Random', 'Congruent', 'Incongruent'],
+                    palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
+                    data = grouped_df_1,
+                    errorbar = ("se", 1),
+                    ax = ax1)
+        # ax1.set_xticks(np.arange(1, 8), minor = True)
+        # ax1.set_xlabel('Block no.')
+        ax1.set_ylabel('HRC (%)')
+        # ax1.grid(which='minor', alpha=0.5)
+        ax1.set_title(f'Model {model_1}')
+        # ax1.axvline(3.5, color='k', linewidth=0.5)
+        
+        sns.barplot(y = 'choices_GD', 
+                    hue ='jokertypes', 
+                    hue_order = ['Random', 'Congruent', 'Incongruent'],
+                    palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
+                    data = grouped_df_2,
+                    errorbar = ("se", 1),
+                    ax = ax2)
+
+        # ax2.set_xticks(np.arange(1, 8), minor = True)
+        # ax2.grid(which='minor', alpha=0.5)
+        ax2.set_title(f'Model {model_2}')
+        # ax2.get_legend().remove()
+        # ax2.set_xlabel('Block no.')
+        ax2.set_ylabel('HRC (%)')
+        # plt.savefig(f'/home/sascha/Downloads/{df2["ID"].unique()[0]}.svg')
+        plt.show()     
+        
 
     else:
         "----- Remove error trials (where choices_GD == -2)"
@@ -1569,6 +1608,10 @@ def plot_grouplevel(df1,
         plt.show()
         
         if len(grouped_df_1['day'].unique()) > 1:
+            '''
+                Days 1 & 2
+                Only one DF given
+            '''
             fig, ax = plt.subplots(figsize = (5, 5))
             sns.lineplot(x = "day",
                         y = "choices_GD",
@@ -1587,6 +1630,10 @@ def plot_grouplevel(df1,
             plt.show()
             
         else:
+            '''
+                Only one day
+                Only one DF given
+            '''
             fig, ax = plt.subplots(figsize = (5, 5))
             sns.barplot(y = "choices_GD",
                         hue = "DTT Types",
@@ -1595,13 +1642,15 @@ def plot_grouplevel(df1,
                         palette = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'},
                         errorbar = ("se", 1),
                         ax = ax)
-            ax.set_xticks([1,2])
-            ax.set_ylim([0.61, 1])
-            ax.set_xlabel('Day')
-            ax.set_ylabel('HRCF (%)')
-            # plt.savefig('/home/sascha/Desktop/Paper_2024/KW2.png', dpi=600)
+            # ax.set_xticks([1,2])
+            ax.set_ylim([0.5, 1])
+            # ax.set_xlabel('Day')
+            ax.set_ylabel('HRC (%)')
+            # import time
+            # time.sleep(70)
+            # plt.savefig(f'/home/sascha/Desktop/Paper_2024/Mar/res_fig3/sim_{np.random.randint(0,1000_000)}.svg')
             plt.show()
-        
+            
         return grouped_df_1.drop(['blocknum'], axis = 1)
         
 def plot_dual_behav(agent_df_1, agent_df_2):
@@ -2969,12 +3018,13 @@ def RT_err_to_m2(data_dict):
     return data_dict
     
 def load_data():
-    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage_day2 = get_data_from_file()
+    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage_day2, filepath = get_data_from_file()
+    
     post_sample_df_day2['day'] = 2
     Q_init_day2 = extra_storage_day2[0]
     param_names = extra_storage_day2[9]
-    if extra_storage_day2[11] >= 1e-03:
-        print("rhalt too large for IC computation.")
+    # if extra_storage_day2[11] >= 1e-03:
+        # print("rhalt too large for IC computation.")
     
     day = extra_storage_day2[2]
     
@@ -3079,11 +3129,12 @@ def load_data():
         print("\n\nCreating and appending dataframe for day 1.")
         filename_day1 = extra_storage_day2[7]
         
+        file_directory = '/'.join(filepath.split('/')[0:-1]) + '/'
         if extra_storage_day2[10] == 'recovery':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('parameter_recovery/'+filename_day1+'.p')    
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
             
         elif extra_storage_day2[10] == 'behav_fit':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1 = get_data_from_file('behav_fit/'+filename_day1+'.p')    
+            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
             
         else:
             raise Exception('Error')
@@ -3091,8 +3142,8 @@ def load_data():
         post_sample_df_day1['day'] = 1
         # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
         param_names_day1 = extra_storage_day1[9]
-        if extra_storage_day1[11] >= 1e-03:
-            print("rhalt too large for IC computation.")
+        # if extra_storage_day1[11] >= 1e-03:
+        #     print("rhalt too large for IC computation.")
         
         if 'handedness' in post_sample_df_day1.columns:
             inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
@@ -3152,3 +3203,83 @@ def load_data():
         anal.violin(inf_mean_df_day1, param_names, model)
         anal.violin(inf_mean_df_day2, param_names, model)
         return complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1
+    
+def longest_common_substring(A, B):
+    # Start by checking the longer substrings of B
+    for length in range(len(B), 0, -1):
+        # Generate all substrings of B with the current length
+        for start in range(len(B) - length + 1):
+            # Extract the substring
+            substring = B[start:start + length]
+            # Check if the substring is in A
+            if substring in A:
+                return substring
+    return ""  # Return an empty string if no common substring is found
+
+
+def check_debriefing_quest(expdata_df):
+    '''
+        Check for reproduced sequence in debriefing questionnaire
+    '''
+    max_length = []
+    q_notice_answer = []
+    seq1 = 'kxmksmxsxkms'
+    seq2 = 'smxskxmkmsxk'
+    for ag_idx in expdata_df['ag_idx'].unique():
+        string = expdata_df[expdata_df['ag_idx']==ag_idx]['q_sequence_repro'].iloc[0]
+        print(string)
+        string = string.replace(",", "")
+        string = string.replace(" ", "")
+        
+        q_notice_answer.append(expdata_df[expdata_df['ag_idx']==ag_idx]['q_notice_a_sequence'].unique()[0])
+        
+        # if ('kxmks' in string) or ('ksmx' in string) and ((expdata_df[expdata_df['ag_idx']==ag_idx]['group'].unique() == 0) or (expdata_df[expdata_df['ag_idx']==ag_idx]['group'].unique() == 1)):
+            # print(f'YES: ag_idx = {ag_idx}, group = {expdata_df[expdata_df["ag_idx"]==ag_idx]["group"].unique()}')
+            # print(string)
+            # print("\n")
+            
+        if expdata_df[expdata_df['ag_idx']==ag_idx]['group'].unique() < 2:
+            maxlength = 0
+            participant_string = string
+            cycled_string = seq1
+            
+            for i in range(13):
+                
+                longest_substring = longest_common_substring(participant_string, cycled_string)
+                
+                if len(longest_substring) > maxlength:
+                    maxlength = len(longest_substring)
+                
+                cycled_string = cycled_string[-1] + cycled_string[:-1]
+                
+            max_length.append(maxlength)
+            
+        elif expdata_df[expdata_df['ag_idx']==ag_idx]['group'].unique() >= 2:
+            maxlength = 0
+            participant_string = string
+            cycled_string = seq2
+            
+            for i in range(13):
+                
+                longest_substring = longest_common_substring(participant_string, cycled_string)
+                
+                if len(longest_substring) > maxlength:
+                    maxlength = len(longest_substring)
+                
+                cycled_string = cycled_string[-1] + cycled_string[:-1]
+                
+            max_length.append(maxlength)
+    
+    import seaborn as sns
+    import numpy as np
+    import matplotlib.pyplot as plt
+    sns.histplot(np.array(max_length), bins = 13, binrange=[-0.5, 12.5])  
+    plt.axvline(np.array(max_length).mean(), color = 'k')
+    plt.show()
+    
+    notice_seq_idx = np.where(np.array(q_notice_answer)==1)[0]
+    not_notice_seq_idx = np.where(np.array(q_notice_answer)==0)[0]
+    np.array(max_length)[notice_seq_idx].mean()
+    np.array(max_length)[not_notice_seq_idx].mean()
+    
+    print(f"mean reproduced sequence length: {np.array(max_length).mean()} +- {np.array(max_length).std()}.")
