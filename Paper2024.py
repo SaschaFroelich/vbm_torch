@@ -28,7 +28,10 @@ import scipy
 import statsmodels as sm
 import itertools
 
-complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, _, _, _, extra_storage_day2, extra_storage_day1 = utils.load_data()
+complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1 = utils.load_data()
+
+# complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1  = utils.load_data()
+
 model = complete_df_all['model'].unique()[0]
 hue_order = ['Random', 'Congruent', 'Incongruent']
 
@@ -46,7 +49,7 @@ elif 'theta_Q_congdiff' in param_names:
 
 #%%
 '''
-    Plot behaviour both days
+    Plot behaviour on both days
 '''
 
 # HPCF_DF = complete_df_all.loc[:, ['hpcf_cong', 'hpcf_incong',
@@ -88,13 +91,32 @@ aov = pg.rm_anova(dv = 'ER',
                   effsize = 'np2')
 print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
 
-
+'''
+    ER
+    Differences within days
+'''
+"Rand vs Rep"
 t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Random')]['ER'], 
                             ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Repeating')]['ER'])
 print(f"t={t}, p={p}")
 
-
+"Rand vs Rep"
 t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Random')]['ER'], 
+                            ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Repeating')]['ER'])
+print(f"t={t}, p={p}")
+
+
+'''
+    ER
+    Differences between days
+'''
+"Rand vs Rand"
+t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Random')]['ER'], 
+                            ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Random')]['ER'])
+print(f"t={t}, p={p}")
+
+"Rep vs Rep"
+t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Repeating')]['ER'], 
                             ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Repeating')]['ER'])
 print(f"t={t}, p={p}")
 
@@ -125,17 +147,35 @@ aov = pg.rm_anova(dv = 'RT',
 
 print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
 
+'''
+    RT 
+    Differences within Days
+'''
+
+"Rand vs Rep"
 t,p = scipy.stats.ttest_rel(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Random')]['RT'], 
                             RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Repeating')]['RT'])
 print(f"t={t}, p={p}")
 
+"Rand vs Rep"
 t,p = scipy.stats.ttest_rel(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Random')]['RT'], 
                             RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Repeating')]['RT'])
 print(f"t={t}, p={p}")
 
-t,p = scipy.stats.ttest_rel(np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Random')]['RT']) - np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Repeating')]['RT']),
-                            np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Random')]['RT']) - np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Repeating')]['RT']))
+'''
+    RT 
+    Differences between Days
+'''
+"Rand vs Rand"
+t,p = scipy.stats.ttest_rel(np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Random')]['RT']),
+                            np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Random')]['RT']))
 print(f"t={t}, p={p}")
+
+"Rep vs Rep"
+t,p = scipy.stats.ttest_rel(np.array(RT_all[(RT_all['day'] == 2) & (RT_all['Condition'] == 'Repeating')]['RT']),
+                            np.array(RT_all[(RT_all['day'] == 1) & (RT_all['Condition'] == 'Repeating')]['RT']))
+print(f"t={t}, p={p}")
+
 
 #%%
 
@@ -164,6 +204,8 @@ hpcf_all['DTT Type'] = hpcf_all['DTT Type'].map(lambda x: "Congruent" if x == 'h
 
 hpcf_all['HRC'] = hpcf_all['HRC']*100
 hpcf_all['day'] = hpcf_all['day'].astype(int)
+
+
 fig, ax = plt.subplots(1, 3, figsize = (20, 10))
 sns.barplot(data = hpcf_all,
             x = 'day',
@@ -214,27 +256,41 @@ ax[2].tick_params(axis='both', labelsize=18)
 plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig0/res_fig0_python.svg', bbox_inches = 'tight')
 plt.show()
 
+'''
+    HRC
+    Differences within days
+'''
+
+"Rand vs Cong"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'])
 print(f"HRC All, Rand vs Cong, Day 1: t={t}, p={p}")
 
+"Rand vs Inc"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
 print(f"HRC All, Rand vs Incong, Day 1: t={t}, p={p}")
 
+"Cong vs Inc"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
 print(f"HRC All, Cong vs Incong, Day 1: t={t}, p={p}")
 
-
+'''
+    HRC
+    Differences between days
+'''
+"Random vs Random"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Random')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Random')]['HRC'])
 print(f"HRC All, Rand vs Cong, Day 1: t={t}, p={p}")
 
+"Cong vs Cong"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Congruent')]['HRC'])
 print(f"HRC All, Rand vs Incongruent, Day 1: t={t}, p={p}")
 
+"Incong vs Incong"
 t,p = scipy.stats.ttest_rel(hpcf_all[(hpcf_all['day'] == 1) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'], 
                             hpcf_all[(hpcf_all['day'] == 2) & (hpcf_all['DTT Type'] == 'Incongruent')]['HRC'])
 print(f"HRC All, Congruent vs Incongruent, Day 1: t={t}, p={p}")
@@ -1091,8 +1147,8 @@ ax[1].legend(title='Adaptation Score', loc='upper left', bbox_to_anchor=(1, 1))
 ax[1].get_legend().get_title().set_fontsize(14)
 # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
 # plt.plot([0, 2.5], [0, 1.1])
-if param1 == 'theta_rep':
-    ax[1].set_xlim([0.25, 2])
+# if param1 == 'theta_rep':
+#     ax[1].set_xlim([0.25, 2])
     # ax[1].set_ylim([0, 2.5])
 ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
 ax[1].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
@@ -1116,6 +1172,7 @@ dfadapt['strategy'] = dfadapt['ID'].map(lambda x: 'Inhibitor' if x in hrc_df_day
                                           'Adapter' if x in hrc_df_day2[exploit_mask_day2]['ID'].unique() else
                                           'negative effect of habit' if x in hrc_df_day2[hab_mask_day2]['ID'].unique() else
                                           'None')
+
 
 fig, ax = plt.subplots()
 sns.scatterplot(dfadapt,
@@ -1186,8 +1243,8 @@ sns.scatterplot(dfadapt,
 ax[1].legend(title='', fontsize = 13)
 # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
 # plt.plot([0, 2.5], [0, 1.1])
-if param1 == 'theta_rep':
-    ax[1].set_xlim([0.25, 2])
+# if param1 == 'theta_rep':
+#     ax[1].set_xlim([0.25, 2])
     # ax[1].set_ylim([0, 2.5])
 ax[1].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
 ax[1].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
@@ -1204,20 +1261,20 @@ ax[2].legend(title='Adaptation Score', loc='upper left', bbox_to_anchor=(1, 1))
 ax[2].get_legend().get_title().set_fontsize(13)
 # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
 # plt.plot([0, 2.5], [0, 1.1])
-if param1 == 'theta_rep':
-    ax[2].set_xlim([0.25, 2])
+# if param1 == 'theta_rep':
+#     ax[2].set_xlim([0.25, 2])
     # ax[2].set_ylim([0, 2.5])
 ax[2].set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
 ax[2].set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
 
-plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
+plt.savefig('/home/sascha/Desktop/Paper_2024/May/res_fig3/res_fig3_python.svg', bbox_inches = 'tight')
 plt.show()
 
 #%%
 '''
     Annotate
 '''
-for rowidx in range(60):
+for rowidx in range(2):
     x = dfadapt.iloc[rowidx,:]['theta_rep']
     y = dfadapt.iloc[rowidx,:]['theta_conflict']
     # z = dfadapt.iloc[rowidx,:]['theta_Q']
@@ -1243,8 +1300,8 @@ for rowidx in range(60):
     ax.legend(title='', fontsize = 13)
     # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
     # plt.plot([0, 2.5], [0, 1.1])
-    if param1 == 'theta_rep':
-        ax.set_xlim([0.25, 2])
+    # if param1 == 'theta_rep':
+    #     ax.set_xlim([0.25, 2])
         # ax[1].set_ylim([0, 2.5])
     ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
     ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
@@ -1252,13 +1309,14 @@ for rowidx in range(60):
     ax.legend(title='', fontsize = 13)
     # plt.plot([0, 2.5], [0, 2.5], color='k', linewidth = 0.5)
     # plt.plot([0, 2.5], [0, 1.1])
-    if param1 == 'theta_rep':
-        ax.set_xlim([0.25, 2])
+    # if param1 == 'theta_rep':
+    #     ax.set_xlim([0.25, 2])
         # ax[1].set_ylim([0, 2.5])
     ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
     ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
     ax.get_legend().set_visible(False)
     plt.show()
+    
 #%%
 '''
     Histogram of Habit Exploitation Score
@@ -1517,6 +1575,14 @@ r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q
 print(f"r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_conflict'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
                            complete_df_all[complete_df_all['day'] == 2]['CRspread'])
 print(f"r={r}, p={p}")
 
@@ -1547,6 +1613,10 @@ r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['comb'],
                            complete_df_all[complete_df_all['day'] == 2]['theta_Q'])
 print(f"r={r}, p={p}")
 
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['comb'],
+                           complete_df_all[complete_df_all['day'] == 2]['RIspread'])
+print(f"r={r}, p={p}")
+
 print("===========================")
 print("Correlation Model Parameters & Spreads, resp HRC.")
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CRspread'],
@@ -1570,6 +1640,19 @@ print(f"r={r}, p={p}")
 '''
 print("===========================")
 print("Age effects")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_Q'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_conflict'],
+                           complete_df_all[complete_df_all['day'] == 2]['age'])
+print(f"r={r}, p={p}")
+
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
 print(f"r={r}, p={p}")
@@ -1663,4 +1746,113 @@ t,p = scipy.stats.ttest_ind(dfadapt[(dfadapt['day'] == 2) & (dfadapt['q_notice_a
                            dfadapt[(dfadapt['day'] == 2) & (dfadapt['q_notice_a_sequence'] == 0)]['exploit_score'])
 print(f"t={t}, p={p}")
 
+#%%
+'''
+    Simulate behaviiour
+'''
 
+num_agents = 60
+
+theta_rep_values = []
+theta_conflict_values = []
+
+for theta_rep_sim in [dfadapt.theta_rep.min(), dfadapt.theta_rep.max()]:
+    for theta_conflict_sim in [dfadapt.theta_conflict.min(), dfadapt.theta_conflict.max()]:
+        theta_rep_values.append(theta_rep_sim)
+        theta_conflict_values.append(theta_conflict_sim)
+        print(" \n\ntheta_rep_sim=%.2f, theta_conflict_sim=%.2f"%(theta_rep_sim, theta_conflict_sim))
+        parameters = inf_mean_df_all[inf_mean_df_all['day'] == 2].loc[:, [*param_names]]
+        parameters['theta_rep'] = theta_rep_sim
+        parameters['theta_conflict'] = theta_conflict_sim
+        
+        groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+                                                                                num_agents,
+                                                                                group = list(inf_mean_df_all['group'])[0:num_agents],
+                                                                                day = 2,
+                                                                                params = parameters,
+                                                                                STT = False,
+                                                                                Q_init = Q_init_day2,
+                                                                                seq_init = seq_counter_day2,
+                                                                                errorrates = er_day2)
+        
+        
+        utils.plot_grouplevel(sim_group_behav_df, plot_single = False, day = 2)
+        
+        
+        # utils.plot_grouplevel(sim_group_behav_df, expdata_df_all[(expdata_df_all['day']==2) & 
+        #                                                          (expdata_df_all['ID']==2)], plot_single = False, day = 2)
+        
+        # utils.plot_grouplevel(expdata_df_all, expdata_df_all, plot_single = False, day = 2)
+   
+        
+extreme_values_df = pd.DataFrame({'theta_rep': theta_rep_values, 'theta_conflict': theta_conflict_values})
+    
+#%%
+
+plot_IDs = ['5b5e0e86902ad10001cfcc59', '5c321ebf6558270001bd79aa', 
+            '60f816ff1fa74fcfab532378', '5db4ef4a2986a3000be1f886', 
+            '56f699e876348f000c883bba', '654abe303c4940ec0502538e', 
+            '596f961cfe061d00011e3e03']
+
+# utils.plot_grouplevel(expdata_df_all[expdata_df_all['ID'].isin(plot_IDs)], plot_single = True, day = 2)
+num_agents = 60
+for ID in plot_IDs:
+# ID = plot_IDs[0]
+    parameters = inf_mean_df_all[(inf_mean_df_all['day'] == 2) & (inf_mean_df_all['ID'] == ID)].loc[:, [*param_names]]
+    parameters = parameters.iloc[np.repeat(0, num_agents)]
+    
+    groupdata_dict, sim_group_behav_df, params_sim_df, _ = utils.simulate_data(model, 
+                                                                                num_agents,
+                                                                                group = list(inf_mean_df_all['group'])[0:num_agents],
+                                                                                day = 2,
+                                                                                params = parameters,
+                                                                                STT = False,
+                                                                                Q_init = Q_init_day2,
+                                                                                seq_init = seq_counter_day2,
+                                                                                errorrates = er_day2)
+    
+    print(ID)
+    utils.plot_grouplevel(sim_group_behav_df, expdata_df_all[(expdata_df_all['day'] == 2) 
+                                                             & (expdata_df_all['ID'] == ID)], plot_single = False, day = 2)
+    
+#%%
+
+fig, ax = plt.subplots()
+sns.scatterplot(dfadapt,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                # hue = 'ri_0',
+                # hue_order = ['yes', 'no'],
+                # palette = {'yes': '#d62728', 'no': '#1f77b4'},
+                ax = ax)
+custom_labels = ["no negative effect of habit", "negative effect of habit"]  # Define your custom labels here
+handles, labels = ax.get_legend_handles_labels()
+# ax[0].plot(np.arange(0.5,2),np.arange(0.5,2)-0.8, color='k')
+ax.legend(handles, custom_labels, fontsize = 13, loc='upper left', bbox_to_anchor=(1, 1))
+ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+
+sns.scatterplot(extreme_values_df,
+                x = f'{param1}',
+                y = f'{param2}',
+                # palette = ['r', 'b'],
+                # hue = 'ri_0',
+                # hue_order = ['yes', 'no'],
+                # palette = {'yes': '#d62728', 'no': '#1f77b4'},
+                color = 'k',
+                ax = ax)
+custom_labels = ["no negative effect of habit", "negative effect of habit"]  # Define your custom labels here
+handles, labels = ax.get_legend_handles_labels()
+# ax[0].plot(np.arange(0.5,2),np.arange(0.5,2)-0.8, color='k')
+ax.legend(handles, custom_labels, fontsize = 13, loc='upper left', bbox_to_anchor=(1, 1))
+ax.set_xlabel(r'$\theta_{Rep}$', fontsize = 20)
+ax.set_ylabel(r'$\theta_{Switch}$', fontsize = 20)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+plt.savefig('/home/sascha/Desktop/Paper_2024/May/res_fig3/inferred_thetas_python.svg')
+plt.show()

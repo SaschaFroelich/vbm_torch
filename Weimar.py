@@ -29,7 +29,7 @@ from sklearn.linear_model import LinearRegression
 import scipy
 import itertools
 
-complete_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, _, _, _  = utils.load_data()
+complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, _, _, _, _, _  = utils.load_data()
 
 #%%
 '''
