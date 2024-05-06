@@ -43,7 +43,7 @@ def sweep_probs(samples, index):
         c_point += c_sign * step_size
     return (samples[:, index] >= c_point).sum() / samples.shape[0]
 
-num_models = 15
+num_models = 6
 num_agents = 60
 elbos_2nd_lvl = np.zeros(num_models)
 elbos = np.zeros((num_agents, num_models))
@@ -129,7 +129,16 @@ for model in range(num_models):
                 infname += '_' + strlist[idx]
             
             inf_models.append(infname)
-
+            
+        elif day == 2:
+            stridx = strlist.index('day2')
+            infname = strlist[stridx + 1]
+            
+            for idx in range(stridx+2, len(strlist)-2):
+                infname += '_' + strlist[idx]
+            
+            inf_models.append(infname)
+            
 #%%
 import csv
 
@@ -140,6 +149,15 @@ with open('IC.csv', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=' ',
                                 quotechar='|', quoting=csv.QUOTE_MINIMAL)
         spamwriter.writerow([f'{sim_models[midx]},', f'{inf_models[midx]},', '%.0f,'%WAIC[midx], '%.0f,'%DIC[midx]])
+        
+    if len(sim_models) == 0:
+
+        for midx in range(len(inf_models)):        
+
+            spamwriter = csv.writer(csvfile, delimiter=' ',
+                                    quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            spamwriter.writerow([f'{inf_models[midx]},', '%.0f,'%WAIC[midx], '%.0f,'%DIC[midx]])
+            
 
 #%%
 with pm.Model() as BMS:
@@ -256,9 +274,9 @@ fig, ax = plt.subplots(sharey = True, figsize = (15,5))
 for midx in range(num_models):
     # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
     ax.scatter(range(num_agents), individual_WAIC[:, midx], 
-                  marker=markershapes[midx], 
-                  edgecolor=colors[midx], 
-                  facecolors='none', 
+                  # marker=markershapes[midx], 
+                  # edgecolor=colors[midx], 
+                  # facecolors='none', 
                   linewidth=1, 
                   label=model_names[midx])
     
@@ -284,9 +302,9 @@ if AICs.shape[1] == 2:
     for midx in range(num_models):
         # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
         ax.scatter(range(num_agents), individual_WAIC[WAIC_sort_idxs, midx], 
-                      marker=markershapes[midx], 
-                      edgecolor=colors[midx], 
-                      facecolors='none', 
+                      # marker=markershapes[midx], 
+                      # edgecolor=colors[midx], 
+                      # facecolors='none', 
                       linewidth=1, 
                       label=model_names[midx])
         
@@ -300,6 +318,36 @@ if AICs.shape[1] == 2:
 
     # plt.savefig('BMS/ICs.png')
     plt.show()
+
+
+wins = []
+winning_model = []
+IC = []
+
+for midx in range(num_models):
+    wins.append((individual_WAIC.argmin(axis=1) == midx).astype(int).sum())
+    winning_model.append(model_names[midx])
+    IC.append('WAIC')
+    
+    wins.append((individual_DIC.argmin(axis=1) == midx).astype(int).sum())
+    winning_model.append(model_names[midx])
+    IC.append('DIC')
+
+IC_performance_df = pd.DataFrame({'Wins':wins, 'IC':IC, 'Model':winning_model})
+
+fig, ax = plt.subplots()
+sns.barplot(IC_performance_df,
+            x = 'Model',
+            y = 'Wins',
+            hue = 'IC')
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+plt.savefig(f'winning_models_day{day}.svg')
+
+ax.set_xlabel('Model', fontsize=20)
+ax.set_ylabel('Count', fontsize=20)
+
+plt.show()
 
 #%%
 '''
@@ -343,9 +391,9 @@ fig, ax = plt.subplots(sharey = True, figsize = (15,5))
 for midx in range(num_models):
     # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
     ax.scatter(range(num_agents), individual_DIC[:, midx], 
-                  marker=markershapes[midx], 
-                  edgecolor=colors[midx], 
-                  facecolors='none', 
+                  # marker=markershapes[midx], 
+                  # edgecolor=colors[midx], 
+                  # facecolors='none', 
                   linewidth=1, 
                   label=model_names[midx])
     
@@ -371,9 +419,9 @@ if AICs.shape[1] == 2:
     for midx in range(num_models):
         # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
         ax.scatter(range(num_agents), individual_DIC[DIC_sort_idxs, midx], 
-                      marker=markershapes[midx], 
-                      edgecolor=colors[midx], 
-                      facecolors='none', 
+                      # marker=markershapes[midx], 
+                      # edgecolor=colors[midx], 
+                      # facecolors='none', 
                       linewidth=1, 
                       label=model_names[midx])
         
@@ -459,9 +507,9 @@ fig, ax = plt.subplots(1,2, sharey = True, figsize = (15,5))
 for midx in range(num_models):
     # ax[0].scatter(range(num_agents), AICs[:, midx], s=20, label=model_names[midx], marker = markershapes[midx])
     ax[0].scatter(range(num_agents), AICs[:, midx], 
-                  marker=markershapes[midx], 
-                  edgecolor=colors[midx], 
-                  facecolors='none', 
+                  # marker=markershapes[midx], 
+                  # edgecolor=colors[midx], 
+                  # facecolors='none', 
                   linewidth=1, 
                   label=model_names[midx])
     
@@ -473,9 +521,9 @@ ax[0].legend(loc='upper left', bbox_to_anchor=(1, 1))
 
 for midx in range(num_models):
     ax[1].scatter(range(num_agents), BICs[:, midx], 
-                  marker=markershapes[midx], 
-                  edgecolor=colors[midx], 
-                  facecolors='none', 
+                  # marker=markershapes[midx], 
+                  # edgecolor=colors[midx], 
+                  # facecolors='none', 
                   linewidth=1, 
                   label=model_names[midx])
     
