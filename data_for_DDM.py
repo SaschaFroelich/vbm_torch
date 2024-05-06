@@ -42,7 +42,6 @@ def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
     df_all = pd.DataFrame()
     
     for agentid in expdata_df['ID'].unique():
-        
         agent_data = expdata_df[expdata_df['ID'] == agentid].copy()
         group = agent_data['group'].unique()
         
@@ -74,22 +73,25 @@ def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
 
             "----- Update sequence counters -----"
             if blocktype != -1:
-                seq_counter[agent_data["blocktype"][tt]][pppchoice, ppchoice, pchoice, choice] += 1
+                blocktype_counter_idx = agent_data["blocktype"][tt]
+                seq_counter[blocktype_counter_idx][pppchoice, ppchoice, pchoice, choice] += 1
                  
             else:
                 pppchoice = -1
                 ppchoice = -1
                 pchoice = -1
                 choice = -1
+                
+                blocktype_counter_idx = agent_data["blocktype"][tt+1]
 
             "----- Update repetition values rep -----"
-            seqs_sum = seq_counter[blocktype, 
+            seqs_sum = seq_counter[blocktype_counter_idx, 
                                         ppchoice, 
                                         pchoice, 
                                         choice, 
                                         0:4].sum(axis=-1)
             
-            new_rows = seq_counter[blocktype, 
+            new_rows = seq_counter[blocktype_counter_idx, 
                                         ppchoice, 
                                         pchoice, 
                                         choice, 
@@ -125,6 +127,7 @@ def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
         # df["choices_GD"] = df["choices_GD"].map(lambda x: x[0])
         
         df["group"] = df["group"].map(lambda x: x+1)
+        # print(tt)
         df["blockidx"] = df["blockidx"].map(lambda x: x+1)
         df["choices"] = df["choices"].map(lambda x: x+1 if x > -1 else x)
 
@@ -136,7 +139,9 @@ def get_ddm_data(preproc_file = 'behav_data/preproc_data.p', k=4, save = 0):
     
     if save:
         print("Saving to file.")
-        df_all.to_csv("/home/sascha/Downloads/Data_DDM_heute.csv")
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        df_all.to_csv(f"/home/sascha/Downloads/Data_DDM_{timestamp}.csv")
         
     """Next steps 
     6) Make sure the block orders are correct
