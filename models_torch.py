@@ -667,6 +667,9 @@ class Vbm_nolr(model_master):
             self.pchoice = choices
 
 class Repbias_lr(model_master):
+    '''
+        3 parameters: lr, theta_Q, & theta_rep
+    '''
     
     param_names = ['lr', 
                     'theta_Q',
@@ -978,6 +981,9 @@ class Repbias_nobound(model_master):
             self.pchoice = choices
             
 class Repbias_onlyseq_lr(model_master):
+    '''
+        3 parameters: lr, θ_Q, and Θ_R
+    '''
     
     param_names = ['lr', 
                     'theta_Q',
@@ -1461,6 +1467,9 @@ class Repbias_nolr(model_master):
             self.pchoice = choices
 
 class Repbias_Conflict_both_onlyseq(Repbias_lr):
+    '''
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
     
     param_names = ['lr',
                     'theta_Q',
@@ -1542,6 +1551,118 @@ class Repbias_Conflict_both_onlyseq(Repbias_lr):
         #                 torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
         
         incong_bool = (jokertype == 2).type(torch.int)        
+        conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
+        
+        '''
+            opt1_GD :   1 if option1 is goal-directed response
+                        -1 if option2 is goal-directed response
+        '''
+        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        
+        '''
+            seq_bool :  0 random condition
+                        1 sequential condition
+        '''
+        seq_bool = (blocktype == 0).type(torch.int)
+        
+        inc_bonus = incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param
+        
+        # inc_bonus = incong_bool*opt1_GD*conflict_value*conflict_param
+
+        probs = self.softmax(torch.stack((Vopt1 + inc_bonus, Vopt2), 2))
+        
+        return probs
+    
+class Repbias_Conflict_both_onlyseq_inferinc(Repbias_lr):
+    '''
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
+    
+    param_names = ['lr',
+                    'theta_Q',
+                    'theta_rep',
+                    'theta_conflict']
+    
+    num_params = len(param_names)
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')]),
+                    'theta_conflict': locs[..., self.param_names.index('theta_conflict')]}
+    
+        return param_dict
+    
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        conflict_param = self.param_dict['theta_conflict']
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            Rep(option1) - Rep(option2) --> DeltaRep > 0 if Rep(option1) > Rep(option2)
+        '''
+        DeltaRep = self.rep[-1][:, torch.arange(self.num_agents), option1] - \
+            self.rep[-1][:, torch.arange(self.num_agents), option2]
+        
+        '''
+        incong_bool :   0 if congruent trial
+                        1 if incongruent trial
+                        
+                        !! Given participant's inference (i.e. also in random condition) !!
+                        
+                        sign(X) can be -1, 0, 1 
+                        --> (1*1 -1)/-2 = 0
+                        
+                            (0*1 -1)/-2 = 0.5 -> 0
+                            (1*0 -1)/-2 = 0.5 -> 0
+                            (0*0 -1)/2 = 0.5 -> 0
+                            
+                            (1*-1 -1)/-2 = 1
+                            (-1*1 -1)/-2 = 1
+        '''
+        # incong_bool = ((torch.sign(DeltaQ).type(torch.int) * 
+        #                 torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
+        
+        # incong_bool = (jokertype == 2).type(torch.int)        
+        
+        incong_bool =   (blocktype == 0).type(torch.int) *\
+                        (torch.sign(DeltaRep) != 0).type(torch.int) * \
+                        (torch.sign(DeltaRep)==-torch.sign(DeltaQ)).type(torch.int)
+        
         conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
         
         '''
@@ -1669,6 +1790,9 @@ class Repbias_Conflict_both_onlyseq_nobound(Repbias_lr):
         return probs
 
 class Repbias_Conflict_both_both(Repbias_lr):
+    '''
+        4 parameters: LR, θ_Q, θ_R, θ_Switch
+    '''
     
     param_names = ['lr',
                     'theta_Q',
@@ -1977,6 +2101,9 @@ class Repbias_Conflict_nobound_lr(Repbias_lr):
         return probs
     
 class Repbias_Conflict_Repdiff_lr(Repbias_lr):
+    '''
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
     
     param_names = ['lr',
                     'theta_Q',
@@ -2384,6 +2511,8 @@ class Repbias_Exploiter_Repdiff_lr(Repbias_lr):
 class Repbias_Conflict_Repdiff_onlyseq_lr(Repbias_lr):
     '''
         onlyseq: conflict parameter is fitted only in case of incongruent DTT, based on jokertype variable
+        
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
     '''
     
     param_names = ['lr',
@@ -2476,6 +2605,124 @@ class Repbias_Conflict_Repdiff_onlyseq_lr(Repbias_lr):
         '''
         seq_bool = (blocktype == 0).type(torch.int)
         
+        '''
+            Introducing redundance incong_bool*seq_bool
+        '''
+        inc_bonus = incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param
+        
+        # inc_bonus = incong_bool*opt1_GD*conflict_value*conflict_param
+
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + inc_bonus, Vopt2), 2))
+        
+        return probs
+    
+    
+class Repbias_Conflict_Repdiff_onlyseq_lr_inferinc(Repbias_lr):
+    '''
+        onlyseq: conflict parameter is fitted only in case of incongruent DTT, based on jokertype variable
+        
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
+    
+    param_names = ['lr',
+                    'theta_Q',
+                    'theta_rep',
+                    'theta_conflict']
+    
+    num_params = len(param_names)
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q': torch.exp(locs[..., self.param_names.index('theta_Q')]),
+                    'theta_rep': torch.exp(locs[..., self.param_names.index('theta_rep')]),
+                    'theta_conflict': locs[..., self.param_names.index('theta_conflict')]}
+    
+        return param_dict
+    
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        conflict_param = self.param_dict['theta_conflict']
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            Rep(option1) - Rep(option2) --> DeltaRep > 0 if Rep(option1) > Rep(option2)
+        '''
+        DeltaRep = self.rep[-1][:, torch.arange(self.num_agents), option1] - \
+            self.rep[-1][:, torch.arange(self.num_agents), option2]
+        
+        '''
+        incong_bool :   0 if congruent trial
+                        1 if incongruent trial
+                        
+                        sign(X) can be -1, 0, 1 
+                        --> (1*1 -1)/-2 = 0
+                        
+                            (0*1 -1)/-2 = 0.5 -> 0
+                            (1*0 -1)/-2 = 0.5 -> 0
+                            (0*0 -1)/2 = 0.5 -> 0
+
+                            (1*-1 -1)/-2 = 1
+                            (-1*1 -1)/-2 = 1
+        '''
+        # incong_bool = ((torch.sign(DeltaQ).type(torch.int) * 
+        #                 # torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
+        # incong_bool = (jokertype == 2).type(torch.int)
+        
+        incong_bool =   (blocktype == 0).type(torch.int) *\
+                        (torch.sign(DeltaRep) != 0).type(torch.int) * \
+                        (torch.sign(DeltaRep)==-torch.sign(DeltaQ)).type(torch.int)
+        
+        conflict_value = torch.abs(DeltaRep)
+        
+        '''
+            opt1_GD :   1 if option1 is goal-directed response
+                        -1 if option2 is goal-directed response
+        '''
+        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        
+        '''
+            seq_bool :  0 random condition
+                        1 sequential condition
+        '''
+        seq_bool = (blocktype == 0).type(torch.int)
+        
+        '''
+            Introducing redundance incong_bool*seq_bool
+        '''
         inc_bonus = incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param
         
         # inc_bonus = incong_bool*opt1_GD*conflict_value*conflict_param
@@ -2593,6 +2840,8 @@ class Repbias_Conflict_Repdiff_onlyseq_onlyseq_lr(Repbias_lr):
     "Fits ONLY Q in random trials"
     '''
         onlyseq_onlyseq: θRep and θConflict are fitted only in repeating-sequence condition
+        
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
     '''
     
     param_names = ['lr',
@@ -2724,6 +2973,8 @@ class Repbias_Conflict_onlyseq_onlyseq_lr(Repbias_lr):
     "Fits ONLY Q in random trials"
     '''
         onlyseq_onlyseq: θRep and θConflict are fitted only in repeating-sequence condition
+        
+        4 parameters: lr, θ_Q. θ_R, θ_Switch
     '''
     
     param_names = ['lr',
@@ -4659,6 +4910,8 @@ class OnlyQ_lr(model_master):
 
 class OnlyQ_Qdiff_onlyseq_lr(model_master):
     '''
+        4 parameters.
+        
         Learns Q-values for Random, and difference Random-Congruent, and Congruent-Incongruent.
         Is given the jokertype directly.
         
@@ -4834,7 +5087,10 @@ class OnlyQ_Qdiff_onlyseq_lr(model_master):
 
 class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
     '''
+        Model 2
+    
         Description here        
+        3 parameters
     '''
     
     param_names = ['lr',
@@ -5012,10 +5268,11 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
         "Q and"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
         
-        
 class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
     '''
-        Description here        
+        3 parameters
+    
+        Learns θ_Q for random DTT, and a difference parameter for non-random DTT
     '''
     
     param_names = ['lr',
@@ -5195,6 +5452,8 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
         
 class OnlyQ_Qdiff_onlyseq_nobound(model_master):
     '''
+        4 parameters
+    
         Learns Q-values for Random, and difference Random-Congruent, and Congruent-Incongruent
         Is given the jokertype directly.
     '''
