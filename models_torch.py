@@ -824,7 +824,6 @@ class Repbias_lr(model_master):
             self.ppchoice = self.pchoice
             self.pchoice = choices
             
-            
 class Repbias_nobound(model_master):
     
     param_names = ['lr', 
@@ -2616,7 +2615,6 @@ class Repbias_Conflict_Repdiff_onlyseq_lr(Repbias_lr):
         probs = self.softmax(torch.stack((Vopt1 + inc_bonus, Vopt2), 2))
         
         return probs
-    
     
 class Repbias_Conflict_Repdiff_onlyseq_lr_inferinc(Repbias_lr):
     '''
@@ -4936,7 +4934,7 @@ class OnlyQ_Qdiff_onlyseq_lr(model_master):
     def locs_to_pars(self, locs):
         param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
                     'theta_Q_rand': torch.exp(locs[..., self.param_names.index('theta_Q_rand')]),
-                    'theta_Q_congdiff': torch.exp(locs[..., self.param_names.index('theta_Q_congdiff')]),
+                    'theta_Q_congdiff': locs[..., self.param_names.index('theta_Q_congdiff')],
                     'theta_Q_conflict': locs[..., self.param_names.index('theta_Q_conflict')]}
     
         return param_dict
@@ -4989,24 +4987,63 @@ class OnlyQ_Qdiff_onlyseq_lr(model_master):
                 -1 when incongruent
         '''
         incong_bool = (jokertype == 2).type(torch.int)
+        cong_bool = (jokertype == 1).type(torch.int)
         cong_bin = (jokertype == 1).type(torch.int) - incong_bool
-        
-        '''
-            opt1_GD :   1 if option1 is goal-directed response
-                        -1 if option2 is goal-directed response
-        '''
-        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
-        
-        # '''
-        #     seq_bool :  0 random condition
-        #                 1 sequential condition
-        # '''
-        # seq_bool = (blocktype == 0).type(torch.int)
-        
-        GD_bonus = opt1_GD*(cong_param*cong_bin - incong_param*incong_bool)
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+  
+        if 0:
+            '''
+                GD response is inferred.
+            
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            
+            '''
+                Bonus: Give the "sequential" response 
+            '''
+            Vopt1_diff = opt1_GD*(cong_param*cong_bool + incong_param*incong_bool)
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt2 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            
+            '''
+                GD response is given.
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write forumla like *_param is positive, for readability."
+            Vopt1_diff = seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*(cong_bool*cong_param-incong_bool*incong_param)
         
         "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
-        probs = self.softmax(torch.stack((Vopt1 + GD_bonus, Vopt2), 2))
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
         
         return probs
     
@@ -5084,35 +5121,9 @@ class OnlyQ_Qdiff_onlyseq_lr(model_master):
             
         "Q and"
         self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
-
-class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
-    '''
-        Model 2
+        
+class OnlyQ_Qdiff_onlyseq_lr_DQ(OnlyQ_Qdiff_onlyseq_lr):
     
-        Description here        
-        3 parameters
-    '''
-    
-    param_names = ['lr',
-                    'theta_Q_rand',
-                    'theta_diff']
-    
-    num_params = len(param_names)
-    NA = 4 # no. of possible actions
-    # num_blocks = 14
-    # trials = 480*num_blocks
-    BAD_CHOICE = -2
-
-    def specific_init(self):
-        pass
-
-    def locs_to_pars(self, locs):
-        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
-                    'theta_Q_rand': torch.exp(locs[..., self.param_names.index('theta_Q_rand')]),
-                    'theta_diff': torch.exp(locs[..., self.param_names.index('theta_diff')])}
-    
-        return param_dict
-
     def compute_probs(self, trial, blocktype, jokertype, **kwargs):
         '''
         Parameters
@@ -5137,7 +5148,8 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
         '''
         
         Q_param = self.param_dict['theta_Q_rand']
-        diff_param = self.param_dict['theta_diff']
+        cong_param = self.param_dict['theta_Q_congdiff']
+        incong_param = self.param_dict['theta_Q_conflict']
         option1, option2 = self.find_resp_options(trial)
         
         _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
@@ -5160,119 +5172,292 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
                 -1 when incongruent
         '''
         incong_bool = (jokertype == 2).type(torch.int)
+        cong_bool = (jokertype == 1).type(torch.int)
         cong_bin = (jokertype == 1).type(torch.int) - incong_bool
         seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
-        
-        '''
-            opt1_GD :   1 if option1 is goal-directed response
-                        -1 if option2 is goal-directed response
-        '''
-        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
-        
-        reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
-        reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
-        
-        opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
-                        reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
-                        
-        opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
-                        reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
-        
-        # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
-        # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
-        
-        # '''
-        #     seq_bool :  0 random condition
-        #                 1 sequential condition
-        # '''
-        # seq_bool = (blocktype == 0).type(torch.int)
-        GD_bonus = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)
+  
+        if 0:
+            '''
+                GD response is inferred.
+            
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            
+            '''
+                Bonus: Give the "sequential" response 
+            '''
+            Vopt1_diff = opt1_GD*(cong_param*cong_bool + incong_param*incong_bool)
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt2 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            
+            '''
+                GD response is given.
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write forumla like *_param is positive, for readability."
+            Vopt1_diff = seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*(cong_bool*cong_param-incong_bool*incong_param)*torch.abs(DeltaQ)
         
         "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
-        probs = self.softmax(torch.stack((Vopt1 + GD_bonus, Vopt2), 2))
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
         
         return probs
+
+
+class OnlyQ_Qdiff_onlyseq_lr_C(OnlyQ_Qdiff_onlyseq_lr):
     
-    def update(self, choices, outcomes, blocktype, trialstimulus, jokertype, **kwargs):
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
         '''
-        Class Vbm().
-        
         Parameters
         ----------
-        choices : torch.tensor with shape [num_agents]
-            The particiapnt's choice at the dual-target trial.
-            -2, 0, 1, 2, or 3
-            -2 = error
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
             
-        outcomes : torch.tensor with shape [num_agents]
-            no reward (0) or reward (1).
-            
+        day : int
+            Day of experiment.
+
         blocktype : torch.tensor with shape [num_agents]
             0/1 : sequential/ random 
-                        
-        day : int
-            Day of experiment (1 or 2).
             
-        **kwargs : TYPE
-            DESCRIPTION.
-
-        Raises
-        ------
-        Exception
-            DESCRIPTION.
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
 
         Returns
         -------
-        None.
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
 
         '''
         
-        lr = self.param_dict['lr']
+        Q_param = self.param_dict['theta_Q_rand']
+        cong_param = self.param_dict['theta_Q_congdiff']
+        incong_param = self.param_dict['theta_Q_conflict']
+        option1, option2 = self.find_resp_options(trial)
         
-        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
-            "Set previous actions to -1 because it's the beginning of a new block"
-            "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
+        Vopt1 = (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)*Q_param
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option2)
+        Vopt2 = self.Q[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)*Q_param
+        
+        assert Q_param.shape == Vopt1.shape
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
 
-            self.Q.append(self.Q[-1])
+        '''
+            cong_bin
+                1 when congruent
+                -1 when incongruent
+        '''
+        incong_bool = (jokertype == 2).type(torch.int)
+        cong_bool = (jokertype == 1).type(torch.int)
+        cong_bin = (jokertype == 1).type(torch.int) - incong_bool
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+  
+        if 0:
+            '''
+                GD response is inferred.
+            
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            
+            '''
+                Bonus: Give the "sequential" response 
+            '''
+            Vopt1_diff = opt1_GD*(cong_param*cong_bool + incong_param*incong_bool)
             
         else:
-            "----- Update GD-values -----"
-            Qout, mask = self.Qoutcomp(self.Q[-1], choices)
-            Qnew = self.Q[-1] + lr[..., None]*(outcomes[None,...,None]-Qout)*mask
-            self.Q.append(Qnew)
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt2 is GD & incongruent trial -> Boost option 1
+                
+            '''
             
-            # print(Qnew.mean(axis=1))
+            '''
+                GD response is given.
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
             
-            if len(self.Q) > 20:
-                "Free up memory space"
-                self.Q[0:-10] = []
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write forumla like *_param is positive, for readability."
+            Vopt1_diff = seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*(cong_param-incong_bool*incong_param)
+        
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
+        
+        return probs
 
-            "----- Update action memory -----"
-            # pchoice stands for "previous choice"
-            self.pppchoice = self.ppchoice
-            self.ppchoice = self.pchoice
-            self.pchoice = choices
-        
-    def reset(self, locs):
-        self.param_dict = self.locs_to_pars(locs)
-        
-        self.num_particles = locs.shape[0]
-        self.num_agents = locs.shape[1]
-        
-        "K"
-        # self.k = kwargs["k"]
-            
-        "Q and"
-        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
-        
-class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
-    '''
-        3 parameters
+
+class OnlyQ_Qdiff_onlyseq_lr_D(OnlyQ_Qdiff_onlyseq_lr):
     
-        Learns θ_Q for random DTT, and a difference parameter for non-random DTT
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        Q_param = self.param_dict['theta_Q_rand']
+        cong_param = self.param_dict['theta_Q_congdiff']
+        incong_param = self.param_dict['theta_Q_conflict']
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
+        Vopt1 = (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)*Q_param
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option2)
+        Vopt2 = self.Q[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)*Q_param
+        
+        assert Q_param.shape == Vopt1.shape
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            cong_bin
+                1 when congruent
+                -1 when incongruent
+        '''
+        incong_bool = (jokertype == 2).type(torch.int)
+        cong_bool = (jokertype == 1).type(torch.int)
+        cong_bin = (jokertype == 1).type(torch.int) - incong_bool
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+  
+        if 0:
+            '''
+                GD response is inferred.
+            
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            
+            '''
+                Bonus: Give the "sequential" response 
+            '''
+            Vopt1_diff = opt1_GD*(cong_param*cong_bool + incong_param*incong_bool)
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt2 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            
+            '''
+                GD response is given.
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write forumla like *_param is positive, for readability."
+            Vopt1_diff = seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*(cong_param-incong_bool*incong_param)*torch.abs(DeltaQ)
+        
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
+        
+        return probs
+
+class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
+    '''
+        Description here        
+        3 parameters
     '''
     
     param_names = ['lr',
@@ -5345,30 +5530,343 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
         cong_bin = (jokertype == 1).type(torch.int) - incong_bool
         seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
         
-        '''
-            opt1_GD :   1 if option1 is goal-directed response
-                        -1 if option2 is goal-directed response
-        '''
-        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        if 0:
+            '''
+                GD response is inferred.
+            '''
+            '''
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            Vopt1_diff = diff_param*seq_dtt_bool*opt1_GD
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt1 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write formula as if theta_diff is positive. for better readability."
+            Vopt1_diff = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)
         
-        reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
-        reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
         
-        opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
-                        reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+        return probs
+    
+    def update(self, choices, outcomes, blocktype, trialstimulus, jokertype, **kwargs):
+        '''
+        Class Vbm().
+        
+        Parameters
+        ----------
+        choices : torch.tensor with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
                         
-        opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
-                        reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
         
-        # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
-        # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+        lr = self.param_dict['lr']
         
-        # '''
-        #     seq_bool :  0 random condition
-        #                 1 sequential condition
-        # '''
-        # seq_bool = (blocktype == 0).type(torch.int)
-        GD_bonus = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
+            "Set previous actions to -1 because it's the beginning of a new block"
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+
+            self.Q.append(self.Q[-1])
+            
+        else:
+            "----- Update GD-values -----"
+            Qout, mask = self.Qoutcomp(self.Q[-1], choices)
+            Qnew = self.Q[-1] + lr[..., None]*(outcomes[None,...,None]-Qout)*mask
+            self.Q.append(Qnew)
+            
+            # print(Qnew.mean(axis=1))
+            
+            if len(self.Q) > 20:
+                "Free up memory space"
+                self.Q[0:-10] = []
+
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = choices
+        
+    def reset(self, locs):
+        self.param_dict = self.locs_to_pars(locs)
+        
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        
+class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ(OnlyQ_Qdiff_noswitch_onlyseq_onlyseq):
+    
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        Q_param = self.param_dict['theta_Q_rand']
+        diff_param = self.param_dict['theta_diff']
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
+        Vopt1 = (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)*Q_param
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option2)
+        Vopt2 = self.Q[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)*Q_param
+        
+        assert Q_param.shape == Vopt1.shape
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            cong_bin
+                1 when congruent
+                -1 when incongruent
+        '''
+        incong_bool = (jokertype == 2).type(torch.int)
+        cong_bin = (jokertype == 1).type(torch.int) - incong_bool
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+        
+        if 0:
+            '''
+                GD response is inferred.
+            '''
+            '''
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            Vopt1_diff = diff_param*seq_dtt_bool*opt1_GD
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt1 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            "Write formula as if theta_diff is positive. for better readability."
+            Vopt1_diff = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*torch.abs(DeltaQ)
+        
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
+        
+        return probs
+        
+class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
+    '''
+        3 parameters
+    
+        Learns θ_Q for random DTT, and a difference parameter for non-random DTT.
+        
+    '''
+    
+    param_names = ['lr',
+                    'theta_Q_rand',
+                    'theta_diff']
+    
+    num_params = len(param_names)
+    NA = 4 # no. of possible actions
+    # num_blocks = 14
+    # trials = 480*num_blocks
+    BAD_CHOICE = -2
+
+    def specific_init(self):
+        pass
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr': torch.sigmoid(locs[..., self.param_names.index('lr')]),
+                    'theta_Q_rand': torch.exp(locs[..., self.param_names.index('theta_Q_rand')]),
+                    'theta_diff': locs[..., self.param_names.index('theta_diff')]}
+    
+        return param_dict
+
+    def compute_probs(self, trial, blocktype, jokertype, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        Q_param = self.param_dict['theta_Q_rand']
+        diff_param = self.param_dict['theta_diff']
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
+        Vopt1 = (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)*Q_param
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option2)
+        Vopt2 = self.Q[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)*Q_param
+        
+        assert Q_param.shape == Vopt1.shape
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            cong_bin
+                1 when congruent
+                -1 when incongruent
+        '''
+        incong_bool = (jokertype == 2).type(torch.int)
+        cong_bin = (jokertype == 1).type(torch.int) - incong_bool
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+        
+        if 1:
+            '''
+                GD response is inferred.
+            '''
+            '''
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            GD_bonus = diff_param*seq_dtt_bool*opt1_GD
+            
+        else:
+            '''
+                GD response is not inferred but given.
+            '''
+        
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            # assert torch.all(opt1_GD_bool[torch.where(opt1_GD == 1)[1]] == 1)
+            # assert torch.all(opt2_GD_bool[torch.where(opt1_GD == -1)[1]] == 1)
+            
+            # '''
+            #     seq_bool :  0 random condition
+            #                 1 sequential condition
+            # '''
+            # seq_bool = (blocktype == 0).type(torch.int)
+            GD_bonus = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)
         
         "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
         probs = self.softmax(torch.stack((Vopt1 + GD_bonus, Vopt2), 2))
