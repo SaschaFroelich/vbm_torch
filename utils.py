@@ -117,7 +117,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
         Directory with data.
 
     getall : bool
-        True: Get all data collected so far
+        True: Get all complete data collected so far
         False: Make sure to get the same number of participants in every group
 
     Returns
@@ -146,36 +146,67 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
     'Exclude because of errors'
     
     if not RTAST:
-        include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
-               '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
-               '5f0f7fe1d7ad1c000b42d091', '55cca8f81676ab000ff06ef1',
-               '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
-               '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
-               '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
-               '63af557b3d4f219c3226b7d6', '5eff5f05b92981000a2aed73',
-               '5c6e8dd877955b0001ff0c58', '5d8b66f5d189bd001a378273',
-               '62db2644ab0a3a353c0dcb54', '6329b1add3dcd53cb9c9cab8',
-               '5c321ebf6558270001bd79aa', '5d49d17b3dad1f0001e2aba1',
-               '5eadaff848b26f4483ae62d9', '60a3f8075b013de7b5518e96',
-               '5eec9ee7d900510326d78fc8', '5d8a29c082fec30001d9c24a',
-               '617406fbfced12169896d158', '5e66c77e8ebdaf4466e26326',
-               '57deda2591b7fc0001493e95', '5982eef79dfc3e00011d81e0',
-               '57dd186e6598aa0001992616', '595e7974af78da0001a21c3a',
-               '5a9ed5046475f90001a0189e', '615739949cf5767509a7e29a',
-               '5f16fde210d37701904c9dc2', '5dc5da21d999de45a504651b',
-               '5d0245966e208b0017301561', '63d79fcd741f9cfb2f87152f',
-               '59dd90f6e75b450001a68dac', '63174af7d57182f9bf90c094',
-               '5eaadc0a7adeb404eea9c3c0', '62c97799bd8ab72a531abde0',
-               '60f816ff1fa74fcfab532378', '6500615b226d81ec5db464d7',
-               '5c4b987538878c0001c7883b', '5b2a72f7c293b90001732b89',
-               '57d5ab3a722df500017f3622', '5db4ef4a2986a3000be1f886',
-               '57c4761195a3ea00016e5992', '5db32244dbe39d000be72fb0',
-               '5e850b0e390e520ec806b084', '6116b022b7ef87ef5828748b',
-               '596f961cfe061d00011e3e03', '6044ca22bc6235555362d5bb',
-               '58aca85e0da7f10001de92d4', '65389f0b0f181197c4218f6d',
-               '654abe303c4940ec0502538e', '60e2577f8c52db9d1fb5ffac',
-               '62e02b26e879244a99e852fa', '56f699e876348f000c883bba',
-               '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
+        # include_IDs = ['5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
+        #        '6419cedec2078147e5682474', '5d55b7ef6a0f930017202336',
+        #        '5f0f7fe1d7ad1c000b42d091', '55cca8f81676ab000ff06ef1',
+        #        '5908458b1138880001bc77e7', '5efb31fa8cd32f04bf048643',
+        #        '62b44f66a16d45783569fad6', '5b5e0e86902ad10001cfcc59',
+        #        '629f6b8c65fcae219e245284', '5f356cbffb4cea5170d04fd9',
+        #        '63af557b3d4f219c3226b7d6', '5eff5f05b92981000a2aed73',
+        #        '5c6e8dd877955b0001ff0c58', '5d8b66f5d189bd001a378273',
+        #        '62db2644ab0a3a353c0dcb54', '6329b1add3dcd53cb9c9cab8',
+        #        '5c321ebf6558270001bd79aa', '5d49d17b3dad1f0001e2aba1',
+        #        '5eadaff848b26f4483ae62d9', '60a3f8075b013de7b5518e96',
+        #        '5eec9ee7d900510326d78fc8', '5d8a29c082fec30001d9c24a',
+        #        '617406fbfced12169896d158', '5e66c77e8ebdaf4466e26326',
+        #        '57deda2591b7fc0001493e95', '5982eef79dfc3e00011d81e0',
+        #        '57dd186e6598aa0001992616', '595e7974af78da0001a21c3a',
+        #        '5a9ed5046475f90001a0189e', '615739949cf5767509a7e29a',
+        #        '5f16fde210d37701904c9dc2', '5dc5da21d999de45a504651b',
+        #        '5d0245966e208b0017301561', '63d79fcd741f9cfb2f87152f',
+        #        '59dd90f6e75b450001a68dac', '63174af7d57182f9bf90c094',
+        #        '5eaadc0a7adeb404eea9c3c0', '62c97799bd8ab72a531abde0',
+        #        '60f816ff1fa74fcfab532378', '6500615b226d81ec5db464d7',
+        #        '5c4b987538878c0001c7883b', '5b2a72f7c293b90001732b89',
+        #        '57d5ab3a722df500017f3622', '5db4ef4a2986a3000be1f886',
+        #        '57c4761195a3ea00016e5992', '5db32244dbe39d000be72fb0',
+        #        '5e850b0e390e520ec806b084', '6116b022b7ef87ef5828748b',
+        #        '596f961cfe061d00011e3e03', '6044ca22bc6235555362d5bb',
+        #        '58aca85e0da7f10001de92d4', '65389f0b0f181197c4218f6d',
+        #        '654abe303c4940ec0502538e', '60e2577f8c52db9d1fb5ffac',
+        #        '62e02b26e879244a99e852fa', '56f699e876348f000c883bba',
+        #        '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
+        
+        include_IDs = ['5908458b1138880001bc77e7', '62c8391cd913ab9b5317d5f9',
+                       '62b44f66a16d45783569fad6', '5f0f7fe1d7ad1c000b42d091',
+                       '5d55b7ef6a0f930017202336', '5b5e0e86902ad10001cfcc59',
+                       '629f6b8c65fcae219e245284', '63af557b3d4f219c3226b7d6',
+                       '5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
+                       '5f356cbffb4cea5170d04fd9', '5eff5f05b92981000a2aed73',
+                       '5c6e8dd877955b0001ff0c58', '55cca8f81676ab000ff06ef1',
+                       '6419cedec2078147e5682474', '6329b1add3dcd53cb9c9cab8',
+                       '595e7974af78da0001a21c3a', '5d5bdf323feb0c00195dcf2e',
+                       '5eec9ee7d900510326d78fc8', '5982eef79dfc3e00011d81e0',
+                       '5d8a29c082fec30001d9c24a', '62db2644ab0a3a353c0dcb54',
+                       '5e66c77e8ebdaf4466e26326', '617406fbfced12169896d158',
+                       '5d49d17b3dad1f0001e2aba1', '5c321ebf6558270001bd79aa',
+                       '5eadaff848b26f4483ae62d9', '5d8b66f5d189bd001a378273',
+                       '57deda2591b7fc0001493e95', '654560feea0568aed78db680',
+                       '5eaadc0a7adeb404eea9c3c0', '60f816ff1fa74fcfab532378',
+                       '615739949cf5767509a7e29a', '5b2a72f7c293b90001732b89',
+                       '59dd90f6e75b450001a68dac', '63d79fcd741f9cfb2f87152f',
+                       '63174af7d57182f9bf90c094', '5d0245966e208b0017301561',
+                       '5dc5da21d999de45a504651b', '5f16fde210d37701904c9dc2',
+                       '5a9ed5046475f90001a0189e', '57d5ab3a722df500017f3622',
+                       '64217d8202361ad4dbed3596', '6500615b226d81ec5db464d7',
+                       '62b05691722d0db3c9d69acb', '62b05fdedd70cd33ea6afbd2',
+                       '5db32244dbe39d000be72fb0', '6116b022b7ef87ef5828748b',
+                       '5d5a75c570a7c1000152623e', '5e850b0e390e520ec806b084',
+                       '60e2577f8c52db9d1fb5ffac', '57c4761195a3ea00016e5992',
+                       '5fb46dd5d9ece50422838e7a', '62e02b26e879244a99e852fa',
+                       '56f699e876348f000c883bba', '6044ca22bc6235555362d5bb',
+                       '5db4ef4a2986a3000be1f886', '58aca85e0da7f10001de92d4',
+                       '596f961cfe061d00011e3e03', '654abe303c4940ec0502538e']
         
         exclude_errors = [
                       '5e07c976f6191f137214e91f' # (Grp 1)
@@ -183,7 +214,8 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
         
         exclude_gender = ['6286672d0165aad8f1386c27'] # (Grp 0)
         
-        'Exclude because of execution time'
+        'Exclude because of execution time.'
+        'Not executed on consecutive days, or not within the same timeframe.'
         exclude_time = [# Grp 0
                       '604fa685e33606f9a0ee8189',
                       # Grp 1
@@ -210,6 +242,8 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
     from os.path import exists
     sociopsy_dir = data_dir + 'sociopsy_data.csv'
     file_exists = exists(sociopsy_dir)
+    
+    assert file_exists
     
     if file_exists:
         'right/left/ambidextrous: 0/1/2'
@@ -261,6 +295,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
                     
                     q_sometimes_easier.append(participant_day2['q1'][0,1][0])
                     q_notice_a_sequence.append(participant_day2['q2'][0,1][0])
+                    q_sequence_repro.append(participant_day2['q3'][0,1][0])
                 
             else:
                 # if ID not in exclude_time and ID not in exclude_errors and pb not in exclude_random:
@@ -1566,7 +1601,7 @@ def plot_grouplevel(df1,
         # ax2.get_legend().remove()
         # ax2.set_xlabel('Block no.')
         ax2.set_ylabel('HRC (%)')
-        # plt.savefig(f'/home/sascha/Downloads/{df2["ID"].unique()[0]}.svg')
+        plt.savefig(f'/home/sascha/Downloads/{df2["ID"].unique()[0]}.svg')
         plt.show()     
         
 
