@@ -55,14 +55,24 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 0
+waithrs = 12
 post_pred = 1
 STT = 0
 
 import sys
 
-model_day1 = 'Repbias_lr'
-models_day2 = ['Repbias_Conflict_Repdiff_lr']
+model_day1 = 'Repbias_Conflict_both_onlyseq_inferinc'
+models_day2 = ['Repbias_lr',
+                'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
+                'Repbias_Conflict_both_onlyseq_inferinc',
+                'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq',
+                'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ',
+                'OnlyQ_Qdiff_onlyseq_lr_C', 
+                'OnlyQ_Qdiff_onlyseq_lr_D',
+                'OnlyQ_lr']
+
+# models_day2 = ['Repbias_lr']
+
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
 posterior_pred_samples_day1 = 2
@@ -73,10 +83,10 @@ halting_rtol_day2 = halting_rtol_day1 # for MLE estimation
 posterior_pred_samples_day2 = posterior_pred_samples_day1
 num_waic_samples_day2 = num_waic_samples_day1
 
-num_inf_steps_day2 = 1
-halting_rtol_day2 = 1e-01 # for MLE estimation
-posterior_pred_samples_day2 = 1
-num_waic_samples_day2 = 1
+num_inf_steps_day2 = 3_000
+halting_rtol_day2 = 1e-07 # for MLE estimation
+posterior_pred_samples_day2 = 2
+num_waic_samples_day2 = 3_000
 
 #%%
 "Day 1"
@@ -258,7 +268,7 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  secondlevel_df, # 8
                  param_names_day1, # 9
                  'behav_fit', # 10
-                 '', # 11 (halting r_tol)
+                 halting_rtol_day1, # 11 (halting r_tol)
                  WAIC, # 12
                  ll, # 13
                  predictive_choices, # 14
@@ -350,7 +360,7 @@ for model_day2 in models_day2:
                      secondlevel_df,
                      param_names_day2,
                      'behav_fit',
-                     '', # halting r_tol
+                     halting_rtol_day2, # halting r_tol
                      WAIC,
                      ll,
                      predictive_choices,
