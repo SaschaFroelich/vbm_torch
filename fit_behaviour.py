@@ -55,23 +55,26 @@ Modelle:
     Repbias_Conflict_both_both_nobound
 '''
 
-waithrs = 12
+import tracemalloc
+tracemalloc.start()
+
+waithrs = 15
 post_pred = 1
 STT = 0
 
 import sys
 
-model_day1 = 'Repbias_Conflict_both_onlyseq_inferinc'
-models_day2 = ['Repbias_lr',
-                'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
-                'Repbias_Conflict_both_onlyseq_inferinc',
-                'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq',
-                'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ',
-                'OnlyQ_Qdiff_onlyseq_lr_C', 
-                'OnlyQ_Qdiff_onlyseq_lr_D',
-                'OnlyQ_lr']
+model_day1 = 'OnlyQ_Qdiff_onlyseq_lr_C'
+models_day2 = [model_day1]
 
-# models_day2 = ['Repbias_lr']
+# models_day2 = ['Repbias_lr',
+#                 'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
+#                 'Repbias_Conflict_both_onlyseq_inferinc',
+#                 'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq',
+#                 'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ',
+#                 'OnlyQ_Qdiff_onlyseq_lr_C', 
+#                 'OnlyQ_Qdiff_onlyseq_lr_D',
+#                 'OnlyQ_lr']
 
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
@@ -87,6 +90,13 @@ num_inf_steps_day2 = 3_000
 halting_rtol_day2 = 1e-07 # for MLE estimation
 posterior_pred_samples_day2 = 2
 num_waic_samples_day2 = 3_000
+
+# '''
+#     Memory Usage
+# '''
+# snapshot = tracemalloc.take_snapshot()
+# utils.display_top(snapshot)
+
 
 #%%
 "Day 1"
@@ -114,6 +124,15 @@ exp_behav_dict_day2, expdata_df_day2 = pickle.load(open(f"behav_data/{datafile_d
 exp_behav_dict_day2 = utils.RT_err_to_m2(exp_behav_dict_day2)
 num_agents = len(expdata_df_day2['ag_idx'].unique())
 group = exp_behav_dict_day2['group'][0]
+
+# error_df_day2 = anal.compute_errors(expdata_df_day2)
+# er_day2 = torch.zeros((4, num_agents))
+# er_day2[0, :] = torch.tensor(error_df_day2['ER_stt']) # stt
+# er_day2[1, :] = torch.tensor(error_df_day2['ER_randomdtt']) # random
+# er_day2[2, :] = torch.tensor(error_df_day2['ER_congruent']) # congruent
+# er_day2[3, :] = torch.tensor(error_df_day2['ER_incongruent']) # incongrent
+
+# del er_day 2
 
 "Make sure same number of participants in each group"
 group_distro = [(np.array(group)==grp).sum() for grp in range(4)]
@@ -146,9 +165,8 @@ if STT:
     
 else:
     infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
-    
-agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
 
+agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
@@ -167,7 +185,7 @@ ID_df = expdata_df_day1.loc[:, ['ID', 'ag_idx']].drop_duplicates()
 firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day1['ID'][0][x])
 
 "----- WAIC & DIC"
-WAIC, ll, WAIC_var, individual_WAIC, DIC, _, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
+WAIC, _, WAIC_var, individual_WAIC, DIC, loglike, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day1)
 
 '''
     Compute WAIC with arviz
@@ -221,6 +239,7 @@ _, _, _, sim_agent = utils.simulate_data(model_day1,
                                         params = inf_mean_df.loc[:, [*param_names_day1]],
                                         errorrates = er_day1)
 
+del er_day1
 assert sim_agent.Q[-1].shape[0] == 1 and sim_agent.Q[-1].ndim == 3
 
 if STT:
@@ -256,7 +275,7 @@ max_log_like, mle_locs = infer.train_mle(halting_rtol = halting_rtol_day1)
 BIC, AIC = infer.compute_BIC_AIC()
 
 "----- Store results"
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 extra_storage = (Q_init_day1, # 0 (Q_init))
                  agent.Q[-1].detach(), # 1 (Q-final)
                  1, # day # 2 (day)
@@ -270,7 +289,7 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  'behav_fit', # 10
                  halting_rtol_day1, # 11 (halting r_tol)
                  WAIC, # 12
-                 ll, # 13
+                 None, # 13 (loglike 2D)
                  predictive_choices, # 14
                  obs_mask, # 15
                  WAIC_var, # 16
@@ -289,12 +308,41 @@ if num_inf_steps_day1 > 1:
                   agent_elbo_tuple, 
                   extra_storage), 
                 open(f"behav_fit/{filename_day1}.p", "wb" ) )
+    
+    print("Saving loglike.")
+    assert loglike.ndim == 3
+    assert loglike.shape[0] == num_waic_samples_day1
+    assert loglike.shape[-1] == num_agents
+    num_loglike_entries = loglike.shape[1]
+
+    column_indices = torch.arange(num_agents)
+    agent_indexer = column_indices.unsqueeze(0).repeat(num_waic_samples_day1, loglike.shape[1], 1)
+        
+    loglike = torch.reshape(loglike, (num_waic_samples_day1, num_loglike_entries*num_agents))
+    agent_indexer = torch.reshape(agent_indexer, (num_waic_samples_day1, num_loglike_entries*num_agents))
+    
+    nan_mask = torch.isnan(loglike)
+    all_nan_columns = nan_mask.all(dim=0)
+    
+    loglike = loglike[:, ~all_nan_columns]
+    agent_indexer = agent_indexer[:, ~all_nan_columns]
+    agent_indexer = agent_indexer[0, :]
+    
+    pickle.dump( (loglike, agent_indexer), 
+                open(f"behav_fit/IC/{filename_day1}_loglike.p", "wb" ) )
+    
+    # del loglike, agent_indexer
+    
 '''
     Fit day 2
 '''
 del exp_behav_dict_day1
 del expdata_df_day1
 for model_day2 in models_day2:
+    del all_nan_columns, nan_mask, column_indices, predictive_choices, firstlevel_df
+    del WAIC, WAIC_var, individual_WAIC, DIC, loglike, pwaic, individual_DIC, agent_indexer
+    del AIC, BIC
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"======== INFERENCE DAY 2 ({timestamp}) ===========.")
     agent = utils.init_agent(model_day2, 
@@ -303,7 +351,7 @@ for model_day2 in models_day2:
                              seq_init = seq_counter_day2)
     
     param_names_day2 = agent.param_names
-    print("===== Starting inference for day 2 =====")
+    print(f"===== Starting inference of model {model_day2} for day 2 =====")
     "----- Start Inference"
     if STT:
         infer = inferencemodels.GeneralGroupInferenceSTT(agent, exp_behav_dict_day2, 1)
@@ -330,7 +378,7 @@ for model_day2 in models_day2:
     firstlevel_df['ID'] = firstlevel_df['ag_idx'].map(lambda x: exp_behav_dict_day2['ID'][0][x])
     
     "----- WAIC & DIC"
-    WAIC, ll, WAIC_var, individual_WAIC, DIC, _, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day2)
+    WAIC, _, WAIC_var, individual_WAIC, DIC, loglike, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples_day2)
     
     "----- Save parameter names to DataFrame"
     params_sim_df = pd.DataFrame(columns = agent.param_dict.keys())
@@ -348,7 +396,7 @@ for model_day2 in models_day2:
     BIC, AIC = infer.compute_BIC_AIC()
     
     "----- Store results"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     extra_storage = (Q_init_day2,  # initial Q-values
                      agent.Q[-1].detach(), # final Q-values
                      2, # day
@@ -362,7 +410,7 @@ for model_day2 in models_day2:
                      'behav_fit',
                      halting_rtol_day2, # halting r_tol
                      WAIC,
-                     ll,
+                     None, # loglike 2D
                      predictive_choices,
                      obs_mask,
                      WAIC_var,
@@ -371,17 +419,39 @@ for model_day2 in models_day2:
                      pwaic,
                      individual_DIC)
     
+    assert loglike.ndim == 3
+    assert loglike.shape[0] == num_waic_samples_day2
+    assert loglike.shape[-1] == num_agents
+    num_loglike_entries = loglike.shape[1]
+
+    column_indices = torch.arange(num_agents)
+    agent_indexer = column_indices.unsqueeze(0).repeat(num_waic_samples_day1, loglike.shape[1], 1)
+        
+    loglike = torch.reshape(loglike, (num_waic_samples_day1, num_loglike_entries*num_agents))
+    agent_indexer = torch.reshape(agent_indexer, (num_waic_samples_day1, num_loglike_entries*num_agents))
+    
+    nan_mask = torch.isnan(loglike)
+    all_nan_columns = nan_mask.all(dim=0)
+    
+    loglike = loglike[:, ~all_nan_columns]
+    agent_indexer = agent_indexer[:, ~all_nan_columns]
+    agent_indexer = agent_indexer[0, :]
+    
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")
+        filename_day2 = f"behav_fit_model_day2_{model_day2}_model1_{model_day1}_{timestamp}_{num_agents}agents"
         pickle.dump( (firstlevel_df, 
                       expdata_df_day2,
                       (loss, BIC, AIC),
                       params_sim_df, 
                       agent_elbo_tuple, 
                       extra_storage), 
-                    open(f"behav_fit/behav_fit_model_day2_{model_day2}_model1_{model_day1}_{timestamp}_{num_agents}agents.p", "wb" ) )
+                    open(f"behav_fit/{filename_day2}.p", "wb" ) )
+
+        print("Saving loglike.")
+        pickle.dump( (loglike, agent_indexer), 
+                    open(f"behav_fit/IC/{filename_day2}_loglike.p", "wb" ) )
 
 from IPython import get_ipython
 get_ipython().run_line_magic("reset", "-f")
-
 quit()

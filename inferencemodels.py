@@ -17,6 +17,10 @@ import env
 import pyro
 import pyro.distributions as dist
 
+import tracemalloc
+import utils
+tracemalloc.start()
+
 # np.random.seed(123)
 # torch.manual_seed(123)
 
@@ -587,13 +591,14 @@ class GeneralGroupInference():
         loglike = torch.zeros(num_samples, num_obs, self.num_agents)
         loglike[:] = torch.nan
         
-        # subject_WAIC = torch.zeros(self.num_agents)
-        # subject_WAIC_var = torch.zeros(self.num_agents)
-        subject_loglike = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
-        subject_like = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
+        # subject_like = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
+        # subject_loglike = {f'ag_{i}':[[] for _ in range(num_samples)] for i in range(self.num_agents)}
         for i in range(num_samples):
             if i % 100 == 0:
                 print(f"Iterating to compute WAIC, step {i}.")
+                # snapshot = tracemalloc.take_snapshot()
+                # utils.display_top(snapshot)
+            
             conditioned_model = pyro.condition(self.model, 
                                                 data = {'locs': self.guide()['locs'].detach()})
             
@@ -614,13 +619,18 @@ class GeneralGroupInference():
                     like[i, obsidx, torch.where(obsmask==1)[1]] = choice_probs[0, torch.where(obsmask==1)[1]].detach()
                     loglike[i, obsidx, torch.where(obsmask==1)[1]] = torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).detach()
                     
-                    for ag_idx in torch.where(obsmask==1)[1]:
-                        subject_like[f'ag_{ag_idx}'][i].append(choice_probs[0, ag_idx].item())
-                        subject_loglike[f'ag_{ag_idx}'][i].append(torch.log(choice_probs[0, ag_idx]).item())
+                    # for ag_idx in torch.where(obsmask==1)[1]:
+                    #     raise exception("This overloads memory, and appending takes very long. Find different solution.")
+                    #     subject_like[f'ag_{ag_idx}'][i].append(choice_probs[0, ag_idx].item())
+                    #     subject_loglike[f'ag_{ag_idx}'][i].append(torch.log(choice_probs[0, ag_idx]).item())
                     
                     obsidx += 1
 
         "effective number of parameters."
+        print("Computing effective number of parameters.")
+        # snapshot = tracemalloc.take_snapshot()
+        # utils.display_top(snapshot)
+        
         loglike_2D = torch.zeros((num_samples, self.num_agents*num_obs))
         like_2D = torch.zeros((num_samples, self.num_agents*num_obs))
         for i in range(num_samples):
@@ -637,19 +647,9 @@ class GeneralGroupInference():
             pwaic_vec = 2*(torch.log(like.mean(axis=0)) - loglike.mean(axis=0))
             pwaic = pwaic_vec.sum()
         
-        # subject_pwaic = torch.zeros(self.num_agents)
-        # subject_lppd = torch.zeros(self.num_agents)
-        # for ag_idx in range(self.num_agents):
-        #     s_pwaic_vec = 2*(torch.log(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0)) -
-        #         torch.tensor(subject_loglike[f'ag_{ag_idx}']).mean(axis=0))
-        #     s_pwaic = s_pwaic_vec.sum()
-        #     subject_pwaic[ag_idx] = s_pwaic
-            
-        #     s_lppd_vec = torch.log(torch.tensor(subject_like[f'ag_{ag_idx}'])).mean(axis=0)
-        #     s_lppd = s_lppd_vec.sum()
-        #     subject_lppd[ag_idx] = s_lppd
-        #     subject_WAIC[ag_idx] = -2*(s_lppd - s_pwaic)
-        
+        print("Computing LPPD")
+        # snapshot = tracemalloc.take_snapshot()
+        # utils.display_top(snapshot)
         lppd_vec = torch.log(like_2D.mean(axis=0))
         lppd = lppd_vec.nansum()
         WAIC = -2*(lppd - pwaic2)
@@ -663,6 +663,9 @@ class GeneralGroupInference():
             Var(X-Y) = Var(X+(-Y)) = Var(X) + Var(-Y) + 2Cov(X,-Y) = Var(X) + Var(Y) - 2*Cov(X,Y)
             Var(aX) = a²Var(X)
         '''
+        print("Put everything together.")
+        # snapshot = tracemalloc.take_snapshot()
+        # utils.display_top(snapshot)
         lppd_var = lppd_vec[~torch.isnan(lppd_vec)].var(correction = 0)
         pwaic2_var = pwaic2_vec[~torch.isnan(pwaic2_vec)].var(correction = 0)
         cov = torch.cov(torch.stack((lppd_vec[~torch.isnan(lppd_vec)], pwaic2_vec[~torch.isnan(pwaic2_vec)])))
@@ -671,7 +674,7 @@ class GeneralGroupInference():
         assert cov.shape[1] == 2
         waic_var = 4*(lppd_var + pwaic2_var - 2*cov[0,1])
 
-        print("Finished WAIC")
+        print("Finished WAIC.")
         
         '''
             DIC (Deviance information criterion) Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). 
@@ -714,7 +717,8 @@ class GeneralGroupInference():
         #     subject_pDIC.append(torch.tensor(subject_like[f'ag_{ag_idx}']).mean(axis=0).sum())
         
         print("Finished DIC")
-        return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
+        # return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
+        return WAIC.detach(), None, waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
     
     def compute_BIC_AIC(self):
         '''

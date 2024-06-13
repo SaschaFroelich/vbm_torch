@@ -178,7 +178,7 @@ def get_groupdata(data_dir, getall = False, RTAST = False):
         #        '5fb46dd5d9ece50422838e7a', '5d5a75c570a7c1000152623e']
         
         include_IDs = ['5908458b1138880001bc77e7', '62c8391cd913ab9b5317d5f9',
-                       '62b44f66a16d45783569fad6', '5f0f7fe1d7ad1c000b42d091',
+                       '62b44f66a16d45783569fad6', '5efb31fa8cd32f04bf048643',
                        '5d55b7ef6a0f930017202336', '5b5e0e86902ad10001cfcc59',
                        '629f6b8c65fcae219e245284', '63af557b3d4f219c3226b7d6',
                        '5d7ebf9e93902b0001965912', '5b266738007d870001c7c360',
@@ -2545,7 +2545,6 @@ def plot_corr_network(r_matrix,
         raise Exception("Use method p.")
     
     
-    # dfgh
     import networkx as nx
 
     # Create a graph from the correlation matrix
@@ -2890,13 +2889,11 @@ def scatterplot_daydiffs(df):
             else:
                 ax_idxs = [plot_col_idx]
             
-            # df['difference'] = -df[(df['parameter']==par) & (df['day']==1)]
-            # dfgh
             ax[*ax_idxs].scatter(mean_day1, difference)
             # sns.scatterplot(data = df, x=par, y='difference', ax =ax[*ax_idxs])
             ax[*ax_idxs].axhline(0, color='k')
             r,p = scipy.stats.pearsonr(mean_day1, difference)
-            # dfgh
+            
             ax[*ax_idxs].text(mean_day1.min(), difference.min(), "Pearson r=%.4f, p=%.4f"%(r,p))
             ax[*ax_idxs].set_xlabel(par)
               
@@ -3318,3 +3315,37 @@ def check_debriefing_quest(expdata_df):
     np.array(max_length)[not_notice_seq_idx].mean()
     
     print(f"mean reproduced sequence length: {np.array(max_length).mean()} +- {np.array(max_length).std()}.")
+    
+
+    
+'''
+    Memory Usage
+'''
+def display_top(snapshot, key_type='lineno', limit=3):
+    import tracemalloc
+    import os
+    import linecache
+    
+    snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<unknown>"),
+    ))
+    top_stats = snapshot.statistics(key_type)
+
+    print("Top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        # replace "/path/to/module/file.py" with "module/file.py"
+        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+        print("#%s: %s:%s: %.1f KiB"
+              % (index, filename, frame.lineno, stat.size / 1024))
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print('    %s' % line)
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f KiB" % (len(other), size / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f KiB" % (total / 1024))
