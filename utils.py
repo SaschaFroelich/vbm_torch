@@ -1054,7 +1054,8 @@ def init_agent(model,
                params = None, 
                Q_init = None, 
                seq_init = None,
-               errorrates = None):
+               errorrates = None,
+               seqlength = None):
     '''
     
     Parameters
@@ -1084,6 +1085,12 @@ def init_agent(model,
     newagent : obj of class model
 
     '''
+    
+    if seqlength is not None and seq_init is not None:
+        assert seq_init.ndim - 2 == seqlength
+        
+    elif seqlength == None and seq_init is not None:
+        seqlength == seq_init.ndim - 2
     
     if params is not None:
         assert errorrates is not None
@@ -1121,7 +1128,8 @@ def init_agent(model,
                                num_agents = num_agents, 
                                seq_init = seq_init,
                                errorrates = errorrates,
-                               group = group)
+                               group = group,
+                               seqlength = seqlength)
         
     else:
         for key in params.keys():
@@ -1131,7 +1139,8 @@ def init_agent(model,
                                param_dict = params, 
                                seq_init = seq_init,
                                errorrates = errorrates,
-                               group = group)
+                               group = group,
+                               seqlength = seqlength)
         
     return newagent
 
@@ -1144,7 +1153,8 @@ def simulate_data(model,
                   plotres = True,
                   Q_init = None,
                   seq_init = None,
-                  errorrates = None):
+                  errorrates = None,
+                  seqlength = None):
     '''
     Simulates data and plots results.
     
@@ -1246,7 +1256,8 @@ def simulate_data(model,
                           params = params,
                           Q_init = Q_init,
                           seq_init = seq_init,
-                          errorrates = errorrates)
+                          errorrates = errorrates, 
+                          seqlength = seqlength)
     
     if params == None:
         params_sim = {}
@@ -1572,6 +1583,9 @@ def plot_grouplevel(df1,
         '''
             Barplots
         '''
+        grouped_df_1['choices_GD'] = grouped_df_1['choices_GD']*100
+        grouped_df_2['choices_GD'] = grouped_df_2['choices_GD']*100
+        
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
         sns.barplot(y = 'choices_GD', 
                     hue = 'jokertypes', 
@@ -1582,7 +1596,7 @@ def plot_grouplevel(df1,
                     ax = ax1)
         # ax1.set_xticks(np.arange(1, 8), minor = True)
         # ax1.set_xlabel('Block no.')
-        ax1.set_ylabel('HRC (%)')
+        ax1.set_ylabel('Goal-Directed Responses (%)')
         # ax1.grid(which='minor', alpha=0.5)
         ax1.set_title(f'Model {model_1}')
         # ax1.axvline(3.5, color='k', linewidth=0.5)
@@ -1600,7 +1614,7 @@ def plot_grouplevel(df1,
         ax2.set_title(f'Model {model_2}')
         # ax2.get_legend().remove()
         # ax2.set_xlabel('Block no.')
-        ax2.set_ylabel('HRC (%)')
+        ax2.set_ylabel('Goal-Directed Responses (%)')
         plt.savefig(f'/home/sascha/Downloads/{df2["ID"].unique()[0]}.svg')
         plt.show()     
         
@@ -2798,20 +2812,29 @@ def lineplot_daydiffs(df):
     
     parameter_names = df['parameter'].unique()
     num_pars = len(parameter_names)
-    fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15, 7))
-    num_plot_cols = 3
-    num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
-                    (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
+    # fig, ax = plt.subplots(int(np.ceil(num_pars/3)), 3, figsize=(15, 9))
+    fig, ax = plt.subplots(2, 2, figsize=(12, 9))
+    num_plot_cols = 2
+    num_plot_rows = 2
+    # num_plot_rows = int((num_pars <= num_plot_cols) * 1 + \
+    #                 (num_pars > num_plot_cols) * np.ceil(num_pars / num_plot_cols))
     gs = fig.add_gridspec(num_plot_rows, num_plot_cols, hspace=0.2, wspace = 0.5)
     param_idx = -1
-    for par in parameter_names:
+    
+    parameter_names_new = parameter_names.copy()
+    for paridx in range(len(parameter_names)):
+        parameter_names_new[paridx] = parameter_names_new[paridx].replace("theta", "$\\theta$")
+        parameter_names_new[paridx] = parameter_names_new[paridx].replace("conflict", "Switch")
+        parameter_names_new[paridx] = parameter_names_new[paridx].replace("rep", "Rep")
+    
+    for paridx in range(len(parameter_names)):
+        par = parameter_names[paridx]
         
         param_idx += 1
         plot_col_idx = param_idx % num_plot_cols
         plot_row_idx = (param_idx // num_plot_cols)
         print(f'{plot_row_idx}, {plot_col_idx}')
         
-        # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
         t_statistic, p_value = scipy.stats.ttest_rel(df[(df['parameter'] == par) & (df['day'] == 1)].sort_values(by='ag_idx')['mean'], 
                                                     df[(df['parameter'] == par) & (df['day'] == 2)].sort_values(by='ag_idx')['mean'])
         
@@ -2850,9 +2873,14 @@ def lineplot_daydiffs(df):
                          color='black', 
                          legend=False)
             
-            ax[*ax_idxs].set_xlabel(par)
-                
-    plt.savefig('/home/sascha/Downloads/daydiff.svg')
+            ax[*ax_idxs].set_xlabel('Day', fontsize = 20)
+            ax[*ax_idxs].set_ylabel(r'%s'%(parameter_names_new[paridx]), fontsize = 20)
+            ax[*ax_idxs].set_xticks([1, 2])
+            # dfgh
+            # ax[*ax_idxs].set_xlabel(r'$\theta$_H')
+            # dfgh
+            
+    plt.savefig('/home/sascha/Desktop/Paper_2024/May/suppl_fig2/daydiffs_python.svg')
     plt.show()
     
 def scatterplot_daydiffs(df):
@@ -2880,8 +2908,6 @@ def scatterplot_daydiffs(df):
             param_idx += 1
             plot_col_idx = param_idx % num_plot_cols
             plot_row_idx = (param_idx // num_plot_cols)
-            
-            # df_plot = pd.melt(df, id_vars='ag_idx', value_vars=[par, par[0:-4]+'day2'])
             
             if num_plot_rows > 1:
                 ax_idxs = [plot_row_idx, plot_col_idx]
@@ -3050,7 +3076,7 @@ def RT_err_to_m2(data_dict):
     return data_dict
     
 def load_data():
-    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage_day2, filepath = get_data_from_file()
+    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple_day2, BIC, AIC, extra_storage_day2, filepath = get_data_from_file()
     
     post_sample_df_day2['day'] = 2
     Q_init_day2 = extra_storage_day2[0]
@@ -3114,6 +3140,13 @@ def load_data():
     ax.set_xlabel("Number of iterations")
     ax.set_ylabel("ELBO")
     plt.show()
+    
+    fig, ax = plt.subplots()
+    plt.plot(loss[-500:])
+    plt.title(f"ELBO for model {model} ({num_agents} agents)")
+    ax.set_xlabel("Number of iterations")
+    ax.set_ylabel("ELBO")
+    plt.show()
     # print(np.array(loss[-1000:]).mean())
     
     '''
@@ -3145,15 +3178,15 @@ def load_data():
     
     if day == 2:
         seq_counter_day2 = extra_storage_day2[6]
-        groupdata_dict_day2, sim_group_behav_df_day2, params_sim_df_day2, _ = simulate_data(model, 
-                                                                                num_agents,
-                                                                                group = list(inf_mean_df_day2['group']),
-                                                                                day = day,
-                                                                                STT = 0,
-                                                                                Q_init = Q_init_day2,
-                                                                                seq_init = seq_counter_day2,
-                                                                                params = inf_mean_df_day2.loc[:, [*param_names]],
-                                                                                errorrates = er_day2)
+        _, sim_group_behav_df_day2, _, _ = simulate_data(model, 
+                                                        num_agents,
+                                                        group = list(inf_mean_df_day2['group']),
+                                                        day = day,
+                                                        STT = 0,
+                                                        Q_init = Q_init_day2,
+                                                        seq_init = seq_counter_day2,
+                                                        params = inf_mean_df_day2.loc[:, [*param_names]],
+                                                        errorrates = er_day2)
         
         plot_grouplevel(expdata_df_day2, sim_group_behav_df_day2, plot_single = False)
         sim_group_behav_df_day2['day'] = 2
@@ -3170,6 +3203,23 @@ def load_data():
             
         else:
             raise Exception('Error')
+    
+        '''
+            Plot ELBO
+        '''
+        fig, ax = plt.subplots()
+        plt.plot(loss_day1)
+        plt.title(f"ELBO for model {model} ({num_agents} agents)")
+        ax.set_xlabel("Number of iterations")
+        ax.set_ylabel("ELBO")
+        plt.show()
+        
+        fig, ax = plt.subplots()
+        plt.plot(loss_day1[-500:])
+        plt.title(f"ELBO for model {model} ({num_agents} agents)")
+        ax.set_xlabel("Number of iterations")
+        ax.set_ylabel("ELBO")
+        plt.show()
     
         post_sample_df_day1['day'] = 1
         # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
@@ -3234,7 +3284,7 @@ def load_data():
         print("Violin plots.")
         anal.violin(inf_mean_df_day1, param_names, model)
         anal.violin(inf_mean_df_day2, param_names, model)
-        return complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1
+        return complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1, agent_elbo_tuple_day2, agent_elbo_tuple_day1
     
 def longest_common_substring(A, B):
     # Start by checking the longer substrings of B

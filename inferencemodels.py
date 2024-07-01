@@ -718,7 +718,7 @@ class GeneralGroupInference():
         
         print("Finished DIC")
         # return WAIC.detach(), loglike_2D.nanmean(axis=0).nansum(), waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
-        return WAIC.detach(), None, waic_var, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
+        return WAIC.detach(), None, None, individual_WAIC, DIC, loglike, pwaic2, individual_DIC
     
     def compute_BIC_AIC(self):
         '''
@@ -1266,85 +1266,6 @@ class GeneralGroupInferenceSTT():
         "Not yet implemented"
         return 0, {"":""}
         return self.max_log_like.detach(), pyro.param('locs').detach()
-    
-    # def compute_IC(self, num_samples):
-    #     '''
-    #         Compute information criteria for each participant individually.
-        
-    #         BIC = k*ln(n) - 2*ll --> the lower, the better
-    #         ll = maximized log-likelihood value
-    #         k = number of parameters
-    #         n = number of observations
-    #     '''
-    #     # print(f"Computing ICs with mll = {self.max_log_like.sum()}")
-        
-    #     # assert self.trial_counts.size()[0] == self.num_agents
-        
-    #     # BIC = torch.tensor(self.agent.num_params)*torch.log(self.trial_counts) -\
-    #     #     2*self.max_log_like
-            
-    #     '''
-    #         AIC = 2*k - 2*ll --> the lower, the better
-    #         ll = maximized log-likelihood value
-    #         k = number of parameters
-    #     '''
-    #     # AIC = 2*torch.tensor(self.agent.num_params) - 2*self.max_log_like
-        
-    #     '''
-    #         DIC (Deviance information criterion) Gelman, Andrew; Carlin, John B.; Stern, Hal S.; Rubin, Donald B. (2004). Bayesian Data Analysis: Second Edition
-    #         Effective number of parameters pD = 2*(log p(y|θ_Bayes) - E_post[log p(y|θ)])
-    #         θ_Bayes : mean of posterior
-    #         E_post[log p(y|θ)] : mean of log p(y|θ) under the posterior of θ
-    #     '''
-        
-    #     '''
-    #         WAIC
-    #     '''
-        
-    #     conditioned_model = pyro.condition(self.model, 
-    #                                         data = {'locs': self.guide()['locs']})
-        
-    #     trace = pyro.poutine.trace(conditioned_model).get_trace()
-        
-    #     num_obs = 0
-    #     for key, val in trace.nodes.items():
-    #         if '_observed' in key:
-    #             num_obs += 1
-    #             obsmask = val['mask'].type(torch.int)
-    #             logprobs = val['fn'].probs
-                
-    #     loglike = torch.zeros(num_obs)
-    #     like = torch.zeros(num_obs)
-    #     for i in range(num_samples):
-    #         print(f"Iterating to compute WAIC, step {i}.")
-    #         conditioned_model = pyro.condition(self.model, 
-    #                                             data = {'locs': self.guide()['locs']})
-            
-    #         trace = pyro.poutine.trace(conditioned_model).get_trace()
-            
-    #         obsidx = 0
-    #         for key, val in trace.nodes.items():
-    #             if '_observed' in key:
-    #                 choices = val['value']
-    #                 obsmask = val['mask'].type(torch.int)
-    #                 probs = val['fn'].probs
-                    
-    #                 choice_probs = probs[0, range(self.num_agents), choices]
-                    
-    #                 like[obsidx] += choice_probs[0, torch.where(obsmask==1)[1]].prod().detach()
-    #                 loglike[obsidx] += torch.log(choice_probs[0, torch.where(obsmask==1)[1]]).sum().detach()
-                    
-    #                 obsidx += 1
-                    
-    #         # ipdb.set_trace()
-
-    #     "effective number of parameters."
-    #     pwaic = 2*((torch.log(like/num_samples) - loglike/num_samples).sum())
-        
-    #     WAIC = torch.log(like).sum() - pwaic
-        
-    #     # ipdb.set_trace()
-    #     return None, None, WAIC.detach(), loglike.detach().mean()
     
     def compute_IC(self, num_samples):
         '''

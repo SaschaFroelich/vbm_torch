@@ -27,18 +27,18 @@ class model_master():
     NA = 4 # no. of possible actions
     # num_blocks = 14
     # trials = 480*num_blocks
-    BAD_CHOICE = -2    
+    BAD_CHOICE = -2
 
     def __init__(self, 
                  Q_init, 
                  group,
+                 seqlength,
                  num_agents = None, 
                  param_dict = None, 
                  k=4.,
                  seq_init = None,
                  errorrates = None):
         '''
-        
         Parameters
         ----------
         omega : torch tensor, shape [num_particles, num_agents]
@@ -123,7 +123,6 @@ class model_master():
             self.errorrates[2, :] = self.errorrates[2, :]*0.2 # congruent 
             self.errorrates[3, :] = self.errorrates[3, :]*0.2 # incongruent
         
-        
         "K"
         self.k = torch.tensor([k])
         
@@ -140,10 +139,34 @@ class model_master():
         Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]
         blocktypes: 0/1 : sequential/ random
         '''
+        self.seqlength = seqlength
         if seq_init == None:
-            self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6))
+            if seqlength == 1:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6))    
+                
+            elif seqlength == 2:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6))
+                
+            elif seqlength == 3:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6))
+                
+            elif seqlength == 4:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6))
+                
+            elif seqlength == 5:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6, 6))
+                
+            elif seqlength == 6:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6, 6, 6))
+                
+            elif seqlength == 7:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6, 6, 6, 6))
+                
+            elif seqlength == 8:
+                self.init_seq_counter = self.k / self.NA * np.ones((self.num_agents, 2, 6, 6, 6, 6, 6, 6, 6, 6))
             
         else:
+            assert seqlength + 2 == len(seq_init.shape)
             self.init_seq_counter = seq_init
             
         self.seq_counter = self.init_seq_counter.clone().detach()
@@ -334,13 +357,72 @@ class model_master():
         self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA] # habitual values (repetition values)
 
         "Compute V"        
-        self.V.append(self.compute_V(blocktype = torch.tensor(0.)))
+        self.V.append(self.compute_V(day = 1, blocktype = torch.tensor(0.)))
         
         "Sequence Counter"
         "-1 in seq_counter for beginning of blocks (so previos sequence is [-1,-1,-1])"
         "-2 in seq_counter for errors"
         "Dimensions are [blocktypes, pppchoice, ppchoice, pchoice, choice, agent]"
         self.seq_counter = self.init_seq_counter.clone().detach()
+
+    def update_seq_counter(self, blocktype, choices):
+        '''
+        self.previous_choices is of length seqlength-1
+
+        Parameters
+        ----------
+        blocktype : TYPE
+            DESCRIPTION.
+        choices : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        new_rows : TYPE
+            DESCRIPTION.
+
+        '''
+        
+        if self.seqlength == 1:
+            self.seq_counter[torch.arange(self.num_agents),
+                            blocktype,
+                            choices] += 1
+        
+            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        0:4].sum(axis=-1)
+            
+            new_rows = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        0:4] / seqs_sum[..., None]
+        
+        elif self.seqlength > 1:
+            self.seq_counter[torch.arange(self.num_agents),
+                            blocktype,
+                            *self.previous_choices,
+                            choices] += 1
+        
+            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        *self.previous_choices[1:],
+                                        choices, 
+                                        0:4].sum(axis=-1)
+            
+            new_rows = self.seq_counter[torch.arange(self.num_agents), 
+                                        blocktype, 
+                                        *self.previous_choices[1:],
+                                        choices, 
+                                        0:4] / seqs_sum[..., None]
+        
+        # print("Sampling")
+        # if torch.randint(0,100,(1,)) == 1:
+        #     dfgh
+        # assert torch.all(seqtest == self.seq_counter)
+        # assert torch.all(seqs_sum_test == seqs_sum)
+        # assert torch.all(new_rows_test == new_rows)
+        
+        return new_rows
+        
 
 class Vbm_lr(model_master):
     '''
@@ -357,7 +439,7 @@ class Vbm_lr(model_master):
     def specific_init(self):
         self.V = [self.compute_V()]
 
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         
         return ((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
                    self.param_dict['omega'][..., None]*self.Q[-1])
@@ -449,9 +531,11 @@ class Vbm_lr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA)
@@ -468,26 +552,28 @@ class Vbm_lr(model_master):
             
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
+            new_rows = self.update_seq_counter(self, blocktype, choices)
+
+            # self.seq_counter[torch.arange(self.num_agents),
+            #                 blocktype,
+            #                 self.pppchoice,
+            #                 self.ppchoice,
+            #                 self.pchoice,
+            #                 choices] += 1
         
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
+            # seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
+            #                             blocktype, 
+            #                             self.ppchoice, 
+            #                             self.pchoice, 
+            #                             choices, 
+            #                             0:4].sum(axis=-1)
             
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[..., None]
+            # new_rows = self.seq_counter[torch.arange(self.num_agents), 
+            #                             blocktype, 
+            #                             self.ppchoice, 
+            #                             self.pchoice, 
+            #                             choices, 
+            #                             0:4] / seqs_sum[..., None]
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
@@ -523,7 +609,7 @@ class Vbm_nolr(model_master):
         self.V = [self.compute_V()]
             
             
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         
         return ((1-self.param_dict['omega'])[..., None]*self.rep[-1] +\
                    self.param_dict['omega'][..., None]*self.Q[-1])
@@ -614,9 +700,11 @@ class Vbm_nolr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA)
@@ -628,27 +716,7 @@ class Vbm_nolr(model_master):
         else:
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
-            
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[..., None]
-
+            new_rows = self.update_seq_counter(self, blocktype, choices)
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
@@ -662,9 +730,12 @@ class Vbm_nolr(model_master):
 
             "----- Update action memory -----"
             # pchoice stands for "previous choice"
-            self.pppchoice = self.ppchoice
-            self.ppchoice = self.pchoice
-            self.pchoice = choices
+            # self.pppchoice = self.ppchoice
+            # self.ppchoice = self.pchoice
+            # self.pchoice = choices
+            
+            self.previous_choices = self.previous_choices[1:]
+            self.previous_choices.append(choices)
 
 class Repbias_lr(model_master):
     '''
@@ -753,18 +824,16 @@ class Repbias_lr(model_master):
         None.
 
         '''
-        # assert torch.is_tensor(choices)
-        # assert torch.is_tensor(outcomes)
-        # assert torch.is_tensor(blocktype)
-        # assert day == 1 or day == 2
         
         lr = self.param_dict['lr']
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            '''
+                self.previous_choices[0] is the oldest choices
+                most recent choice is self.previous_choices[-1]
+            '''
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
@@ -774,10 +843,161 @@ class Repbias_lr(model_master):
             
         else:
             "----- Update GD-values -----"
-            # outcome is either -2 (error), 0, or 1
-            # assert torch.all(outcomes <= 1)
-            # # assert torch.all(outcomes > -1)
             
+            "--- Group!!! ----"
+            "mask contains 1s where Qoutcomp() contains non-zero entries"
+            Qout, mask = self.Qoutcomp(self.Q[-1], choices)
+            Qnew = self.Q[-1] + lr[..., None]*(outcomes[None,...,None]-Qout)*mask
+            self.Q.append(Qnew)
+            
+            "--- The following is executed in case of correct and inocrrect responses ---"
+            "----- Update sequence counters and repetition values of self.rep -----"
+            new_rows = self.update_seq_counter(blocktype, choices)
+            
+            self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
+            
+            "----- Compute new V-values for next trial -----"
+            self.V.append(self.compute_V(blocktype = blocktype))
+
+            if len(self.Q) > 20:
+                "Free up some memory space"
+                # print("Sampling.")
+                # if torch.randint(low=0,high=20,size=(1,)) == 1:
+                #     dfgh
+                self.V[0:-10] = []
+                self.Q[0:-10] = []
+                self.rep[0:-10] = []
+
+            "----- Update action memory -----"
+            "pchoice stands for previous choice"
+            self.previous_choices = self.previous_choices[1:]
+            self.previous_choices.append(choices)
+
+class Repbias_lr_bothdays(model_master):
+    '''
+        3 parameters: lr, theta_Q, & theta_rep
+    '''
+    
+    param_names = ['lr_day1', 
+                    'theta_Q_day1',
+                    'theta_rep_day1',
+                    'lr_day2', 
+                    'theta_Q_day2',
+                    'theta_rep_day2']
+    
+    num_params = len(param_names)
+    
+    def locs_to_pars(self, locs):
+        param_dict = {'lr_day1': torch.sigmoid(locs[..., self.param_names.index('lr_day1')]),
+                    'theta_Q_day1': torch.exp(locs[..., self.param_names.index('theta_Q_day1')]),
+                    'theta_rep_day1': torch.exp(locs[..., self.param_names.index('theta_rep_day1')]),
+                    'lr_day2': torch.sigmoid(locs[..., self.param_names.index('lr_day2')]),
+                    'theta_Q_day2': torch.exp(locs[..., self.param_names.index('theta_Q_day2')]),
+                    'theta_rep_day2': torch.exp(locs[..., self.param_names.index('theta_rep_day2')])}
+        
+        return param_dict
+    
+    def specific_init(self):
+        "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
+        self.V = [self.compute_V(day = 1, blocktype = torch.tensor(0.))]
+        
+    def compute_V(self, day = None, **kwargs):
+        
+        assert day is not None
+        
+        if day == 1:
+        
+            return self.param_dict['theta_rep_day1'][..., None]*self.rep[-1] + \
+                    self.param_dict['theta_Q_day1'][..., None]*self.Q[-1]
+                    
+        elif day == 2:
+            
+            return self.param_dict['theta_rep_day2'][..., None]*self.rep[-1] + \
+                    self.param_dict['theta_Q_day2'][..., None]*self.Q[-1]
+        
+    def compute_probs(self, trial, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        probs = self.softmax(torch.stack((Vopt1, Vopt2), 2))
+        
+        return probs
+    
+    def update(self, choices, outcomes, blocktype, day, **kwargs):
+        '''
+        Class Vbm_B(Vbm_1day).
+        
+        Parameters
+        ----------
+        choices : torch.tensor or list with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+                        
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        # assert torch.is_tensor(choices)
+        # assert torch.is_tensor(outcomes)
+        # assert torch.is_tensor(blocktype)
+        # assert day == 1 or day == 2
+        
+        if day == 1:
+            lr = self.param_dict['lr_day1']
+            
+        elif day == 2:
+            lr = self.param_dict['lr_day2']
+        
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
+
+            "Set repetition values to 0 because of new block"
+            self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
+            self.Q.append(self.Q[-1])
+            
+            self.V.append(self.compute_V(day = day, blocktype = blocktype))
+            
+        else:
+            "----- Update GD-values -----"
             "--- Group!!! ----"
             "mask contains 1s where Qoutcomp() contains non-zero entries"
             Qout, mask = self.Qoutcomp(self.Q[-1], choices)
@@ -786,31 +1006,12 @@ class Repbias_lr(model_master):
             self.Q.append(Qnew)
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
-            
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[...,None]
+            new_rows = self.update_seq_counter(blocktype, choices)
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
-            self.V.append(self.compute_V(blocktype = blocktype))
+            self.V.append(self.compute_V(day = day, blocktype = blocktype))
 
             if len(self.Q) > 20:
                 "Free up some memory space"
@@ -819,10 +1020,8 @@ class Repbias_lr(model_master):
                 self.rep[0:-10] = []
 
             "----- Update action memory -----"
-            # pchoice stands for "previous choice"
-            self.pppchoice = self.ppchoice
-            self.ppchoice = self.pchoice
-            self.pchoice = choices
+            self.previous_choices = self.previous_choices[1:]
+            self.previous_choices.append(choices)
             
 class Repbias_nobound(model_master):
     
@@ -917,9 +1116,11 @@ class Repbias_nobound(model_master):
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
+            # self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
@@ -941,27 +1142,7 @@ class Repbias_nobound(model_master):
             self.Q.append(Qnew)
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
-            
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[...,None]
-
+            new_rows = self.update_seq_counter(self, blocktype, choices)
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
             "----- Compute new V-values for next trial -----"
@@ -982,6 +1163,8 @@ class Repbias_nobound(model_master):
 class Repbias_onlyseq_lr(model_master):
     '''
         3 parameters: lr, θ_Q, and Θ_R
+        
+        onlyseq: Fit θ_Rep only in repeating condition.
     '''
     
     param_names = ['lr', 
@@ -1001,7 +1184,7 @@ class Repbias_onlyseq_lr(model_master):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
         self.V = [self.compute_V(blocktype = torch.zeros(self.num_agents))]
         
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None):
         '''
         
 
@@ -1016,6 +1199,8 @@ class Repbias_onlyseq_lr(model_master):
             DESCRIPTION.
 
         '''
+        
+        assert blocktype is not None
         
         return self.param_dict['theta_rep'][..., None]*self.rep[-1]*((blocktype == 0).type(torch.int)[None,...,None]) + \
                 self.param_dict['theta_Q'][..., None]*self.Q[-1]
@@ -1091,9 +1276,7 @@ class Repbias_onlyseq_lr(model_master):
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
@@ -1115,26 +1298,7 @@ class Repbias_onlyseq_lr(model_master):
             self.Q.append(Qnew)
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
-            
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[...,None]
+            new_rows = self.update_seq_counter(self, blocktype, choices)
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
@@ -1172,7 +1336,7 @@ class Repbias_onlyseq_nobound(model_master):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
         self.V = [self.compute_V(blocktype = torch.zeros(self.num_agents))]
         
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None):
         '''
         
 
@@ -1187,6 +1351,8 @@ class Repbias_onlyseq_nobound(model_master):
             DESCRIPTION.
 
         '''
+        
+        assert blocktype is not None
         
         return self.param_dict['theta_rep'][..., None]*self.rep[-1]*((blocktype == 0).type(torch.int)[None,...,None]) + \
                 self.param_dict['theta_Q'][..., None]*self.Q[-1]
@@ -1262,9 +1428,7 @@ class Repbias_onlyseq_nobound(model_master):
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(lr.shape[0], lr.shape[1], self.NA)/self.NA)
@@ -1286,26 +1450,7 @@ class Repbias_onlyseq_nobound(model_master):
             self.Q.append(Qnew)
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
-            
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[...,None]
+            new_rows = self.update_seq_counter(self, blocktype, choices)
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
@@ -1335,7 +1480,7 @@ class Repbias_nolr(model_master):
         "V(ai) = Θ_r*rep_val(ai) + Θ_Q*Q(ai)"
         self.V = [self.compute_V()]
     
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         
         return self.param_dict['theta_rep'][..., None]*self.rep[-1] + \
                 self.param_dict['theta_Q'][..., None]*self.Q[-1]
@@ -1416,9 +1561,7 @@ class Repbias_nolr(model_master):
         
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             "Set repetition values to 0 because of new block"
             self.rep.append(torch.ones(self.num_particles, self.num_agents, self.NA)/self.NA)
@@ -1428,26 +1571,8 @@ class Repbias_nolr(model_master):
             
             "--- The following is executed in case of correct and inocrrect responses ---"
             "----- Update sequence counters and repetition values of self.rep -----"
-            self.seq_counter[torch.arange(self.num_agents),
-                            blocktype,
-                            self.pppchoice,
-                            self.ppchoice,
-                            self.pchoice,
-                            choices] += 1
-        
-            seqs_sum = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4].sum(axis=-1)
             
-            new_rows = self.seq_counter[torch.arange(self.num_agents), 
-                                        blocktype, 
-                                        self.ppchoice, 
-                                        self.pchoice, 
-                                        choices, 
-                                        0:4] / seqs_sum[...,None]
+            new_rows = self.update_seq_counter(blocktype, choices)
 
             self.rep.append(new_rows.broadcast_to(self.num_particles , self.num_agents, 4))
             
@@ -1617,6 +1742,127 @@ class Repbias_Conflict_both_onlyseq_inferinc(Repbias_lr):
         '''
         
         conflict_param = self.param_dict['theta_conflict']
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            Rep(option1) - Rep(option2) --> DeltaRep > 0 if Rep(option1) > Rep(option2)
+        '''
+        DeltaRep = self.rep[-1][:, torch.arange(self.num_agents), option1] - \
+            self.rep[-1][:, torch.arange(self.num_agents), option2]
+        
+        '''
+        incong_bool :   0 if congruent trial
+                        1 if incongruent trial
+                        
+                        !! Given participant's inference (i.e. also in random condition) !!
+                        
+                        sign(X) can be -1, 0, 1 
+                        --> (1*1 -1)/-2 = 0
+                        
+                            (0*1 -1)/-2 = 0.5 -> 0
+                            (1*0 -1)/-2 = 0.5 -> 0
+                            (0*0 -1)/2 = 0.5 -> 0
+                            
+                            (1*-1 -1)/-2 = 1
+                            (-1*1 -1)/-2 = 1
+        '''
+        # incong_bool = ((torch.sign(DeltaQ).type(torch.int) * 
+        #                 torch.sign(DeltaRep).type(torch.int) - 1)*-0.5).type(torch.int)
+        
+        # incong_bool = (jokertype == 2).type(torch.int)        
+        
+        incong_bool =   (blocktype == 0).type(torch.int) *\
+                        (torch.sign(DeltaRep) != 0).type(torch.int) * \
+                        (torch.sign(DeltaRep)==-torch.sign(DeltaQ)).type(torch.int)
+        
+        conflict_value = torch.min(torch.abs(DeltaQ), torch.abs(DeltaRep))
+        
+        '''
+            opt1_GD :   1 if option1 is goal-directed response
+                        -1 if option2 is goal-directed response
+        '''
+        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        
+        '''
+            seq_bool :  0 random condition
+                        1 sequential condition
+        '''
+        seq_bool = (blocktype == 0).type(torch.int)
+        
+        inc_bonus = incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param
+        
+        # inc_bonus = incong_bool*opt1_GD*conflict_value*conflict_param
+
+        probs = self.softmax(torch.stack((Vopt1 + inc_bonus, Vopt2), 2))
+        
+        return probs
+    
+class Repbias_Conflict_both_onlyseq_inferinc_bothdays(Repbias_lr_bothdays):
+    '''
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
+    
+    param_names = ['lr_day1',
+                    'theta_Q_day1',
+                    'theta_rep_day1',
+                    'theta_conflict_day1']
+    
+    num_params = len(param_names)
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr_day1': torch.sigmoid(locs[..., self.param_names.index('lr_day1')]),
+                    'theta_Q_day1': torch.exp(locs[..., self.param_names.index('theta_Q_day1')]),
+                    'theta_rep_day1': torch.exp(locs[..., self.param_names.index('theta_rep_day1')]),
+                    'theta_conflict_day1': locs[..., self.param_names.index('theta_conflict_day1')],
+                    
+                    'lr_day2': torch.sigmoid(locs[..., self.param_names.index('lr_day2')]),
+                    'theta_Q_day2': torch.exp(locs[..., self.param_names.index('theta_Q_day2')]),
+                    'theta_rep_day2': torch.exp(locs[..., self.param_names.index('theta_rep_day2')]),
+                    'theta_conflict_day2': locs[..., self.param_names.index('theta_conflict_day2')]}
+    
+        return param_dict
+    
+    def compute_probs(self, trial, blocktype, jokertype, day, **kwargs):
+        '''
+
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        if day == 1:
+            conflict_param = self.param_dict['theta_conflict_day1']
+            
+        elif day == 2:
+            conflict_param = self.param_dict['theta_conflict_day2']
         
         option1, option2 = self.find_resp_options(trial)
         
@@ -2730,6 +2976,130 @@ class Repbias_Conflict_Repdiff_onlyseq_lr_inferinc(Repbias_lr):
         
         return probs
     
+class Repbias_Conflict_Repdiff_onlyseq_lr_inferinc_bothdays(Repbias_lr_bothdays):
+    '''
+        onlyseq: conflict parameter is fitted only in case of incongruent DTT, based on jokertype variable
+        
+        4 parameters: lr, θ_Q, θ_R, θ_Switch
+    '''
+    
+    param_names = ['lr_day1',
+                    'theta_Q_day1',
+                    'theta_rep_day1',
+                    'theta_conflict_day1',
+                    'lr_day2',
+                    'theta_Q_day2',
+                    'theta_rep_day2',
+                    'theta_conflict_day2']
+    
+    num_params = len(param_names)
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr_day1': torch.sigmoid(locs[..., self.param_names.index('lr_day1')]),
+                    'theta_Q_day1': torch.exp(locs[..., self.param_names.index('theta_Q_day1')]),
+                    'theta_rep_day1': torch.exp(locs[..., self.param_names.index('theta_rep_day1')]),
+                    'theta_conflict_day1': locs[..., self.param_names.index('theta_conflict_day1')],
+                    
+                    'lr_day2': torch.sigmoid(locs[..., self.param_names.index('lr_day2')]),
+                    'theta_Q_day2': torch.exp(locs[..., self.param_names.index('theta_Q_day2')]),
+                    'theta_rep_day2': torch.exp(locs[..., self.param_names.index('theta_rep_day2')]),
+                    'theta_conflict_day2': locs[..., self.param_names.index('theta_conflict_day2')]}
+    
+        return param_dict
+    
+    def compute_probs(self, trial, blocktype, jokertype, day, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        if day == 1:
+            conflict_param = self.param_dict['theta_conflict_day1']
+            
+        elif day == 2:
+            conflict_param = self.param_dict['theta_conflict_day2']
+        
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(self.V[-1], option1)
+        Vopt1 = (self.V[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)
+        _, mask = self.Qoutcomp(self.V[-1], option2)
+        Vopt2 = self.V[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            Rep(option1) - Rep(option2) --> DeltaRep > 0 if Rep(option1) > Rep(option2)
+        '''
+        DeltaRep = self.rep[-1][:, torch.arange(self.num_agents), option1] - \
+            self.rep[-1][:, torch.arange(self.num_agents), option2]
+        
+        '''
+        incong_bool :   0 if congruent trial
+                        1 if incongruent trial
+                        
+                        sign(X) can be -1, 0, 1 
+                        --> (1*1 -1)/-2 = 0
+                        
+                            (0*1 -1)/-2 = 0.5 -> 0
+                            (1*0 -1)/-2 = 0.5 -> 0
+                            (0*0 -1)/2 = 0.5 -> 0
+
+                            (1*-1 -1)/-2 = 1
+                            (-1*1 -1)/-2 = 1
+        '''
+        
+        incong_bool =   (blocktype == 0).type(torch.int) *\
+                        (torch.sign(DeltaRep) != 0).type(torch.int) * \
+                        (torch.sign(DeltaRep)==-torch.sign(DeltaQ)).type(torch.int)
+        
+        conflict_value = torch.abs(DeltaRep)
+        
+        '''
+            opt1_GD :   1 if option1 is goal-directed response
+                        -1 if option2 is goal-directed response
+        '''
+        opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+        
+        '''
+            seq_bool :  0 random condition
+                        1 sequential condition
+        '''
+        seq_bool = (blocktype == 0).type(torch.int)
+        
+        '''
+            Introducing redundance incong_bool*seq_bool
+        '''
+        inc_bonus = incong_bool*seq_bool*opt1_GD*conflict_value*conflict_param
+        
+        # inc_bonus = incong_bool*opt1_GD*conflict_value*conflict_param
+
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + inc_bonus, Vopt2), 2))
+        
+        return probs
+    
 class Repbias_Conflict_Repdiff_onlyseq_nobound(Repbias_lr):
     '''
         onlyseq: conflict parameter is fitted only in case of incongruent DTT, based on jokertype variable
@@ -2857,7 +3227,7 @@ class Repbias_Conflict_Repdiff_onlyseq_onlyseq_lr(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -2871,6 +3241,8 @@ class Repbias_Conflict_Repdiff_onlyseq_onlyseq_lr(Repbias_lr):
             DESCRIPTION.
 
         '''
+        
+        assert blocktype is not None
         
         
         seq_bool = (blocktype == 0).type(torch.int)
@@ -2990,7 +3362,7 @@ class Repbias_Conflict_onlyseq_onlyseq_lr(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3005,6 +3377,7 @@ class Repbias_Conflict_onlyseq_onlyseq_lr(Repbias_lr):
 
         '''
         
+        assert blocktype is not None
         
         seq_bool = (blocktype == 0).type(torch.int)
         
@@ -3120,7 +3493,7 @@ class Repbias_Conflict_onlyseq_both(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3134,6 +3507,8 @@ class Repbias_Conflict_onlyseq_both(Repbias_lr):
             DESCRIPTION.
 
         '''
+        
+        assert blocktype is not None
         
         
         seq_bool = (blocktype == 0).type(torch.int)
@@ -3251,7 +3626,7 @@ class Repbias_Conflict_onlyseq_both_nobound(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3266,6 +3641,7 @@ class Repbias_Conflict_onlyseq_both_nobound(Repbias_lr):
 
         '''
         
+        assert blocktype is not None
         
         seq_bool = (blocktype == 0).type(torch.int)
         
@@ -3383,7 +3759,7 @@ class Repbias_Conflict_Repdiff_onlyseq_onlyseq_nobound_lr(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3398,6 +3774,7 @@ class Repbias_Conflict_Repdiff_onlyseq_onlyseq_nobound_lr(Repbias_lr):
 
         '''
         
+        assert blocktype is not None
         
         seq_bool = (blocktype == 0).type(torch.int)
         
@@ -3513,7 +3890,7 @@ class Repbias_Conflict_Repdiff_onlyseq_both(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3528,6 +3905,7 @@ class Repbias_Conflict_Repdiff_onlyseq_both(Repbias_lr):
 
         '''
         
+        assert blocktype is not None
         
         seq_bool = (blocktype == 0).type(torch.int)
         
@@ -3643,7 +4021,7 @@ class Repbias_Conflict_Repdiff_onlyseq_both_nobound(Repbias_lr):
     
         return param_dict
     
-    def compute_V(self, blocktype):
+    def compute_V(self, blocktype = None, **kwargs):
         '''
 
         Parameters
@@ -3658,6 +4036,7 @@ class Repbias_Conflict_Repdiff_onlyseq_both_nobound(Repbias_lr):
 
         '''
         
+        assert blocktype is not None
         
         seq_bool = (blocktype == 0).type(torch.int)
         
@@ -3996,7 +4375,7 @@ class Repbias_3Q_lr(Repbias_lr):
     
     num_params = len(param_names)
         
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         
         return ((1-self.param_dict['theta_repcong'])[..., None]*0*self.rep[-1] +\
                    self.param_dict['theta_Q'][..., None]*0*self.Q[-1])
@@ -4158,7 +4537,7 @@ class Repbias_3Q_nobound_lr(Repbias_lr):
     
     num_params = len(param_names)
         
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         
         return ((1-self.param_dict['theta_repcong'])[..., None]*0*self.rep[-1] +\
                    self.param_dict['theta_Q'][..., None]*0*self.Q[-1])
@@ -4870,9 +5249,7 @@ class OnlyQ_lr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -5086,9 +5463,7 @@ class OnlyQ_Qdiff_onlyseq_lr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -5618,9 +5993,214 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
+
+            self.Q.append(self.Q[-1])
+            
+        else:
+            "----- Update GD-values -----"
+            Qout, mask = self.Qoutcomp(self.Q[-1], choices)
+            Qnew = self.Q[-1] + lr[..., None]*(outcomes[None,...,None]-Qout)*mask
+            self.Q.append(Qnew)
+            
+            # print(Qnew.mean(axis=1))
+            
+            if len(self.Q) > 20:
+                "Free up memory space"
+                self.Q[0:-10] = []
+
+            "----- Update action memory -----"
+            # pchoice stands for "previous choice"
+            self.pppchoice = self.ppchoice
+            self.ppchoice = self.pchoice
+            self.pchoice = choices
+        
+    def reset(self, locs):
+        self.param_dict = self.locs_to_pars(locs)
+        
+        self.num_particles = locs.shape[0]
+        self.num_agents = locs.shape[1]
+        
+        "K"
+        # self.k = kwargs["k"]
+            
+        "Q and"
+        self.Q = [self.Q_init.broadcast_to(self.num_particles, self.num_agents, self.NA)] # Goal-Directed Q-Values
+        
+class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_bothdays(model_master):
+    '''
+        Description here        
+        3 parameters
+    '''
+    
+    param_names = ['lr_day1',
+                    'theta_Q_rand_day1',
+                    'theta_diff_day1',
+                    'lr_day2',
+                    'theta_Q_rand_day2',
+                    'theta_diff_day2']
+    
+    
+    num_params = len(param_names)
+    NA = 4 # no. of possible actions
+    # num_blocks = 14
+    # trials = 480*num_blocks
+    BAD_CHOICE = -2
+
+    def specific_init(self):
+        pass
+
+    def locs_to_pars(self, locs):
+        param_dict = {'lr_day1': torch.sigmoid(locs[..., self.param_names.index('lr_day1')]),
+                    'theta_Q_rand_day1': torch.exp(locs[..., self.param_names.index('theta_Q_rand_day1')]),
+                    'theta_diff_day1': locs[..., self.param_names.index('theta_diff_day1')],
+                    'lr_day2': torch.sigmoid(locs[..., self.param_names.index('lr_day2')]),
+                    'theta_Q_rand_day2': torch.exp(locs[..., self.param_names.index('theta_Q_rand_day2')]),
+                    'theta_diff_day2': locs[..., self.param_names.index('theta_diff_day2')]}
+    
+        return param_dict
+
+    def compute_probs(self, trial, blocktype, jokertype, day, **kwargs):
+        '''
+        Parameters
+        ----------
+        trial : tensor with shape [num_agents]
+            DESCRIPTION.
+            
+        day : int
+            Day of experiment.
+
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+            
+        jokertype : -1/0/1/2 no joker/random/congruent/incongruent
+
+        Returns
+        -------
+        probs : tensor with shape [num_particles, num_agents, 2]
+            [0.5, 0.5] in the corresponding row in case of single-target trial.
+            probs of response option1 and response option2 in case of dual-target trial.
+
+        '''
+        
+        if day == 1:
+            Q_param = self.param_dict['theta_Q_rand_day1']
+            diff_param = self.param_dict['theta_diff_day1']
+            
+        elif day == 2:
+            Q_param = self.param_dict['theta_Q_rand_day2']
+            diff_param = self.param_dict['theta_diff_day2']
+            
+        option1, option2 = self.find_resp_options(trial)
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option1)
+        Vopt1 = (self.Q[-1][torch.where(mask == 1)]).reshape(self.num_particles, self.num_agents)*Q_param
+        
+        _, mask = self.Qoutcomp(torch.zeros((self.num_particles, self.num_agents, 4)), option2)
+        Vopt2 = self.Q[-1][torch.where(mask == 1)].reshape(self.num_particles, self.num_agents)*Q_param
+        
+        assert Q_param.shape == Vopt1.shape
+        
+        '''
+            Q(option1) - Q(option2) --> DeltaQ > 0 if Q(option1) > Q(option2)
+        '''
+        DeltaQ = self.Q[-1][:, torch.arange(self.num_agents), option1] - \
+            self.Q[-1][:, torch.arange(self.num_agents), option2]
+
+        '''
+            cong_bin
+                1 when congruent
+                -1 when incongruent
+        '''
+        incong_bool = (jokertype == 2).type(torch.int)
+        cong_bin = (jokertype == 1).type(torch.int) - incong_bool
+        seq_dtt_bool = (jokertype == 2).type(torch.int) + (jokertype == 1).type(torch.int)
+        
+        if 0:
+            '''
+                GD response is inferred.
+            '''
+            '''
+                opt1_GD :   1 if option1 is goal-directed response
+                            -1 if option2 is goal-directed response
+            '''
+            opt1_GD = (DeltaQ > 0).type(torch.int) - (DeltaQ < 0).type(torch.int)
+            Vopt1_diff = diff_param*seq_dtt_bool*opt1_GD
+            
+        else:
+            '''
+                Idea: Give the SEQUENTIAL response option a boost. Since we cannot infer the
+                sequential response option (no ΔR), we GIVE the agent the sequential response 
+                option.
+                
+                - opt1 is GD & congruent trial -> Boost option 1
+                - opt1 is GD & incongruent trial -> Boost option 2
+                
+                - opt2 is GD & congruent trial -> Boost option 2
+                - opt1 is GD & incongruent trial -> Boost option 1
+                
+            '''
+            reward_group1 = (torch.tensor(self.group) == 0).type(torch.int) + (torch.tensor(self.group) == 1).type(torch.int)
+            reward_group2 = (torch.tensor(self.group) == 2).type(torch.int) + (torch.tensor(self.group) == 3).type(torch.int)
+            
+            opt1_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int))
+                            
+            opt2_GD_bool = reward_group1 * ((trial > 10).type(torch.int) * (option2 == 3).type(torch.int)) +\
+                            reward_group2 * ((trial > 10).type(torch.int) * (option1 == 0).type(torch.int))
+            
+            "Write formula as if theta_diff is positive. for better readability."
+            Vopt1_diff = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)
+        
+        "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
+        probs = self.softmax(torch.stack((Vopt1 + Vopt1_diff, Vopt2), 2))
+        
+        return probs
+    
+    def update(self, choices, outcomes, blocktype, day, trialstimulus, jokertype, **kwargs):
+        '''
+        Class Vbm().
+        
+        Parameters
+        ----------
+        choices : torch.tensor with shape [num_agents]
+            The particiapnt's choice at the dual-target trial.
+            -2, 0, 1, 2, or 3
+            -2 = error
+            
+        outcomes : torch.tensor with shape [num_agents]
+            no reward (0) or reward (1).
+            
+        blocktype : torch.tensor with shape [num_agents]
+            0/1 : sequential/ random 
+                        
+        day : int
+            Day of experiment (1 or 2).
+            
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        Exception
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        '''
+        
+        if day == 1:
+            lr = self.param_dict['lr_day1']
+            
+        elif day == 2:
+            lr = self.param_dict['lr_day2']
+        
+        if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
+            "Set previous actions to -1 because it's the beginning of a new block"
+            "Set previous actions to -1 because it's the beginning of a new block"
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -5747,7 +6327,7 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ(OnlyQ_Qdiff_noswitch_onlyseq_onlys
             #                 1 sequential condition
             # '''
             # seq_bool = (blocktype == 0).type(torch.int)
-            "Write formula as if theta_diff is positive. for better readability."
+            "Write formula as if theta_diff is positive, for better readability."
             Vopt1_diff = diff_param*seq_dtt_bool*(opt1_GD_bool - opt2_GD_bool)*torch.abs(DeltaQ)
         
         "SM[V1, V2] -> [p1, p2], where p1 = σ(V1-V2)"
@@ -5912,9 +6492,7 @@ class OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_nobound(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -6086,9 +6664,7 @@ class OnlyQ_Qdiff_onlyseq_nobound(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -6236,9 +6812,7 @@ class OnlyQ_nolr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -6378,9 +6952,7 @@ class Q_seqimpact_lr(model_master):
         if torch.all(choices == -1) and torch.all(outcomes == -1) and torch.all(blocktype == -1):
             "Set previous actions to -1 because it's the beginning of a new block"
             "Set previous actions to -1 because it's the beginning of a new block"
-            self.pppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.ppchoice = -1*torch.ones(self.num_agents, dtype = int)
-            self.pchoice = -1*torch.ones(self.num_agents, dtype = int)
+            self.previous_choices = [-1*torch.ones(self.num_agents, dtype = int)]*(self.seqlength-1)
 
             self.Q.append(self.Q[-1])
             
@@ -7023,7 +7595,7 @@ class RTmodel_nolearning(model_master):
     def specific_init(self):
         self.V = [] # compatibility variable with no function
         
-    def compute_V(self):
+    def compute_V(self, **kwargs):
         # compatibility method with no function
         return []
 
