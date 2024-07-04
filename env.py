@@ -55,7 +55,8 @@ class Env():
         ----------
         group
 
-        day
+        day : int
+            1,2 or 3
             
         STORES
         ----------
@@ -69,6 +70,8 @@ class Env():
         '''
         import pickle
         exp_behav_dict, _ = pickle.load(open(f"behav_data/preproc_data_day{day}.p", "rb" ))
+        
+        # raise Exception("Haha not day 1, digga.")
         
         self.data = {}
         if exp_behav_dict['group'][0] == group:
@@ -89,6 +92,9 @@ class Env():
                     trialidx_day.append((torch.tensor(tl)-2886).tolist())
                 
                 self.data['trialidx_day'] = trialidx_day
+                
+            elif day == 3:
+                dfgh
                 
         else:
             '''
@@ -213,15 +219,22 @@ class Env():
             trial = torch.tensor(data["trialsequence"][tau])
             blocktype = torch.tensor(data["blocktype"][tau])
             jtype = torch.tensor(data["jokertypes"][tau])
+            
+            if data['blockidx'][0][0] <= 5:
+                day = 1
+                
+            elif data['blockidx'][0][0] > 5:
+                day = 2
+                
+            else:
+                raise Exception("Day not defined.")
 
             if all(trial == -1):
                 "Beginning of new block"
-                # blocknum += 1
-                # print(f"NEW BLOCK NUMBER {blocknum}!")
                 agent.update(torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
                                 torch.tensor([-1]*agent.num_agents), 
-                                # day = day, 
+                                day = day, 
                                 trialstimulus = trial,
                                 jokertype = jtype)
                 
@@ -268,7 +281,7 @@ class Env():
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype, blockidx = data["blockidx"][tau])
+                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype, day = day, blockidx = data["blockidx"][tau])
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
@@ -294,7 +307,7 @@ class Env():
                     agent.update(current_choice, 
                                     outcome, 
                                     blocktype, 
-                                    # day = day, 
+                                    day = day, 
                                     trialstimulus = trial,
                                     jokertype = jtype)
 
