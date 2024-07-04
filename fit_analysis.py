@@ -265,22 +265,27 @@ for param in range(num_params):
                 
             # if param == 4:
             #     dfgh
-            ax[0, day-1].set_xlabel(r'learning rate')
-            ax[1, day-1].set_xlabel(r'$\Theta_Q$')
-            ax[2, day-1].set_xlabel(r'$\Theta_R$')
-            ax[3, day-1].set_xlabel(r'$\Theta_\text{Conflict}$')
+            ax[0, day-1].set_xlabel(r'learning rate', fontsize = 20)
+            ax[1, day-1].set_xlabel(r'$\Theta_Q$', fontsize = 20)
+            ax[2, day-1].set_xlabel(r'$\Theta_{Rep}$', fontsize = 20)
+            ax[3, day-1].set_xlabel(r'$\Theta_\text{Switch}$', fontsize = 20)
             ax[0, day-1].set_ylabel('')
             ax[1, day-1].set_ylabel('')
             ax[2, day-1].set_ylabel('')
             ax[3, day-1].set_ylabel('')
             # if param == 0:
                 # 'lr'
-            ax[0, day-1].set_xlim([-0.025, 0.08])
+            ax[0, day-1].set_xlim([-0.025, 0.2])
             ax[1, day-1].set_xlim([-1, 8])
             ax[2, day-1].set_xlim([-1, 5])
             ax[3, day-1].set_xlim([-2, 4])
+            
+            ax[0, day-1].set_ylim([0, 80])
+            ax[1, day-1].set_ylim([0, 20])
+            ax[2, day-1].set_ylim([0, 20])
+            ax[3, day-1].set_ylim([0, 20])
 
-# plt.savefig('posterior_diffs.svg')
+plt.savefig('posterior_diffs_python.svg')
 plt.show()
 
 #%%

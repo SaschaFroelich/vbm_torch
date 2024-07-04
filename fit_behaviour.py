@@ -58,23 +58,16 @@ Modelle:
 import tracemalloc
 tracemalloc.start()
 
-waithrs = 15
+waithrs = 0
 post_pred = 1
 STT = 0
 
 import sys
 
-model_day1 = 'OnlyQ_Qdiff_onlyseq_lr_C'
+model_day1 = 'Repbias_lr'
 models_day2 = [model_day1]
 
-# models_day2 = ['Repbias_lr',
-#                 'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
-#                 'Repbias_Conflict_both_onlyseq_inferinc',
-#                 'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq',
-#                 'OnlyQ_Qdiff_noswitch_onlyseq_onlyseq_DQ',
-#                 'OnlyQ_Qdiff_onlyseq_lr_C', 
-#                 'OnlyQ_Qdiff_onlyseq_lr_D',
-#                 'OnlyQ_lr']
+seqlength = 4
 
 num_inf_steps_day1 = 3_000
 halting_rtol_day1 = 1e-07 # for MLE estimation
@@ -96,7 +89,6 @@ num_waic_samples_day2 = 3_000
 # '''
 # snapshot = tracemalloc.take_snapshot()
 # utils.display_top(snapshot)
-
 
 #%%
 "Day 1"
@@ -149,7 +141,8 @@ print(f"Starting inference of model {model_day1} for day 1 (datafiles {datafile_
 "----- Initialize new agent object with num_agents agents for inference"
 agent = utils.init_agent(model_day1, 
                          group, 
-                         num_agents = num_agents)
+                         num_agents = num_agents,
+                         seqlength = seqlength)
 
 import time
 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -166,7 +159,7 @@ if STT:
 else:
     infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day1)
 
-agent_elbo_tuple, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
+agent_elbo_tuple_day1, loss = infer.infer_posterior(iter_steps = num_inf_steps_day1, num_particles = 10)
 
 "----- Sample parameter estimates from posterior and add information to DataFrame"
 if post_pred:
@@ -298,14 +291,14 @@ extra_storage = (Q_init_day1, # 0 (Q_init))
                  pwaic, # 19
                  individual_DIC) # 20
 
-filename_day1 = f'behav_fit_model_day1_{model_day1}_{timestamp}_{num_agents}agents'
+filename_day1 = f'BehavFitDay1_{model_day1}_{timestamp}_{num_agents}agents'
 if num_inf_steps_day1 > 1:
     print("Storing results for day 1.")
     pickle.dump( (firstlevel_df, 
                   expdata_df_day1,
                   (loss, BIC, AIC), 
                   params_sim_df, 
-                  agent_elbo_tuple, 
+                  agent_elbo_tuple_day1, 
                   extra_storage), 
                 open(f"behav_fit/{filename_day1}.p", "wb" ) )
     
@@ -330,8 +323,6 @@ if num_inf_steps_day1 > 1:
     
     pickle.dump( (loglike, agent_indexer), 
                 open(f"behav_fit/IC/{filename_day1}_loglike.p", "wb" ) )
-    
-    # del loglike, agent_indexer
     
 '''
     Fit day 2
@@ -359,7 +350,7 @@ for model_day2 in models_day2:
     else:
         infer = inferencemodels.GeneralGroupInference(agent, exp_behav_dict_day2)
         
-    agent_elbos, loss = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
+    agent_elbo_tuple_day2, loss = infer.infer_posterior(iter_steps = num_inf_steps_day2, num_particles = 10)
 
     "----- Sample parameter estimates from posterior and add information to DataFrame"
     if post_pred:
@@ -439,12 +430,12 @@ for model_day2 in models_day2:
     
     if num_inf_steps_day2 > 1:
         print("Storing results for day two.")
-        filename_day2 = f"behav_fit_model_day2_{model_day2}_model1_{model_day1}_{timestamp}_{num_agents}agents"
+        filename_day2 = f"BehavFitDay2_{model_day2}_Day1_{model_day1}_{timestamp}_{num_agents}agents"
         pickle.dump( (firstlevel_df, 
                       expdata_df_day2,
                       (loss, BIC, AIC),
                       params_sim_df, 
-                      agent_elbo_tuple, 
+                      agent_elbo_tuple_day2, 
                       extra_storage), 
                     open(f"behav_fit/{filename_day2}.p", "wb" ) )
 

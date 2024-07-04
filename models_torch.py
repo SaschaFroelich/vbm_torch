@@ -71,6 +71,8 @@ class model_master():
         '''
         self.group = group
         
+        assert seqlength is not None
+        
         if param_dict is not None:
             assert errorrates is not None
         

@@ -25,13 +25,15 @@ import arviz as az
 
 from sklearn.linear_model import LinearRegression
 import scipy
-import statsmodels as sm
+import statsmodels.api as sm
 import itertools
 
-complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1 = utils.load_data()
+complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, \
+param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, \
+extra_storage_day1, agent_elbo_tuple_day2, agent_elbo_tuple_day1 = utils.load_data()
 
-# complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1  = utils.load_data()
 
+#%%
 model = complete_df_all['model'].unique()[0]
 hue_order = ['Random', 'Congruent', 'Incongruent']
 
@@ -50,6 +52,9 @@ elif 'theta_Q_congdiff' in param_names:
 #%%
 '''
     Plot behaviour on both days
+    
+    HPCF stands for 'high-probability choice frequency' and is identical to
+    ratio of goal-directed responses.
 '''
 
 # HPCF_DF = complete_df_all.loc[:, ['hpcf_cong', 'hpcf_incong',
@@ -71,22 +76,22 @@ utils.plot_hpcf(hpcf_df_all, title=f'{model}', post_pred = False)
     ER ~ Condition, Day
 '''
 
-ER_all = complete_df_all.loc[:, ['ID',
+ER_stt_all = complete_df_all.loc[:, ['ID',
                                  'day',
                                  'ER_stt_rand', 
-                                   'ER_stt_seq']]
+                                  'ER_stt_seq']]
 
-ER_all = ER_all.melt(id_vars=['ID', 'day'], value_vars=['ER_stt_rand', 'ER_stt_seq'])
-ER_all['variable'] = ER_all['variable'].map(lambda x: "Repeating" if x == 'ER_stt_seq' else
+ER_stt_all = ER_stt_all.melt(id_vars=['ID', 'day'], value_vars=['ER_stt_rand', 'ER_stt_seq'])
+ER_stt_all['variable'] = ER_stt_all['variable'].map(lambda x: "Repeating" if x == 'ER_stt_seq' else
                                                 'Random' if x == 'ER_stt_rand' else
                                                 'None')
-ER_all = ER_all.rename(columns={'variable': 'Condition',
+ER_stt_all = ER_stt_all.rename(columns={'variable': 'Condition',
                                 'value': 'ER'})
 import pingouin as pg
 aov = pg.rm_anova(dv = 'ER', 
                   within = ['Condition', 'day'], 
                   subject = 'ID', 
-                  data = ER_all, 
+                  data = ER_stt_all, 
                   detailed = True,
                   effsize = 'np2')
 print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
@@ -96,13 +101,13 @@ print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
     Differences within days
 '''
 "Rand vs Rep"
-t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Random')]['ER'], 
-                            ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Repeating')]['ER'])
+t,p = scipy.stats.ttest_rel(ER_stt_all[(ER_stt_all['day'] == 1) & (ER_stt_all['Condition'] == 'Random')]['ER'], 
+                            ER_stt_all[(ER_stt_all['day'] == 1) & (ER_stt_all['Condition'] == 'Repeating')]['ER'])
 print(f"t={t}, p={p}")
 
 "Rand vs Rep"
-t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Random')]['ER'], 
-                            ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Repeating')]['ER'])
+t,p = scipy.stats.ttest_rel(ER_stt_all[(ER_stt_all['day'] == 2) & (ER_stt_all['Condition'] == 'Random')]['ER'], 
+                            ER_stt_all[(ER_stt_all['day'] == 2) & (ER_stt_all['Condition'] == 'Repeating')]['ER'])
 print(f"t={t}, p={p}")
 
 
@@ -111,13 +116,13 @@ print(f"t={t}, p={p}")
     Differences between days
 '''
 "Rand vs Rand"
-t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Random')]['ER'], 
-                            ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Random')]['ER'])
+t,p = scipy.stats.ttest_rel(ER_stt_all[(ER_stt_all['day'] == 1) & (ER_stt_all['Condition'] == 'Random')]['ER'], 
+                            ER_stt_all[(ER_stt_all['day'] == 2) & (ER_stt_all['Condition'] == 'Random')]['ER'])
 print(f"t={t}, p={p}")
 
 "Rep vs Rep"
-t,p = scipy.stats.ttest_rel(ER_all[(ER_all['day'] == 1) & (ER_all['Condition'] == 'Repeating')]['ER'], 
-                            ER_all[(ER_all['day'] == 2) & (ER_all['Condition'] == 'Repeating')]['ER'])
+t,p = scipy.stats.ttest_rel(ER_stt_all[(ER_stt_all['day'] == 1) & (ER_stt_all['Condition'] == 'Repeating')]['ER'], 
+                            ER_stt_all[(ER_stt_all['day'] == 2) & (ER_stt_all['Condition'] == 'Repeating')]['ER'])
 print(f"t={t}, p={p}")
 
 '''
@@ -187,7 +192,8 @@ print(f"t={t}, p={p}")
 '''
 
 colors1 = {'Random': '#67b798', 'Congruent': '#BE54C6', 'Incongruent': '#7454C7'}
-colors2 = {'Random': '#67b798', 'Repeating': '#bd97c6'} # random, fix
+colors2 = {'Random': '#67b798', 'Repeating': '#bd97c6'} # random, rep
+colors2_stt = {'Random': '#8EC2AE', 'Repeating': '#bd97c6'} # random, rep
 
 hpcf_all = complete_df_all.loc[:, ['ID',
                                    'day',
@@ -222,16 +228,15 @@ ax[0].set_ylim([60, 100])
 ax[0].set_xlabel("Day", fontsize = 20)
 ax[0].tick_params(axis='both', labelsize=18)
 
-ER_all['day'] = ER_all['day'].astype(int)
-ER_all['ER'] = ER_all['ER']*100
-sns.barplot(data = ER_all,
+ER_stt_all['day'] = ER_stt_all['day'].astype(int)
+ER_stt_all['ER'] = ER_stt_all['ER']*100
+sns.barplot(data = ER_stt_all,
             x = 'day',
             y = 'ER',
             hue = 'Condition',
-            palette = colors2,
+            palette = colors2_stt,
             errorbar=('se', 1),
             ax = ax[1])
-
 
 ax[1].legend(title="", fontsize = 18)
 ax[1].set_ylabel("ER STT (%)", fontsize = 20)
@@ -244,7 +249,7 @@ sns.barplot(data = RT_all,
             x = 'day',
             y = 'RT',
             hue = 'Condition',
-            palette = colors2,
+            palette = colors2_stt,
             errorbar=('se', 1),
             ax = ax[2])
 
@@ -253,7 +258,7 @@ ax[2].set_ylabel("RT STT (ms)", fontsize = 20)
 ax[2].set_ylim([320, 420])
 ax[2].set_xlabel("Day", fontsize = 20)
 ax[2].tick_params(axis='both', labelsize=18)
-plt.savefig('/home/sascha/Desktop/Paper_2024/Mar/res_fig0/res_fig0_python.svg', bbox_inches = 'tight')
+plt.savefig('/home/sascha/Desktop/Paper_2024/May/res_fig0/res_fig0_python.svg', bbox_inches = 'tight')
 plt.show()
 
 '''
@@ -331,7 +336,7 @@ aov = pg.rm_anova(dv = 'HRC',
 print(aov.loc[:, ['Source', 'ddof1', 'ddof2', 'F', 'p-unc', 'np2']])
 
 RT_all.to_csv('RT_stt.csv')
-ER_all.to_csv('ER_stt.csv')
+ER_stt_all.to_csv('ER_stt.csv')
 complete_df_all.to_csv('complete_df.csv')
 
 #%%
@@ -376,7 +381,8 @@ print(f"ΔER & ΔRT Correlation Day 2: r={t}, p={p}")
 
 #%%
 '''
-    Corr RT ~ ΔCI
+    Poisitive measures of habit
+    Corr ΔRT ~ ΔCI (Cong-Inc)
 '''
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day']==1]['RT_diff_stt'], 
                            complete_df_all[complete_df_all['day']==1]['CIspread'])
@@ -1726,6 +1732,10 @@ r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_c
                            complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
 print(f"r={r}, p={p}")
 
+r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['lr'],
+                           complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'])
+print(f"r={r}, p={p}")
+
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rep'],
                            complete_df_all[complete_df_all['day'] == 2]['CRspread'])
 print(f"r={r}, p={p}")
@@ -1799,15 +1809,15 @@ print(f"r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_rand'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r GD(Random DTT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_cong'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r GD(Cong DTT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['hpcf_incong'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r GD(Incong DTT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['CRspread'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
@@ -1827,11 +1837,11 @@ print(f"r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_dtt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r ER(DTT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_stt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r ER(STT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['ER_diff_stt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
@@ -1839,56 +1849,57 @@ print(f"r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_stt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r RT(STT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_dtt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
-print(f"r={r}, p={p}")
+print(f"Pearson r RT(DTT) vs Age: r={r}, p={p}")
 
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['RT_diff_stt'],
                            complete_df_all[complete_df_all['day'] == 2]['age'])
 print(f"r={r}, p={p}")
 
 '''
-    Noticed a sequence effect
+    Effect of noticing a sequence
 '''
 print("===========================")
 print("Noticed a sequence effects")
-t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age'],
-                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['age'])
-print(f"t={t}, p={p}")
 
-t,p,dof = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age'],
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age'],
                                         complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['age'])
-print(f"t={t}, p={p}, dof={dof}")
+dof = len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['age']) + len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['age']) -2
+print(f"Age: t={t}, p={p}, dof = {dof}")
+del dof
 
 t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['hpcf_rand'],
                            complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['hpcf_rand'])
-print(f"t={t}, p={p}")
 
-t,p,dof = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['hpcf_rand'],
-                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['hpcf_rand'])
-print(f"t={t}, p={p}, dof={dof}")
+dof = len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['hpcf_rand']) + len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['hpcf_rand']) -2
+print(f"GD(Rand): t={t}, p={p}, dof = {dof}")
+del dof
 
 t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread'],
                            complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread'])
-print(f"t={t}, p={p}")
+dof = len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread']) + len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread']) -2
+print(f"CRspread: t={t}, p={p}, dof = {dof}")
+del dof
 
-t,p,dof = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread'],
-                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread'])
-print(f"t={t}, p={p}, dof={dof}")
+t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CIspread'],
+                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CIspread'])
+dof = len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['CRspread']) + len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['CRspread']) - 2
+print(f"CIspread: t={t}, p={p}, dof = {dof}")
 
 t,p = scipy.stats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['RIspread'],
                            complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['RIspread'])
-print(f"t={t}, p={p}")
+dof = len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['RIspread']) + len(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['RIspread']) -2
+print(f"RIspread: t={t}, p={p}, dof = {dof}")
+del dof
 
-t,p,dof = sm.stats.weightstats.ttest_ind(complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 1)]['RIspread'],
-                           complete_df_all[(complete_df_all['day'] == 2) & (complete_df_all['q_notice_a_sequence'] == 0)]['RIspread'])
-print(f"t={t}, p={p}, dof={dof}")
-
-t,p = scipy.stats.ttest_ind(dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 1)]['exploit_score'],
-                           dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 0)]['exploit_score'])
-print(f"t={t}, p={p}")
+# t,p = scipy.stats.ttest_ind(dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 1)]['exploit_score'],
+#                            dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 0)]['exploit_score'])
+# dof = len(dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 1)]['exploit_score']) + len(dfadapt_day2[(dfadapt_day2['day'] == 2) & (dfadapt_day2['q_notice_a_sequence'] == 0)]['exploit_score']) -2
+# print(f"t={t}, p={p}, dof={dof}")
+# del dof
 
 #%%
 '''
@@ -1928,19 +1939,23 @@ for theta_rep_sim in [dfadapt_day2.theta_rep.min(), dfadapt_day2.theta_rep.max()
         
         # utils.plot_grouplevel(expdata_df_all, expdata_df_all, plot_single = False, day = 2)
    
-        
 extreme_values_df = pd.DataFrame({'theta_rep': theta_rep_values, 'theta_conflict': theta_conflict_values})
-    
+
 #%%
 '''
     Plot behaviour of IDs, and simulate model behaviour
 '''
 
-plot_IDs = ['5b5e0e86902ad10001cfcc59', '5c321ebf6558270001bd79aa', 
-            '60f816ff1fa74fcfab532378', '5db4ef4a2986a3000be1f886', 
-            '56f699e876348f000c883bba', '654abe303c4940ec0502538e', 
-            '596f961cfe061d00011e3e03', '629f6b8c65fcae219e245284',
-            '654abe303c4940ec0502538e']
+# plot_IDs = ['5b5e0e86902ad10001cfcc59', '5c321ebf6558270001bd79aa', 
+#             '60f816ff1fa74fcfab532378', '5db4ef4a2986a3000be1f886', 
+#             '56f699e876348f000c883bba', '654abe303c4940ec0502538e', 
+#             '596f961cfe061d00011e3e03', '629f6b8c65fcae219e245284',
+#             '654abe303c4940ec0502538e']
+
+plot_IDs = ['595e7974af78da0001a21c3a', '654abe303c4940ec0502538e',
+            '5db32244dbe39d000be72fb0', '5db4ef4a2986a3000be1f886',
+            '59dd90f6e75b450001a68dac', '6329b1add3dcd53cb9c9cab8',
+            '615739949cf5767509a7e29a']
 
 # utils.plot_grouplevel(expdata_df_all[expdata_df_all['ID'].isin(plot_IDs)], plot_single = True, day = 2)
 num_agents = 60
@@ -2023,19 +2038,24 @@ import pickle
 import arviz as az
 
 import scipy
-import statsmodels as sm
 import itertools
 
 sns.set()
 
-df_day1=pd.DataFrame({'WAIC': {0: 19937, 1: 20118, 2: 19894, 3: 19589, 4: 19583, 5: 19540},
-                      'DIC': {0: 19938, 1: 20127, 2: 19900, 3: 19596, 4: 19588, 5: 19545},
-                      'Model_Names': {0: u'M 1',1: u'M 2',2: u'M 3',3: u'M 4', 4: u'M 5',5: u'M 6'}})
+errors_day1_waic = [187, 187, 187, 186, 187, 187, 186, 187]
+# errors_day1_dic = [210, 190, 180, 170, 160, 150, 150, 140]
+errors_day2_waic = [221, 221, 222, 224, 224, 222, 223, 223]
+# errors_day2_dic = [310, 290, 280, 270, 260, 250, 150, 140]
 
-df_day2=pd.DataFrame({'WAIC': {0: 24538, 1: 25108, 2: 24515, 3: 24005, 4: 23879, 5: 23795},
-                      'DIC': {0: 24534, 1: 25107, 2: 24509, 3: 24004, 4: 23870, 5: 23784},
-                      'Model_Names': {0: u'M 1',1: u'M 2',2: u'M 3',3: u'M 4', 4: u'M 5',5: u'M 6'}})
+df_day1 = pd.DataFrame({'WAIC': {0: 19987, 1: 19982, 2: 19939, 3: 20550, 4: 20551, 5: 20306, 6: 20316, 7: 20345},
+                      'DIC': {0: 19997, 1: 19988, 2: 19946, 3: 20559, 4: 20561, 5: 20316, 6: 20324, 7: 20347},
+                      'Model_Names': {0: u'M 1',1: u'M 2',2: u'M 3',3: u'M 4.A', 
+                                      4: u'M 4.B', 5: u'M 5.A', 6: u'M 5.B', 7: u'M 6'}})
 
+df_day2 = pd.DataFrame({'WAIC': {0: 23916, 1: 23815, 2: 23742, 3: 24960, 4: 24958, 5: 24391, 6: 24400, 7: 24428},
+                      'DIC': {0: 23909, 1: 23801, 2: 23729, 3: 24956, 4: 24953, 5: 24384, 6: 24393, 7: 24420},
+                      'Model_Names': {0: u'M 1',1: u'M 2',2: u'M 3',3: u'M 4.A', 
+                                      4: u'M 4.B', 5: u'M 5.A', 6: u'M 5.B', 7: u'M 6'}})
 
 df_day1 = df_day1.set_index('Model_Names')
 df_day2 = df_day2.set_index('Model_Names')
@@ -2046,34 +2066,43 @@ fig, ax = plt.subplots(1, 2, figsize=(12, 5)) # Create matplotlib figure
 # ax2 = ax.twinx() # Create another axes that shares the same x-axis as a
 width = .3
 
-df_day1.WAIC.plot(kind='bar',color='green',ax=ax[0], width=width, position=0)
-df_day1.DIC.plot(kind='bar',color='blue', ax=ax[0], width = width, position=1)
+df_day1.WAIC.plot(kind='bar', color='deepskyblue',ax=ax[0], width=width, position=0, yerr=errors_day1_waic)
+df_day1.DIC.plot(kind='bar', color='green', ax=ax[0], width = width, position=1)
 ax[0].axvline(x = 2.5, color = 'k', label = 'axvline - full height')
 
-df_day2.WAIC.plot(kind='bar',color='green',ax=ax[1],width=width, position=0)
-df_day2.DIC.plot(kind='bar',color='blue', ax=ax[1],width = width,position=1)
+df_day2.WAIC.plot(kind='bar', color='deepskyblue', ax=ax[1], width=width, position=0, yerr=errors_day2_waic)
+df_day2.DIC.plot(kind='bar', color='green', ax=ax[1], width = width,position=1)
 ax[1].axvline(x = 2.5, color = 'k', label = 'axvline - full height')
+
+for i, label in enumerate(ax[0].get_xticklabels()):
+    if label.get_text() in ['M 2', 'M 3', 'M 5.A', 'M 5.B', 'M 6']:
+        label.set_color('red')
+
+for i, label in enumerate(ax[1].get_xticklabels()):
+    if label.get_text() in ['M 2', 'M 3', 'M 5.A', 'M 5.B', 'M 6']:
+        label.set_color('red')
+
 
 ax[0].set_ylabel('IC', fontsize = 20)
 ax[0].set_xlabel('Model', fontsize = 20)
 ax[1].set_xlabel('Model', fontsize = 20)
 
-ax[0].set_xlim(-1,6)
-ax[0].set_ylim(19_400, 20_300)
+ax[0].set_xlim(-1, 8)
+ax[0].set_ylim(19_600, 21_300)
 
-ax[1].set_xlim(-1,6)
-ax[1].set_ylim(23_500, 25_500)
+ax[1].set_xlim(-1, 8)
+ax[1].set_ylim(23_000, 26_500)
 
 ax[0].legend(handles=ax[0].get_legend_handles_labels()[0][1:3], labels=['WAIC', 'DIC'], fontsize = 16)
 ax[1].legend(handles=ax[1].get_legend_handles_labels()[0][1:3], labels=['WAIC', 'DIC'], fontsize = 16)
 
-ax[0].text(-1, 20200, 'No repetition bias', fontsize = 15)
-ax[0].text(3, 20200, 'With repetition bias', fontsize = 15)
+ax[0].text(-1, 21200, 'repetition bias', fontsize = 15)
+ax[0].text(3, 21200, 'No repetition bias', fontsize = 15)
 
-ax[1].text(-1, 25250, 'No repetition bias', fontsize = 15)
-ax[1].text(3, 25250, 'With repetition bias', fontsize = 15)
+ax[1].text(-1, 26200, 'repetition bias', fontsize = 15)
+ax[1].text(3, 26200, 'No repetition bias', fontsize = 15)
 
-plt.savefig('/home/sascha/Desktop/Paper_2024/May/res_fig4/MC_python.svg')
+plt.savefig('/home/sascha/Desktop/Nextcloud/work/presentations/Poster_FENS_2024/MC_python.svg')
 
 plt.show()
 
@@ -2300,3 +2329,164 @@ print("θ_Rep + θ_Switch vs points(STT Rand) r=%.2f, p=%.4f"%(r,p))
 r,p = scipy.stats.pearsonr(complete_df_all[complete_df_all['day'] == 2]['theta_rpc'], 
                             complete_df_all[complete_df_all['day'] == 2]['points_stt_seq'])
 print("θ_Rep + θ_Switch vs points(STT Rep) r=%.2f, p=%.4f"%(r,p))
+
+#%%
+'''
+    Correlate with DDM results
+'''
+
+DDM_res = pd.read_csv('DDM_model_params_conflictmodel_May_29_2024.csv')
+
+DDM_res['phi_learnrate_day1'] = scipy.stats.norm(0, 1).pdf(DDM_res['phi_lernrate_day1'])
+DDM_res['phi_learnrate_day2'] = scipy.stats.norm(0, 1).pdf(DDM_res['phi_learnrate_day2'])
+
+DDM_params = ['drift_theta_Q_day2', 'drift_theta_rep_day2', 'drift_theta_switch_day2',
+              'bias_theta_rep_congruent_day2', 'bias_theta_rep_incongruent_day2',
+              'bias_baseline_day2', 'non_decision_time_day2', 'phi_learnrate_day2']
+
+model_params = []
+
+num_comparisons = len(DDM_params)*len(param_names)
+print("------ Day 2")
+for param1 in DDM_params:
+    for param2 in param_names:
+        r,p = scipy.stats.spearmanr(DDM_res[param1], inf_mean_df_all[inf_mean_df_all['day']==2][param2])
+        
+        if p < 0.05:
+            print(f"{param1} vs {param2}: r=%.2f, p=%.4f"%(r,p))
+            
+plt.figure()
+plt.scatter(DDM_res['phi_learnrate_day1'], inf_mean_df_all[inf_mean_df_all['day']==1]['lr'])
+plt.show()
+            
+plt.figure()
+plt.scatter(DDM_res['phi_learnrate_day2'], inf_mean_df_all[inf_mean_df_all['day']==2]['lr'])
+plt.show()
+
+#%%
+'''
+    Supplementary Material
+'''
+
+'''
+    Fig for paper
+    Individual posteriors
+'''
+num_params = len(param_names)
+num_agents = len(complete_df_all['ID'].unique())
+
+fig, ax = plt.subplots(num_params, 2, figsize = (15, 19))
+
+for param in range(num_params):
+    for day in range(1, 3): 
+        for ag in range(num_agents):
+            if param == 0:
+                sns.kdeplot(post_sample_df_all[(post_sample_df_all['ag_idx']==ag) & 
+                                               (post_sample_df_all['day']==day)][param_names[param]], 
+                            ax = ax[param, day-1], clip=(0,1))
+                
+            else:
+                sns.kdeplot(post_sample_df_all[(post_sample_df_all['ag_idx']==ag) & (post_sample_df_all['day']==day)][param_names[param]], 
+                            ax = ax[param, day-1])
+                
+            # if param == 4:
+            #     dfgh
+            ax[0, day-1].set_xlabel(r'learning rate', fontsize = 20)
+            ax[1, day-1].set_xlabel(r'$\Theta_Q$', fontsize = 20)
+            ax[2, day-1].set_xlabel(r'$\Theta_{Rep}$', fontsize = 20)
+            ax[3, day-1].set_xlabel(r'$\Theta_\text{Switch}$', fontsize = 20)
+            ax[0, day-1].set_ylabel('')
+            ax[1, day-1].set_ylabel('')
+            ax[2, day-1].set_ylabel('')
+            ax[3, day-1].set_ylabel('')
+            # if param == 0:
+                # 'lr'
+            ax[0, day-1].set_xlim([-0.025, 0.2])
+            ax[1, day-1].set_xlim([-1, 8])
+            ax[2, day-1].set_xlim([-1, 5])
+            ax[3, day-1].set_xlim([-2, 4])
+            
+            ax[0, day-1].set_ylim([0, 80])
+            ax[1, day-1].set_ylim([0, 20])
+            ax[2, day-1].set_ylim([0, 20])
+            ax[3, day-1].set_ylim([0, 20])
+
+plt.savefig('/home/sascha/Desktop/Paper_2024/May/suppl_fig1/posteriors_python.svg')
+plt.show()
+
+#%%
+'''
+    Differences day 1 & day 2
+'''
+inf_mean_df_all['Q/R'] = inf_mean_df_all.apply(lambda row: row['theta_Q']/row['theta_rep'], axis = 1)
+
+post_sample_df_all['Q/R'] = post_sample_df_all.apply(lambda row: row['theta_Q']/row['theta_rep'], axis = 1)
+param_names = list(param_names)
+param_names.append('Q/R')
+
+utils.lineplot_daydiffs(pd.melt(inf_mean_df_all, 
+                                id_vars=['ag_idx', 'day'], 
+                                value_vars = ['lr', 'theta_Q', 'theta_rep', 'theta_conflict'], 
+                                var_name = 'parameter', value_name ='mean'))
+
+
+#%%
+'''
+    Debriefing Questionnaire
+'''
+
+num_never_easier=(expdata_df_all[expdata_df_all['trialidx']==0]['q_sometimes_easier'] == 0).astype(int).sum()
+num_sometimes_easier=(expdata_df_all[expdata_df_all['trialidx']==0]['q_sometimes_easier'] == 1).astype(int).sum()
+num_easier_dunno=(expdata_df_all[expdata_df_all['trialidx']==0]['q_sometimes_easier'] == 2).astype(int).sum()
+
+num_not_noticed_seq = (complete_df_all[complete_df_all['day']==2]['q_notice_a_sequence'] == 0).astype(int).sum()
+num_noticed_seq = (complete_df_all[complete_df_all['day']==2]['q_notice_a_sequence'] == 1).astype(int).sum()
+num_seqnoticed_dunno = (complete_df_all[complete_df_all['day']==2]['q_notice_a_sequence'] == 2).astype(int).sum()
+
+utils.check_debriefing_quest(expdata_df_all)
+
+num_male = (complete_df_all[complete_df_all['day']==2]['gender']=='male').astype(int).sum()
+num_female = (complete_df_all[complete_df_all['day']==2]['gender']=='female').astype(int).sum()
+
+
+#%%
+'''
+    Compute Bayes Factors
+    BF = p(y_A)/p(y_B) = exp[log p(y_A) - log p(y_B)] = exp[elbo_A - elbo_B]
+    
+    BF > 1 indicate a preference for model model_names[compidx]
+'''
+
+elbos = np.zeros((num_agents, 2))
+
+for midx in range(2):
+    _, _, _, _, _, _, _, _, _, _, _, agent_elbo_tuple_day2, agent_elbo_tuple_day1 = utils.load_data()
+    
+    elbo_combined = -agent_elbo_tuple_day2[0] -agent_elbo_tuple_day1[0]
+    
+    elbos[:, model] = elbo_combined
+
+compidx = 0
+
+num_comparisons = num_models - 1
+
+BF = np.zeros((num_comparisons, num_agents))
+BF_2nd_lvl = np.zeros(num_comparisons)
+
+compnumb = 0
+for i in range(num_models):
+    if i != compidx:
+        BF[compnumb, :] = np.exp(elbos[:, compidx] - elbos[:, i])
+        BF_2nd_lvl[compnumb] = np.exp(elbos_2nd_lvl[compidx] - elbos_2nd_lvl[i])
+        # BF[compnumb, :] = np.exp(elbos[:, compidx]) / np.exp(elbos[:, i])
+        compnumb += 1
+        
+fig, ax = plt.subplots()
+sns.histplot(BF[0,:])
+plt.legend([],[], frameon=False)
+plt.show()
+
+fig, ax = plt.subplots()
+sns.histplot(1/BF[0,:])
+plt.legend([],[], frameon=False)
+plt.show()
