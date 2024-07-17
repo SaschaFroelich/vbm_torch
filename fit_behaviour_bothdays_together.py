@@ -64,7 +64,7 @@ STT = 0
 
 import sys
 
-models = ['Repbias_Conflict_Repdiff_onlyseq_lr_inferinc_bothdays']
+models = ['Repbias_Conflict_both_onlyseq_inferinc_bothdays']
 
 # models = ['Repbias_lr',
 #                 'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
@@ -75,12 +75,12 @@ models = ['Repbias_Conflict_Repdiff_onlyseq_lr_inferinc_bothdays']
 #                 'OnlyQ_Qdiff_onlyseq_lr_D',
 #                 'OnlyQ_lr']
 
-seqlength_from = 1
-seqlength_to = 8
+seqlength_from = 3
+seqlength_to = 3
 
-num_inf_steps = 5_000
+num_inf_steps = 7_000
 halting_rtol = 1e-07 # for MLE estimation
-posterior_pred_samples = 2
+posterior_pred_samples = 1
 num_waic_samples = 3_000
 
 #%%
@@ -155,7 +155,8 @@ for model in models:
         
         "----- Sample parameter estimates from posterior and add information to DataFrame"
         if post_pred:
-            firstlevel_df, secondlevel_df, predictive_choices, obs_mask = infer.posterior_predictives(n_samples = posterior_pred_samples)
+            firstlevel_df, secondlevel_df, predictive_choices, obs_mask, Qvalues = infer.posterior_predictives(n_samples = posterior_pred_samples,
+                                                                                                      saveQ = True)
             
         else:
             firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
@@ -171,7 +172,6 @@ for model in models:
         
         "----- WAIC & DIC"
         WAIC, _, WAIC_var, individual_WAIC, DIC, loglike, pwaic, individual_DIC = infer.compute_WAIC_DIC(num_samples = num_waic_samples)
-        
         
         param_names = agent.param_names
         
@@ -235,7 +235,7 @@ for model in models:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         extra_storage = (Q_init, # 0 (Q_init))
                          agent.Q[-1].detach(), # 1 (Q-final)
-                         1, # day # 2 (day)
+                         3, # day # 2 (day) (3 == bothdays)
                          'no preceding model', # 3 (preceding model)
                         '', # 4 (Maximum Log Likelihood)
                         '', # 5 (MLE estimates)
@@ -255,9 +255,9 @@ for model in models:
                          pwaic, # 19
                          individual_DIC) # 20
         
-        filename = f'BehavFitModel_{model}_{timestamp}_{num_agents}agents_SeqLength_{seqlength}'
+        filename = f'BehavFitModelBothDays_{model}_{timestamp}_{num_agents}agents_SeqLength_{seqlength}'
         if num_inf_steps > 1:
-            print("Storing results for day 1.")
+            print("Storing results.")
             pickle.dump( (firstlevel_df, 
                           expdata_df,
                           (loss, BIC, AIC), 
@@ -288,6 +288,8 @@ for model in models:
             pickle.dump( (loglike, agent_indexer), 
                         open(f"behav_fit/IC/{filename}_loglike.p", "wb" ) )
             
+            
+            print("Done.")
             # del loglike, agent_indexer
         
 from IPython import get_ipython

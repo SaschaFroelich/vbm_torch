@@ -131,6 +131,7 @@ class model_master():
         "Q and rep"
         self.Q_init = Q_init
         self.Q = [Q_init] # Goal-Directed Q-Values
+        
         self.rep = [torch.ones(self.num_particles, self.num_agents, self.NA)*1/self.NA] # habitual values (repetition values)
         
         # self.posterior_actions = [] # 2 entries: [p(option1), p(option2)]
@@ -1819,7 +1820,12 @@ class Repbias_Conflict_both_onlyseq_inferinc_bothdays(Repbias_lr_bothdays):
     param_names = ['lr_day1',
                     'theta_Q_day1',
                     'theta_rep_day1',
-                    'theta_conflict_day1']
+                    'theta_conflict_day1',
+                    
+                    'lr_day2',
+                    'theta_Q_day2',
+                    'theta_rep_day2',
+                    'theta_conflict_day2']
     
     num_params = len(param_names)
 
@@ -1897,7 +1903,7 @@ class Repbias_Conflict_both_onlyseq_inferinc_bothdays(Repbias_lr_bothdays):
                             (0*1 -1)/-2 = 0.5 -> 0
                             (1*0 -1)/-2 = 0.5 -> 0
                             (0*0 -1)/2 = 0.5 -> 0
-                            
+
                             (1*-1 -1)/-2 = 1
                             (-1*1 -1)/-2 = 1
         '''

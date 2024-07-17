@@ -304,6 +304,7 @@ class Env():
                                  RT = current_RT)
                     
                 else:
+                    Q = agent.Q[-1].clone()
                     agent.update(current_choice, 
                                     outcome, 
                                     blocktype, 
@@ -316,6 +317,7 @@ class Env():
                     "STT are [0.5, 0.5]"
                     "errors are obs_masked"
                     dtt_trial += 1
+                    pyro.deterministic("Q_{}".format(dtt_trial), Q)
                     pyro.sample('res_{}'.format(dtt_trial), 
                                 dist.Categorical(probs = probs),
                                 obs = choices_bin,
@@ -326,6 +328,7 @@ class Env():
                     stt_trial += 1
                     obs_mask = (current_RT != -2).broadcast_to(num_particles, agent.num_agents) *\
                                 ((trial < 10)*(trial > 0)).broadcast_to(num_particles, agent.num_agents)
+                                
                     pyro.sample('res_{}'.format(stt_trial), 
                                 dist.Normal(loc = loc, scale = scale),
                                 obs = current_RT,

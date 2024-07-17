@@ -12,7 +12,6 @@ import ipdb
 import numpy as np
 import torch
 import pandas as pd
-import env
 
 import pyro
 import pyro.distributions as dist
@@ -212,7 +211,7 @@ class GeneralGroupInference():
             guide_tr = poutine.trace(self.guide).get_trace()
             model_tr = poutine.trace(poutine.replay(conditioned_model, trace=guide_tr)).get_trace()
             # monte_carlo_elbo = model_tr.log_prob_sum() - guide_tr.log_prob_sum()
-    
+            
             model_log_probs = torch.zeros(self.num_agents)
             trace_log_probs = torch.zeros(self.num_agents)
     
@@ -278,7 +277,7 @@ class GeneralGroupInference():
         firstlevel_df = pd.DataFrame(sample_dict)
         return firstlevel_df
     
-    def posterior_predictives(self, n_samples = 1_000):
+    def posterior_predictives(self, n_samples = 1_000, saveQ='False'):
         '''
         Parameters
         ----------
@@ -311,11 +310,14 @@ class GeneralGroupInference():
                                     num_samples=1)()
         
         num_observed = sum([1 if '_observed' in k else 0 for k in predictive_svi.keys()])
-        
+
         "Array for predictive choices"
         # predictive_choices = torch.zeros((self.num_agents, n_samples, num_observed))
         # predictive_choices_observed = torch.zeros((self.num_agents, n_samples, num_observed))
         predictive_choices_unobserved = torch.zeros((self.num_agents, n_samples, num_observed))
+        
+        if saveQ:
+            Qs = torch.empty((self.num_agents, 4, n_samples, num_observed))
         
         "Get obs mask"
         obs_mask = torch.zeros((self.num_agents, num_observed))
@@ -330,32 +332,26 @@ class GeneralGroupInference():
             if '_observed' in k:
                 obs_mask[:, obs] = v['mask']
                 obs += 1
-            
+
         print("Starting predictive predictive_svi.")
-        for i in range(n_samples):
-            print(f"Predictive step {i} of {n_samples}.")
+        for sampleidx in range(n_samples):
+            print(f"Predictive step {sampleidx} of {n_samples}.")
             predictive_svi = Predictive(model = self.model,  
                                         guide = self.guide, 
                                         num_samples=1)()
             
-            # obs = 0
-            # for key in predictive_svi.keys():
-            #     if ('res' in key) and ('observed' not in key):
-            #         predictive_choices[:, i, obs] = torch.squeeze(predictive_svi[key]).detach().clone()
-            #         obs += 1
-                    
-            # obs = 0
-            # for key in predictive_svi.keys():
-            #     if ('res' in key) and ('_observed' in key):
-            #         predictive_choices_observed[:, i, obs] = torch.squeeze(predictive_svi[key]).detach().clone()
-            #         obs += 1
-                    
-                    
             obs = 0
+            Qobs = 0
             for key in predictive_svi.keys():
                 if ('res' in key) and ('_unobserved' in key):
-                    predictive_choices_unobserved[:, i, obs] = torch.squeeze(predictive_svi[key]).detach().clone()
+                    # print(f"The key is {key}.")
+                    predictive_choices_unobserved[:, sampleidx, obs] = torch.squeeze(predictive_svi[key]).detach().clone()
                     obs += 1
+
+                if saveQ and ('Q' in key):
+                    # print(f"The key is {key}.")
+                    Qs[..., sampleidx, Qobs] = torch.squeeze(predictive_svi[key]).detach().clone()
+                    Qobs += 1
             
             "----- 1st Level"
             predictive_locs = predictive_svi['locs']
@@ -378,12 +374,40 @@ class GeneralGroupInference():
                                                                            self.agent.param_names.index(param_name)].item())
                 secondlevel_dict[param_name + '_sig'].append(grouplevel_stdev[..., 
                                                                               self.agent.param_names.index(param_name)].item())
-            
+        
         firstlevel_df = pd.DataFrame(data = firstlevel_dict)
         secondlevel_df = pd.DataFrame(data = secondlevel_dict)
             
-        print(f"Time elapsed: {time.time() - start} secs.")
-        return firstlevel_df, secondlevel_df, predictive_choices_unobserved.mean(axis=1), obs_mask
+        if saveQ:
+            print("Arrranging learned Q-values")
+            Qsmean = Qs.mean(axis=-2)
+            Trialidx = []
+            IDs = []
+            Q1 = []
+            Q2 = []
+            Q3 = []
+            Q4 = []
+            
+            for trial in range(Qs.shape[-1]):
+                IDs.extend(self.data['ID'][0])
+                Q1.extend(Qsmean[:,0,trial])
+                Q2.extend(Qsmean[:,1,trial])
+                Q3.extend(Qsmean[:,2,trial])
+                Q4.extend(Qsmean[:,3,trial])
+                Trialidx.extend([trial]*self.num_agents)
+            
+            Qsdf = pd.DataFrame({'ID': IDs,
+                                 'Trialidx': Trialidx,
+                                 'Q1': Q1,
+                                 'Q2': Q2,
+                                 'Q3': Q3,
+                                 'Q4': Q4})
+            
+            print(f"Time elapsed: {time.time() - start} secs.")
+            return firstlevel_df, secondlevel_df, predictive_choices_unobserved.mean(axis=1), obs_mask, Qsdf
+        else:
+            print(f"Time elapsed: {time.time() - start} secs.")
+            return firstlevel_df, secondlevel_df, predictive_choices_unobserved.mean(axis=1), obs_mask, None
     
     def posterior_predictives_NEW(self, n_samples = 1_000):
         '''
