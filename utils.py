@@ -1230,7 +1230,7 @@ def simulate_data(model,
     
     if params is not None:
         assert errorrates is not None
-        assert torch.is_tensor(errorrates)
+        assert isinstance(errorrates, pd.DataFrame)
     
     import env 
     start = time.time()
@@ -3397,17 +3397,17 @@ def load_data(inftype = None):
         
         seqlength = 3
         
-        # _, sim_group_behav_df, _, _ = simulate_data(model, 
-        #                                             num_agents,
-        #                                             group = list(inf_mean_df['group']),
-        #                                             day = 'both',
-        #                                             STT = 0,
-        #                                             params = inf_mean_df.loc[:, [*param_names]],
-        #                                             errorrates = er,
-        #                                             seqlength = seqlength)
-        
+        _, sim_group_behav_df, _, _ = simulate_data(model, 
+                                                    num_agents,
+                                                    group = list(inf_mean_df['group']),
+                                                    day = 'both',
+                                                    STT = 0,
+                                                    params = inf_mean_df.loc[:, [*param_names]],
+                                                    errorrates = er_df,
+                                                    seqlength = seqlength)
+
         return complete_df, inf_mean_df, expdata_df, \
-            post_sample_df, None, param_names, None, \
+            post_sample_df, sim_group_behav_df, param_names, None, \
             None, er_df, extra_storage, None, \
             agent_elbo_tuple, None
         
@@ -3426,11 +3426,18 @@ def load_data(inftype = None):
             2 : Congruent
             3 : incongruent
         '''
-        er = torch.zeros((4, num_agents))
-        er[0, :] = torch.tensor(complete_df['ER_stt']) # stt
-        er[1, :] = torch.tensor(complete_df['ER_randomdtt']) # random
-        er[2, :] = torch.tensor(complete_df['ER_congruent']) # congruent
-        er[3, :] = torch.tensor(complete_df['ER_incongruent']) # incongruent
+        er = complete_df.loc[:, ['ID', 
+                                 'ag_idx',
+                                 'day', 
+                                 'ER_stt', 
+                                 'ER_randomdtt',
+                                 'ER_congruent',
+                                 'ER_incongruent']]
+        # er = torch.zeros((4, num_agents))
+        # er[0, :] = torch.tensor(complete_df['ER_stt']) # stt
+        # er[1, :] = torch.tensor(complete_df['ER_randomdtt']) # random
+        # er[2, :] = torch.tensor(complete_df['ER_congruent']) # congruent
+        # er[3, :] = torch.tensor(complete_df['ER_incongruent']) # incongruent
         
         complete_df_day2 = complete_df
         inf_mean_df_day2 = inf_mean_df
@@ -3544,11 +3551,18 @@ def load_data(inftype = None):
             
             post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df_day2], ignore_index=True)
             
-            er_day1 = torch.zeros((4, num_agents))
-            er_day1[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
-            er_day1[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
-            er_day1[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
-            er_day1[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
+            er_day1 = complete_df_day1.loc[:, ['ID',
+                                               'day',
+                                               'ag_idx',
+                                               'ER_stt',
+                                               'ER_randomdtt',
+                                               'ER_congruent',
+                                               'ER_incongruent']]
+            # er_day1 = torch.zeros((4, num_agents))
+            # er_day1[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
+            # er_day1[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
+            # er_day1[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
+            # er_day1[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
             groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = simulate_data(model_day1, 
                                                                                     num_agents,
                                                                                     group = list(inf_mean_df_day1['group']),

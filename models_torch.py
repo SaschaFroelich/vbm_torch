@@ -103,11 +103,16 @@ class model_master():
                 assert self.param_dict[key].shape[0] == self.num_particles and \
                     self.param_dict[key].shape[1] == self.num_agents
         
-        
         if errorrates is not None:
-            assert errorrates.ndim == 2
-            assert errorrates.shape[0] == 4
-            assert errorrates.shape[1] == self.num_agents
+            # assert errorrates.ndim == 2
+            # assert errorrates.shape[0] == 4
+            # assert errorrates.shape[1] == self.num_agents
+            
+            assert len(errorrates['ID'].unique()) == self.num_agents
+            assert 'ER_stt' in errorrates.columns and \
+                    'ER_randomdtt' in errorrates.columns and \
+                    'ER_congruent' in errorrates.columns and \
+                    'ER_incongruent' in errorrates.columns
             
             self.errorrates = errorrates
             
@@ -120,7 +125,7 @@ class model_master():
                     3 : incongruent
             '''
             self.errorrates = torch.rand((4, self.num_agents))
-            self.errorrates[0, :] = self.errorrates[0, :]*0.1
+            self.errorrates[0, :] = self.errorrates[0, :]*0.1 # STT
             self.errorrates[1, :] = self.errorrates[1, :]*0.2 # random
             self.errorrates[2, :] = self.errorrates[2, :]*0.2 # congruent 
             self.errorrates[3, :] = self.errorrates[3, :]*0.2 # incongruent
@@ -272,7 +277,7 @@ class model_master():
         
         return option1_python, option2_python
     
-    def choose_action(self, trial, blocktype, jokertype, **kwargs):
+    def choose_action(self, trial, blocktype, jokertype, day, **kwargs):
         '''
         Only execute for num_particles == 1.
         
@@ -298,11 +303,15 @@ class model_master():
         # assert trial.ndim == 1 and trial.shape[0] == self.num_agents
         # assert isinstance(day, int)
         
+        er_df = self.errorrates.copy()
+        er_df = er_df[er_df['day'] == day].reset_index(drop=True)
+        
         "New Code"
         "STT"
         'cond_stt is 1 when an error is performed'
         choice_python_stt = torch.where(trial < 10, trial-1, trial)
-        cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[0, :]).type(torch.int)
+        # cond_stt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[0, :]).type(torch.int)
+        cond_stt = torch.squeeze(torch.rand(self.num_agents) < torch.tensor(er_df.loc[:, 'ER_stt'])).type(torch.int)
         choice_python_stt = cond_stt * self.BAD_CHOICE + (1-cond_stt) * choice_python_stt
         
         "DTT"
@@ -313,7 +322,7 @@ class model_master():
                                                                         self.compute_probs(trial = trial,
                                                                                            blocktype = blocktype,
                                                                                            jokertype = jokertype,
-                                                                                           blockidx = torch.tensor([0]),
+                                                                                           day = day,
                                                                                            **kwargs)).sample()[0, :]
 
             choice_python_dtt = option2*choice_sample + option1*(1-choice_sample)
@@ -326,10 +335,14 @@ class model_master():
                     2 : Congruent
                     3 : incongruent
             '''
-            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[1, :]) * (jokertype == 0).type(torch.int) + \
-                        torch.squeeze(torch.rand(self.num_agents) < self.errorrates[2, :]) * (jokertype == 1).type(torch.int) + \
-                        torch.squeeze(torch.rand(self.num_agents) < self.errorrates[3, :]) * (jokertype == 2).type(torch.int)
+            # cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates[1, :]) * (jokertype == 0).type(torch.int) + \
+            #             torch.squeeze(torch.rand(self.num_agents) < self.errorrates[2, :]) * (jokertype == 1).type(torch.int) + \
+            #             torch.squeeze(torch.rand(self.num_agents) < self.errorrates[3, :]) * (jokertype == 2).type(torch.int)
             
+            cond_dtt = torch.squeeze(torch.rand(self.num_agents) < torch.tensor(er_df.loc[:, 'ER_randomdtt'])) * (jokertype == 0).type(torch.int) + \
+                        torch.squeeze(torch.rand(self.num_agents) < torch.tensor(er_df.loc[:, 'ER_congruent'])) * (jokertype == 1).type(torch.int) + \
+                        torch.squeeze(torch.rand(self.num_agents) < torch.tensor(er_df.loc[:, 'ER_incongruent'])) * (jokertype == 2).type(torch.int)
+
             # cond_dtt = torch.squeeze(torch.rand(self.num_agents) < self.errorrates_dtt)
             choice_python_dtt =  cond_dtt * self.BAD_CHOICE + (1-cond_dtt) * choice_python_dtt
             
@@ -4369,7 +4382,7 @@ class Repbias_3Q_lr(Repbias_lr):
     
         return param_dict
     
-    def compute_probs(self, trial, blocktype, jokertype, blockidx, **kwargs):
+    def compute_probs(self, trial, blocktype, jokertype, day, **kwargs):
         '''
 
         Parameters
@@ -4503,9 +4516,6 @@ class Repbias_3Q_lr(Repbias_lr):
         assert probs.shape[0] == self.num_particles
         assert probs.shape[1] == self.num_agents
         assert probs.shape[2] == 2
-        
-        # if torch.any(torch.where(blocktype==0, trial, 0) > 10) and torch.any(torch.tensor(blockidx) > 5):
-        #     ipdb.set_trace()
         
         return probs
     
@@ -4531,7 +4541,7 @@ class Repbias_3Q_nobound_lr(Repbias_lr):
     
         return param_dict
     
-    def compute_probs(self, trial, blocktype, jokertype, blockidx, **kwargs):
+    def compute_probs(self, trial, blocktype, jokertype, day, **kwargs):
         '''
 
         Parameters
@@ -4665,9 +4675,6 @@ class Repbias_3Q_nobound_lr(Repbias_lr):
         assert probs.shape[0] == self.num_particles
         assert probs.shape[1] == self.num_agents
         assert probs.shape[2] == 2
-        
-        # if torch.any(torch.where(blocktype==0, trial, 0) > 10) and torch.any(torch.tensor(blockidx) > 5):
-        #     ipdb.set_trace()
         
         return probs
         
@@ -5319,7 +5326,7 @@ class OnlyQ_lr_bothdays(model_master):
             theta_Qrand = self.param_dict['theta_Qrand_day1']
             theta_Qcong = self.param_dict['theta_Qcong_day1']
             theta_Qinc = self.param_dict['theta_Qinc_day1']
-            
+
         elif day == 2:
             theta_Qrand = self.param_dict['theta_Qrand_day2']
             theta_Qcong = self.param_dict['theta_Qcong_day2']
@@ -5380,7 +5387,7 @@ class OnlyQ_lr_bothdays(model_master):
         None.
 
         '''
-        
+
         if day == 1:
             lr = self.param_dict['lr_day1']
             

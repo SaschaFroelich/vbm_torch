@@ -69,7 +69,11 @@ class Env():
 
         '''
         import pickle
-        exp_behav_dict, _ = pickle.load(open(f"behav_data/preproc_data_day{day}.p", "rb" ))
+        if day == 'both':
+            exp_behav_dict, _ = pickle.load(open(f"behav_data/preproc_data.p", "rb" ))
+            
+        elif day ==1 or day == 2:
+            exp_behav_dict, _ = pickle.load(open(f"behav_data/preproc_data_day{day}.p", "rb" ))
         
         # raise Exception("Haha not day 1, digga.")
         
@@ -97,7 +101,7 @@ class Env():
                 '''
                     Both days
                 '''
-                dfgh
+                self.data['trialidx_day'] = exp_behav_dict['trialidx'].copy()
                 
         else:
             '''
@@ -264,11 +268,16 @@ class Env():
                 elif infer == 0:
                     "Simulation"
                     if STT:
-                        current_RT = agent.stt_action(trial, blocktype = blocktype, jokertype = jtype)
+                        current_RT = agent.stt_action(trial, 
+                                                      blocktype = blocktype, 
+                                                      jokertype = jtype)
                         self.RTs.append(current_RT)
                         
                     else:
-                        current_choice = agent.choose_action(trial, blocktype = blocktype, jokertype = jtype)
+                        current_choice = agent.choose_action(trial, 
+                                                             blocktype = blocktype, 
+                                                             jokertype = jtype, 
+                                                             day = day)
                         outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
                         self.choices_GD.append((data['rewprobs'][range(agent.num_agents), 
                                                                  current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
@@ -284,7 +293,10 @@ class Env():
                     # RHS comes out as [1, n_actions] or [num_particles, n_actions]
                     
                     "==========================================="
-                    probs = agent.compute_probs(trial, blocktype = blocktype, jokertype = jtype, day = day, blockidx = data["blockidx"][tau])
+                    probs = agent.compute_probs(trial, 
+                                                blocktype = blocktype, 
+                                                jokertype = jtype, 
+                                                day = day)
                     "==========================================="
                     # ipdb.set_trace()
                     choices_bin = (current_choice != option1).type(torch.int).broadcast_to(num_particles, agent.num_agents)
