@@ -93,7 +93,10 @@ class Env():
                 
                 self.data['trialidx_day'] = trialidx_day
                 
-            elif day == 3:
+            elif day == 'both':
+                '''
+                    Both days
+                '''
                 dfgh
                 
         else:
@@ -146,8 +149,8 @@ class Env():
             Which blockorder
             1/2 : RSRSRS SRSRSRSR / SRSRSR RSRSRSRS
             
-        day : int
-            1 or 2
+        day : int or str
+            1 or 2 or 'both'
             
         STT : bool
             Whether to simulate single-target trials (STT)

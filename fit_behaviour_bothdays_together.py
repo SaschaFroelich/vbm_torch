@@ -59,12 +59,13 @@ import tracemalloc
 tracemalloc.start()
 
 waithrs = 0
+saveQ = True
 post_pred = 1
 STT = 0
 
 import sys
 
-models = ['Repbias_Conflict_both_onlyseq_inferinc_bothdays']
+models = ['Repbias_Conflict_both_onlyseq_inferinc']
 
 # models = ['Repbias_lr',
 #                 'Repbias_Conflict_Repdiff_onlyseq_lr_inferinc',
@@ -80,7 +81,11 @@ seqlength_to = 3
 
 num_inf_steps = 7_000
 halting_rtol = 1e-07 # for MLE estimation
-posterior_pred_samples = 1
+if saveQ:
+    posterior_pred_samples = 100 # For Q-values
+else:
+    posterior_pred_samples = 1
+    
 num_waic_samples = 3_000
 
 #%%
@@ -156,7 +161,7 @@ for model in models:
         "----- Sample parameter estimates from posterior and add information to DataFrame"
         if post_pred:
             firstlevel_df, secondlevel_df, predictive_choices, obs_mask, Qvalues = infer.posterior_predictives(n_samples = posterior_pred_samples,
-                                                                                                      saveQ = True)
+                                                                                                      saveQ = saveQ)
             
         else:
             firstlevel_df = infer.sample_posterior(n_samples = posterior_pred_samples)
@@ -253,7 +258,8 @@ for model in models:
                          individual_WAIC, # 17
                          DIC, # 18
                          pwaic, # 19
-                         individual_DIC) # 20
+                         individual_DIC,
+                         '') # 20
         
         filename = f'BehavFitModelBothDays_{model}_{timestamp}_{num_agents}agents_SeqLength_{seqlength}'
         if num_inf_steps > 1:
@@ -265,6 +271,14 @@ for model in models:
                           agent_elbo_tuple, 
                           extra_storage), 
                         open(f"behav_fit/{filename}.p", "wb" ) )
+            
+            print("Storing Q-values.")
+            Qvalues['Q1'] = Qvalues['Q1'].map(lambda x: x.item())
+            Qvalues['Q2'] = Qvalues['Q2'].map(lambda x: x.item())
+            Qvalues['Q3'] = Qvalues['Q3'].map(lambda x: x.item())
+            Qvalues['Q4'] = Qvalues['Q4'].map(lambda x: x.item())
+            
+            Qvalues.to_csv(f'behav_fit/{filename}_Qvalues.csv')
             
             print("Saving loglike.")
             assert loglike.ndim == 3
@@ -285,7 +299,7 @@ for model in models:
             agent_indexer = agent_indexer[:, ~all_nan_columns]
             agent_indexer = agent_indexer[0, :]
             
-            pickle.dump( (loglike, agent_indexer), 
+            pickle.dump( (loglike, agent_indexer, num_inf_steps), 
                         open(f"behav_fit/IC/{filename}_loglike.p", "wb" ) )
             
             

@@ -1193,6 +1193,13 @@ def simulate_data(model,
     plotres : bool, optional
         Plot results.
         
+        
+    errorrates : torch tensor, dim [4, hnum_agents]
+        [0, :] : STT
+        [0, :] : DTT Rand
+        [0, :] : DTT Cong
+        [0, :] : DTT Inc
+        
     Returns
     -------
     data : dict of nested lists.
@@ -1218,6 +1225,8 @@ def simulate_data(model,
         Contains the parameter values with which the simulations were performed.
 
     '''
+    
+    print(f"Seqlength is {seqlength}.")
     
     if params is not None:
         assert errorrates is not None
@@ -2065,9 +2074,10 @@ def get_data_from_file(file_dir = None):
     elif 'recovery'  in filenames[0]:
         sociopsy_df = None
         
-    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple, BIC, AIC, extra_storage, filenames[0]
+    return post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, \
+        agent_elbo_tuple, BIC, AIC, extra_storage, filenames[0]
         
-def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names):
+def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names, day):
     '''
 
     Parameters
@@ -2130,12 +2140,13 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
 
     '''
     
-    
     '''
         Errors
     '''
-    print("\nComputing errorrates.")
-    error_df = anal.compute_errors(expdata_df)
+    print(f"\nComputing errorrates for day {day}.")
+    error_df = anal.compute_errors(expdata_df, day=day)
+    
+    print(error_df)
     "error_df.columns: 'group', 'ID', 'ER_dtt', 'ER_dtt_day1', 'ER_dtt_day2', 'ER_stt','ER_total', 'ER_total_day1', 'ER_total_day2'"
 
     '''
@@ -2159,15 +2170,43 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     print("\nComputing HPCF.")
     hpcf_df = compute_hpcf(expdata_df)
 
-
     '''
         Merge them dataframes
     '''
     print("\nMerging Dataframes.")
-    df1 = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], points_df, on = 'ID')
+    df1 = pd.merge(error_df[error_df['ID'].isin(inf_mean_df['ID'])], points_df, on = ['ID', 'day'])
     # df2 = pd.merge(df1, corr_df, on = 'ID')
-    df2 = pd.merge(df1, hpcf_df, on = 'ID')
-    complete_df = pd.merge(df2, inf_mean_df.drop(['group'], axis=1), on = 'ID')
+    df2 = pd.merge(df1, hpcf_df, on = ['ID', 'day'])
+    
+    if day == 'both':
+        inf_mean_df_temp = pd.DataFrame({})
+        
+        for col in inf_mean_df.columns:
+            
+            if 'day1' in col:
+                new_col_content = inf_mean_df[col].tolist()
+                new_col_content.extend(inf_mean_df[col[0:-4]+'day2'])
+                inf_mean_df_temp[col[0:-5]] = new_col_content
+                
+            elif 'day2' in col:
+                pass
+                
+            else:
+                new_col_content = inf_mean_df[col].tolist()
+                new_col_content.extend(inf_mean_df[col])
+                inf_mean_df_temp[col] = new_col_content
+                
+        days = [1]*len(inf_mean_df['ID'].unique())
+        days.extend([2]*len(inf_mean_df['ID'].unique()))
+        
+        inf_mean_df_temp['day'] = days
+        
+        inf_mean_df = inf_mean_df_temp
+                
+    else:
+        inf_mean_df['day'] = day
+    
+    complete_df = pd.merge(df2, inf_mean_df.drop(['group'], axis=1), on = ['ID', 'day'])
     
     if sociopsy_df is not None:
         '''
@@ -2198,14 +2237,15 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
         complete_df = pd.merge(complete_df, RT_df, on = 'ID')
         complete_df = pd.merge(complete_df, notice_seq_df, on = 'ID')
         
-        
     "Does not work with simulated data"
     # firstcolumns = ['ID', 'ag_idx', 'group', 'age', 'gender', 'handedness', *param_names]
     # complete_df = complete_df[[*firstcolumns + [col for col in complete_df.columns if col not in firstcolumns]]]
     # complete_df = complete_df[[col for col in complete_df.columns if col != 'model'] + ['model']]
     
-    assert len(complete_df) == len(inf_mean_df)
-    complete_df = complete_df.sort_values(by=['ag_idx'])
+    if day != 'both':
+        assert len(complete_df) == len(inf_mean_df)
+        
+        complete_df = complete_df.sort_values(by=['ag_idx'])
     
     for col in complete_df.columns:
         if type(complete_df[col][0]) != str:
@@ -2214,61 +2254,118 @@ def create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, par
     return complete_df
 
 def compute_points(df, identifier = 'ID'):
+    '''
+
+    Parameters
+    ----------
+    df : TYPE
+        DESCRIPTION.
+        
+    identifier : str, optional
+        DESCRIPTION. The default is 'ID'.
+
+    Returns
+    -------
+    points_df : TYPE
+        All Columns
+            ID
+            points_stt
+            points
+            points_stt_seq
+            points_stt_rand
+            points_dtt_seq
+            points_dtt_rand
+            points_randomdtt
+            points_congruent
+            points_incongruent
+            points_dtt
+            day
+
+    '''
+    
+    df['day'] = df['trialidx'].map(lambda x: 1 if x <= 2885 else 2)
+    
     print("Outcomes for errors are not registered as -2 in simulated trials.")
+    
+    days = []
+    
     expdata_df = df[df['choices'] != -1]
     expdata_df = expdata_df[expdata_df['choices'] != -2]
     expdata_df = expdata_df[expdata_df['choices_GD'] != -2]
     
-    "Total"
-    points = expdata_df.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
-    points.rename(columns={'outcomes': 'points'}, inplace = True)
-    
-    "STT"
-    expdata_df_stt = expdata_df[expdata_df['trialsequence'] < 10]
-    points_stt_df = expdata_df_stt.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    points_stt_df.rename(columns = {'outcomes' : 'points_stt'}, inplace = True)
-    
-    "STT sequential"
-    expdata_df_stt_seq = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blocktype'] == 0)]
-    points_stt_seq_df = expdata_df_stt_seq.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    points_stt_seq_df.rename(columns = {'outcomes' : 'points_stt_seq'}, inplace = True)
-    
-    "STT Random"
-    expdata_df_stt_rand = expdata_df[(expdata_df['trialsequence'] < 10) & (expdata_df['blocktype'] == 1)]
-    points_stt_rand_df = expdata_df_stt_rand.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    points_stt_rand_df.rename(columns = {'outcomes' : 'points_stt_rand'}, inplace = True)
-    
-    "DTT Seq"
-    expdata_df_dtt_seq = expdata_df[(expdata_df['trialsequence'] > 10)& (expdata_df['blocktype'] == 0)]
-    points_dtt_seq = expdata_df_dtt_seq.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
-    points_dtt_seq.rename(columns = {'outcomes' : 'points_dtt_seq'}, inplace = True)
-    
-    "DTT Rand"
-    expdata_df_dtt_rand = expdata_df[(expdata_df['trialsequence'] > 10) & (expdata_df['blocktype'] == 1)]
-    points_dtt_rand = expdata_df_dtt_rand.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
-    points_dtt_rand.rename(columns = {'outcomes' : 'points_dtt_rand'}, inplace = True)
-    
-    "DTT Jokertypes"
-    expdata_df_dtt = expdata_df[expdata_df['trialsequence'] > 10]
-    points_dtt_df_jokertypes = expdata_df_dtt.loc[:, [identifier, 'outcomes', 'jokertypes']].groupby([identifier, 'jokertypes'], as_index = False).sum()
-    points_dtt_df_jokertypes_pivoted = points_dtt_df_jokertypes.pivot(index=identifier, columns='jokertypes', values = 'outcomes').reset_index()
-    points_dtt_df_jokertypes_pivoted.rename(columns={0: 'points_randomdtt',
-                                               1: 'points_congruent',
-                                               2: 'points_incongruent'}, inplace=True)
-    
-    expdata_df_dtt = expdata_df_dtt.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
-    expdata_df_dtt.rename(columns = {'outcomes' : 'points_dtt'}, inplace = True)
-    
-    points_df = pd.merge(points_stt_df, points, on = identifier)
-    points_df = pd.merge(points_df, points_stt_seq_df, on = identifier)
-    points_df = pd.merge(points_df, points_stt_rand_df, on = identifier)
-    points_df = pd.merge(points_df, points_dtt_seq, on = identifier)
-    points_df = pd.merge(points_df, points_dtt_rand, on = identifier)
-    
-    points_df = pd.merge(points_df, points_dtt_df_jokertypes_pivoted, on = identifier)
-    
-    points_df = pd.merge(points_df, expdata_df_dtt, on = identifier)
-    
+    for day in df['day'].unique():
+        
+        expdata_df_day = expdata_df[expdata_df['day'] == day]
+        
+        "Total"
+        points = expdata_df_day.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+        points.rename(columns={'outcomes': 'points'}, inplace = True)
+        
+        "STT"
+        expdata_df_stt = expdata_df_day[expdata_df_day['trialsequence'] < 10]
+        points_stt_df = expdata_df_stt.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+        points_stt_df.rename(columns = {'outcomes' : 'points_stt'}, inplace = True)
+        
+        "STT sequential"
+        expdata_df_stt_seq = expdata_df_day[(expdata_df_day['trialsequence'] < 10) & (expdata_df_day['blocktype'] == 0)]
+        points_stt_seq_df = expdata_df_stt_seq.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+        points_stt_seq_df.rename(columns = {'outcomes' : 'points_stt_seq'}, inplace = True)
+        
+        "STT Random"
+        expdata_df_stt_rand = expdata_df_day[(expdata_df_day['trialsequence'] < 10) & (expdata_df_day['blocktype'] == 1)]
+        points_stt_rand_df = expdata_df_stt_rand.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+        points_stt_rand_df.rename(columns = {'outcomes' : 'points_stt_rand'}, inplace = True)
+        
+        "DTT Seq"
+        expdata_df_dtt_seq = expdata_df_day[(expdata_df_day['trialsequence'] > 10)& (expdata_df_day['blocktype'] == 0)]
+        points_dtt_seq = expdata_df_dtt_seq.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+        points_dtt_seq.rename(columns = {'outcomes' : 'points_dtt_seq'}, inplace = True)
+        
+        "DTT Rand"
+        expdata_df_dtt_rand = expdata_df_day[(expdata_df_day['trialsequence'] > 10) & (expdata_df_day['blocktype'] == 1)]
+        points_dtt_rand = expdata_df_dtt_rand.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index=False).sum()
+        points_dtt_rand.rename(columns = {'outcomes' : 'points_dtt_rand'}, inplace = True)
+        
+        "DTT Jokertypes"
+        expdata_df_dtt = expdata_df_day[expdata_df_day['trialsequence'] > 10]
+        points_dtt_df_jokertypes = expdata_df_dtt.loc[:, [identifier, 'outcomes', 'jokertypes']].groupby([identifier, 'jokertypes'], as_index = False).sum()
+        points_dtt_df_jokertypes_pivoted = points_dtt_df_jokertypes.pivot(index=identifier, columns='jokertypes', values = 'outcomes').reset_index()
+        points_dtt_df_jokertypes_pivoted.rename(columns={0: 'points_randomdtt',
+                                                   1: 'points_congruent',
+                                                   2: 'points_incongruent'}, inplace=True)
+        
+        expdata_df_dtt = expdata_df_dtt.loc[:, [identifier, 'outcomes']].groupby([identifier], as_index = False).sum()
+        expdata_df_dtt.rename(columns = {'outcomes' : 'points_dtt'}, inplace = True)
+        
+        if (len(df['day'].unique()) == 2 and day == 1) or len(df['day'].unique()) == 1:
+            points_df = pd.merge(points_stt_df.copy(), points.copy(), on = identifier)
+            points_df = pd.merge(points_df, points_stt_seq_df.copy(), on = identifier)
+            points_df = pd.merge(points_df, points_stt_rand_df.copy(), on = identifier)
+            points_df = pd.merge(points_df, points_dtt_seq.copy(), on = identifier)
+            points_df = pd.merge(points_df, points_dtt_rand.copy(), on = identifier)
+            
+            points_df = pd.merge(points_df, points_dtt_df_jokertypes_pivoted.copy(), on = identifier)
+            
+            points_df = pd.merge(points_df, expdata_df_dtt.copy(), on = identifier)
+            
+            points_df['day'] = day
+                
+        if len(df['day'].unique()) == 2 and day == 2:
+            
+            points_df_day2 = pd.merge(points_stt_df, points, on = identifier)
+            points_df_day2 = pd.merge(points_df_day2, points_stt_seq_df, on = identifier)
+            points_df_day2 = pd.merge(points_df_day2, points_stt_rand_df, on = identifier)
+            points_df_day2 = pd.merge(points_df_day2, points_dtt_seq, on = identifier)
+            points_df_day2 = pd.merge(points_df_day2, points_dtt_rand, on = identifier)
+            
+            points_df_day2 = pd.merge(points_df_day2, points_dtt_df_jokertypes_pivoted, on = identifier)
+            
+            points_df_day2 = pd.merge(points_df_day2, expdata_df_dtt, on = identifier)
+            
+            points_df_day2['day'] = day
+        
+            points_df = pd.concat((points_df, points_df_day2))
+            
     return points_df
 
 def compute_hpcf(expdata_df):
@@ -2283,97 +2380,122 @@ def compute_hpcf(expdata_df):
     df = df[df['choices'] != -2]
     df = df[df['trialsequence'] > 10]
     
+    df['day'] = df['trialidx'].map(lambda x: 1 if x <= 2885 else 2)
+    
     hpcf_df = pd.DataFrame(data = {'ID': expdata_df['ID'].unique()})
-    hpcf = pd.DataFrame(df.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    hpcf.rename(columns={'choices_GD' : 'hpcf'}, inplace = True)
     
-    hpcf_std = pd.DataFrame(df.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
-    hpcf_std.rename(columns={'choices_GD' : 'hpcf_std'}, inplace = True)
-    
-    "Random"
-    df_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
-    
-    df_rand_std = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
-    df_rand_std.rename(columns = {'choices_GD': 'hpcf_rand_std'}, inplace = True)
-    
-    "-> Just for safety."
-    df_rand2 = pd.DataFrame(df[(df['blocktype'] == 1) & (df['trialsequence'] > 10)].loc[:, ['ID', 
-                                                                                            'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_rand2.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
-
-    assert df_rand2.equals(df_rand)
-
-    "Sequential"
-    df_seq = pd.DataFrame(df[(df['jokertypes'] == 1) | (df['jokertypes'] == 2)].loc[:, ['ID', 
-                                                                                        'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_seq.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
-    
-    "-> Just for safety."
-    df_seq2 = pd.DataFrame(df[(df['blocktype'] == 0) & (df['trialsequence'] > 10)].loc[:, ['ID', 
-                                                                                           'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_seq2.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
-    
-    assert df_seq2.equals(df_seq2)
-    
-    "Congruent"
-    df_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_cong.rename(columns = {'choices_GD': 'hpcf_cong'}, inplace = True)
-    
-    "Incongruent"
-    df_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
-    df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
-    
-    hpcf_df = pd.merge(hpcf_df, hpcf, on = 'ID')
-    hpcf_df = pd.merge(hpcf_df, hpcf_std, on = 'ID')
-    hpcf_df = pd.merge(hpcf_df, df_rand, on = 'ID')
-    hpcf_df = pd.merge(hpcf_df, df_seq, on = 'ID')
-    hpcf_df = pd.merge(hpcf_df, df_cong, on = 'ID')
-    hpcf_df = pd.merge(hpcf_df, df_inc, on = 'ID')
-    
-    
-    hpcf_df['RIspread'] = hpcf_df['hpcf_rand'] - hpcf_df['hpcf_incong']
-    hpcf_df['CRspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_rand']
-    hpcf_df['CIspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_incong']
-    
-    if 'post_pred_GD' in expdata_df.columns:
+    for day in df['day'].unique():
+        
+        df_day = df[df['day'] == day]
+        
+        hpcf = pd.DataFrame(df_day.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        hpcf.rename(columns={'choices_GD' : 'hpcf'}, inplace = True)
+        
+        hpcf_std = pd.DataFrame(df_day.loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
+        hpcf_std.rename(columns={'choices_GD' : 'hpcf_std'}, inplace = True)
+        
         "Random"
-        df_pp_rand = pd.DataFrame(df[df['jokertypes'] == 0].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_rand.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
+        df_rand = pd.DataFrame(df_day[df_day['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_rand.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+        
+        df_rand_std = pd.DataFrame(df_day[df_day['jokertypes'] == 0].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).std())
+        df_rand_std.rename(columns = {'choices_GD': 'hpcf_rand_std'}, inplace = True)
         
         "-> Just for safety."
-        df_pp_rand2 = pd.DataFrame(df[(df['blocktype'] == 1) & (df['trialsequence'] > 10)].loc[:, ['ID', 
-                                                                                                'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_rand2.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
-
-        assert df_pp_rand2.equals(df_pp_rand)
-
+        df_rand2 = pd.DataFrame(df_day[(df_day['blocktype'] == 1) & (df_day['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                                'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_rand2.rename(columns = {'choices_GD': 'hpcf_rand'}, inplace = True)
+    
+        assert df_rand2.equals(df_rand)
+    
         "Sequential"
-        df_pp_seq = pd.DataFrame(df[(df['jokertypes'] == 1) | (df['jokertypes'] == 2)].loc[:, ['ID', 
-                                                                                            'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_seq.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+        df_seq = pd.DataFrame(df_day[(df_day['jokertypes'] == 1) | (df_day['jokertypes'] == 2)].loc[:, ['ID', 
+                                                                                            'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_seq.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
         
         "-> Just for safety."
-        df_pp_seq2 = pd.DataFrame(df[(df['blocktype'] == 0) & (df['trialsequence'] > 10)].loc[:, ['ID', 
-                                                                                               'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_seq2.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+        df_seq2 = pd.DataFrame(df_day[(df_day['blocktype'] == 0) & (df_day['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                               'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_seq2.rename(columns = {'choices_GD': 'hpcf_seq'}, inplace = True)
         
-        assert df_pp_seq2.equals(df_pp_seq2)
+        assert df_seq2.equals(df_seq2)
         
         "Congruent"
-        df_pp_cong = pd.DataFrame(df[df['jokertypes'] == 1].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_cong.rename(columns = {'post_pred_GD': 'hpcf_pp_cong'}, inplace = True)
+        df_cong = pd.DataFrame(df_day[df_day['jokertypes'] == 1].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_cong.rename(columns = {'choices_GD': 'hpcf_cong'}, inplace = True)
         
         "Incongruent"
-        df_pp_inc = pd.DataFrame(df[df['jokertypes'] == 2].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
-        df_pp_inc.rename(columns = {'post_pred_GD': 'hpcf_pp_incong'}, inplace = True)
+        df_inc = pd.DataFrame(df_day[df_day['jokertypes'] == 2].loc[:, ['ID', 'choices_GD']].groupby(['ID'], as_index = False).mean())
+        df_inc.rename(columns = {'choices_GD': 'hpcf_incong'}, inplace = True)
+        
+        if (len(df['day'].unique()) == 2 and day == 1) or len(df['day'].unique()) == 1:
+        
+            hpcf_df = pd.merge(hpcf_df, hpcf.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, hpcf_std.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_rand.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_seq.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_cong.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_inc.copy(), on = 'ID')
+            
+            hpcf_df['day'] = day
+            
+        if len(df['day'].unique()) == 2 and day == 2:
+            
+            hpcf_df_day2 = hpcf
+            hpcf_df_day2 = pd.merge(hpcf_df_day2, hpcf_std.copy(), on = 'ID')
+            hpcf_df_day2 = pd.merge(hpcf_df_day2, df_rand.copy(), on = 'ID')
+            hpcf_df_day2 = pd.merge(hpcf_df_day2, df_seq.copy(), on = 'ID')
+            hpcf_df_day2 = pd.merge(hpcf_df_day2, df_cong.copy(), on = 'ID')
+            hpcf_df_day2 = pd.merge(hpcf_df_day2, df_inc.copy(), on = 'ID')
+            
+            hpcf_df_day2['day'] = day
+            
+            hpcf_df = pd.concat((hpcf_df, hpcf_df_day2))
         
         
-        hpcf_df = pd.merge(hpcf_df, df_pp_rand, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, df_pp_seq, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, df_pp_cong, on = 'ID')
-        hpcf_df = pd.merge(hpcf_df, df_pp_inc, on = 'ID')
+        hpcf_df['RIspread'] = hpcf_df['hpcf_rand'] - hpcf_df['hpcf_incong']
+        hpcf_df['CRspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_rand']
+        hpcf_df['CIspread'] = hpcf_df['hpcf_cong'] - hpcf_df['hpcf_incong']
+        
+        if 'post_pred_GD' in expdata_df.columns:
+            raise Exception("Not implemented yet for days_pooled.")
+            
+            "Random"
+            df_pp_rand = pd.DataFrame(df_day[df_day['jokertypes'] == 0].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_rand.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
+            
+            "-> Just for safety."
+            df_pp_rand2 = pd.DataFrame(df_day[(df_day['blocktype'] == 1) & (df_day['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                                    'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_rand2.rename(columns = {'post_pred_GD': 'hpcf_pp_rand'}, inplace = True)
     
+            assert df_pp_rand2.equals(df_pp_rand)
+    
+            "Sequential"
+            df_pp_seq = pd.DataFrame(df_day[(df_day['jokertypes'] == 1) | (df_day['jokertypes'] == 2)].loc[:, ['ID', 
+                                                                                                'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_seq.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+            
+            "-> Just for safety."
+            df_pp_seq2 = pd.DataFrame(df_day[(df_day['blocktype'] == 0) & (df_day['trialsequence'] > 10)].loc[:, ['ID', 
+                                                                                                   'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_seq2.rename(columns = {'post_pred_GD': 'hpcf_pp_seq'}, inplace = True)
+            
+            assert df_pp_seq2.equals(df_pp_seq2)
+            
+            "Congruent"
+            df_pp_cong = pd.DataFrame(df_day[df_day['jokertypes'] == 1].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_cong.rename(columns = {'post_pred_GD': 'hpcf_pp_cong'}, inplace = True)
+            
+            "Incongruent"
+            df_pp_inc = pd.DataFrame(df_day[df_day['jokertypes'] == 2].loc[:, ['ID', 'post_pred_GD']].groupby(['ID'], as_index = False).mean())
+            df_pp_inc.rename(columns = {'post_pred_GD': 'hpcf_pp_incong'}, inplace = True)
+            
+            hpcf_df = pd.merge(hpcf_df, df_pp_rand.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_pp_seq.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_pp_cong.copy(), on = 'ID')
+            hpcf_df = pd.merge(hpcf_df, df_pp_inc.copy(), on = 'ID')
+                
     return hpcf_df 
 
 def compute_RT(expdata_df):
@@ -2381,27 +2503,15 @@ def compute_RT(expdata_df):
     jokertypes : list
         DTT Types
         -1/0/1/2 : no joker/random/congruent/incongruent
+        
+    blocktype : 
+        0/1 : seq/ rand
     '''
     if expdata_df['RT'].max() > 10_000:
         # raise Exception("RT too large.")
         print("RT too large!")
-        
-    expdata_df = expdata_df[expdata_df['RT']<1500]
-    
-    # RT_df = expdata_df.loc[:, ['ID', 
-    #                            'RT', 
-    #                            'choices', 
-    #                            'blockidx', 
-    #                            'jokertypes']]
-    
-    # RT_df = RT_df[RT_df['choices'] != -1]
-    # RT_df = RT_df[RT_df['choices'] != -2]
-    # RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-    # RT_df_temp = pd.DataFrame(RT_df.loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
-    
-    # RT_df_temp = RT_df_temp.rename(columns={'RT':'RT'})
-    
-    # RT_df = pd.merge(RT_df, RT_df_temp, on='ID')
+
+    expdata_df = expdata_df[expdata_df['RT'] < 1500]
     
     RT_cond_df = expdata_df.loc[:, ['ID', 
                                     'RT', 
@@ -2409,7 +2519,8 @@ def compute_RT(expdata_df):
                                     'blockidx', 
                                     'blocktype', 
                                     'trialsequence', 
-                                    'jokertypes']]
+                                    'jokertypes',
+                                    'group']]
     
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -1]
     RT_cond_df = RT_cond_df[RT_cond_df['choices'] != -2]
@@ -2450,6 +2561,26 @@ def compute_RT(expdata_df):
     RT_dtt = pd.DataFrame(RT_cond_df[(RT_cond_df['trialsequence']>10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
     RT_dtt.rename(columns={'RT':'RT_dtt'}, inplace = True)
     
+    RT_cond_df['STT_highprob'] = RT_cond_df.apply(lambda row: 1 if ((row['trialsequence'] == 1 or row['trialsequence'] == 4) and (row['group'] == 0 or row['group'] == 1)) or
+                                                  ((row['trialsequence'] == 2 or row['trialsequence'] == 3) and (row['group'] == 2 or row['group'] == 3)) else 0, axis = 1)
+    
+    RT_stt_lowprob = pd.DataFrame(RT_cond_df[(RT_cond_df['STT_highprob'] == 0) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_lowprob.rename(columns={'RT':'RT_stt_lowprob'}, inplace = True)
+    
+    RT_stt_highprob = pd.DataFrame(RT_cond_df[(RT_cond_df['STT_highprob'] == 1) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_highprob.rename(columns={'RT':'RT_stt_highprob'}, inplace = True)
+    
+    RT_stt_lowprob_seq = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype'] == 0) & (RT_cond_df['STT_highprob'] == 0) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_lowprob_seq.rename(columns={'RT':'RT_stt_lowprob_seq'}, inplace = True)
+    
+    RT_stt_highprob_seq = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype'] == 0) & (RT_cond_df['STT_highprob'] == 1) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_highprob_seq.rename(columns={'RT':'RT_stt_highprob_seq'}, inplace = True)
+    
+    RT_stt_lowprob_rand = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype'] == 1) & (RT_cond_df['STT_highprob'] == 0) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_lowprob_rand.rename(columns={'RT':'RT_stt_lowprob_rand'}, inplace = True)
+    
+    RT_stt_highprob_rand = pd.DataFrame(RT_cond_df[(RT_cond_df['blocktype'] == 1) & (RT_cond_df['STT_highprob'] == 1) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'RT']].groupby(['ID'], as_index = False).mean())
+    RT_stt_highprob_rand.rename(columns={'RT':'RT_stt_highprob_rand'}, inplace = True)
     
     RT_df = pd.merge(RT_df_seq, RT_df_all, on = 'ID')
     RT_df = pd.merge(RT_df, RT_df_rand, on = 'ID')
@@ -2465,8 +2596,45 @@ def compute_RT(expdata_df):
     RT_df = pd.merge(RT_df, RT_incongruent, on = 'ID')
     RT_df = pd.merge(RT_df, RT_randomdtt, on = 'ID')
     
+    RT_df = pd.merge(RT_df, RT_stt_lowprob_seq, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_highprob_seq, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_lowprob_rand, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_highprob_rand, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_lowprob, on = 'ID')
+    RT_df = pd.merge(RT_df, RT_stt_highprob, on = 'ID')
+    
     RT_df['RT_diff_stt'] = RT_df['RT_stt_rand'] - RT_df['RT_stt_seq']
     RT_df['RT_diff_dtt'] = RT_df['RT_dtt_rand'] - RT_df['RT_dtt_seq']
+    
+    
+    if 1:
+        '''
+            Timeocurse of RT Difference in STT RT Lowprob vs Highprob
+        '''
+        RT_stt_lowprob_byblock = pd.DataFrame(RT_cond_df[(RT_cond_df['STT_highprob'] == 0) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID', 'blockidx', 'RT']].groupby(['ID', 'blockidx'], as_index = False).mean())
+        RT_stt_lowprob_byblock.rename(columns={'RT':'RT_stt_lowprob'}, inplace = True)
+        
+        
+        RT_stt_highprob_byblock = pd.DataFrame(RT_cond_df[(RT_cond_df['STT_highprob'] == 1) & (RT_cond_df['trialsequence'] < 10)].loc[:, ['ID','blockidx', 'RT']].groupby(['ID', 'blockidx'], as_index = False).mean())
+        RT_stt_highprob_byblock.rename(columns={'RT':'RT_stt_highprob'}, inplace = True)
+
+        temp_df = pd.merge(RT_stt_lowprob_byblock, RT_stt_highprob_byblock, on=['ID', 'blockidx'])
+        temp_df['diff'] = temp_df['RT_stt_highprob'] - temp_df['RT_stt_lowprob']
+
+        import seaborn
+        from datetime import datetime
+        fig, ax = plt.subplots()
+        sns.lineplot(data= temp_df,
+                     x = 'blockidx',
+                     y = 'diff')
+        
+        ax.set_ylabel(r'$\Delta$RT', fontsize =18)
+        ax.set_xlabel('Block no.', fontsize =18)
+        plt.title('RT STT [Highprrob] - RT STT [Lowprob]')
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        plt.savefig(f'/home/sascha/Downloads/DeltaRT_byblock_{timestamp}.svg', bbox_inches = 'tight')
+        ax.set_ylim([-47, -30])
+        plt.show()
     
     return RT_df
 
@@ -3075,25 +3243,67 @@ def RT_err_to_m2(data_dict):
                 
     return data_dict
     
-def load_data():
-    post_sample_df_day2, expdata_df_day2, loss, params_df, num_params, sociopsy_df, agent_elbo_tuple_day2, BIC, AIC, extra_storage_day2, filepath = get_data_from_file()
+def load_data(inftype = None):
+    '''
     
-    post_sample_df_day2['day'] = 2
-    Q_init_day2 = extra_storage_day2[0]
-    param_names = extra_storage_day2[9]
-    # if extra_storage_day2[11] >= 1e-03:
-        # print("rhalt too large for IC computation.")
+
+    Parameters
+    ----------
+    inftype : str
+        'bothdays' if bothdays
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    complete_df_all : TYPE
+        DESCRIPTION.
+    inf_mean_df_all : TYPE
+        DESCRIPTION.
+    expdata_df_all : TYPE
+        DESCRIPTION.
+    post_sample_df_all : TYPE
+        DESCRIPTION.
+    sim_df : TYPE
+        DESCRIPTION.
+    param_names : TYPE
+        DESCRIPTION.
+    Q_init_day2 : TYPE
+        DESCRIPTION.
+    seq_counter_day2 : TYPE
+        DESCRIPTION.
+    er_day2 : TYPE
+        DESCRIPTION.
+    extra_storage_day2 : TYPE
+        DESCRIPTION.
+    extra_storage_day1 : TYPE
+        DESCRIPTION.
+    agent_elbo_tuple_day2 : TYPE
+        DESCRIPTION.
+    agent_elbo_tuple_day1 : TYPE
+        DESCRIPTION.
+
+    '''
     
-    day = extra_storage_day2[2]
+    post_sample_df, expdata_df, loss, params_df, num_params, sociopsy_df, \
+    agent_elbo_tuple, BIC, AIC, extra_storage, filepath = get_data_from_file()
     
-    WAIC = extra_storage_day2[12]
+    Q_init = extra_storage[0]
+    param_names = extra_storage[9]
+    
+    day = extra_storage[2]
+    
+    WAIC = extra_storage[12]
     print("WAIC is")
     print(WAIC)
     
-    if day != 2:
+    if day != 2 and inftype == None:
         raise Exception("Have to load day 2, bruh.")
     
-    print(f"Preceding model is {extra_storage_day2[3]}.")
+    print(f"Preceding model is {extra_storage[3]}.")
     # assert len(param_names) == num_params
     # blocks = extra_storage[2]
     
@@ -3108,29 +3318,29 @@ def load_data():
     # _, expdata_df_clipre = pickle.load(open("behav_data/preproc_data.p", "rb" ))
     # expdata_df_pub = pickle.load(open("behav_data/preproc_data_old_published_all.p", "rb" ))[1]
     
-    if 'ID_x' in post_sample_df_day2.columns:
+    if 'ID_x' in post_sample_df.columns:
         raise Exception("NONONONONO")
     
-    if 'handedness' in post_sample_df_day2.columns:
-        inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
+    if 'handedness' in post_sample_df.columns:
+        inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                            'ag_idx', 
                                                            'group', 
                                                            'ID', 
                                                            'handedness'], as_index = False).mean())
     
     else:
-        inf_mean_df_day2 = pd.DataFrame(post_sample_df_day2.groupby(['model', 
+        inf_mean_df = pd.DataFrame(post_sample_df.groupby(['model', 
                                                            'ag_idx', 
                                                            'group', 
                                                            'ID'], as_index = False).mean())  
     
-    inf_mean_df_day2['day'] = 2
-    inf_mean_df_day2 = inf_mean_df_day2.sort_values(by=['ag_idx'])
+    inf_mean_df = inf_mean_df.sort_values(by=['ag_idx'])
     
-    model = post_sample_df_day2['model'][0]
-    num_agents = len(post_sample_df_day2['ag_idx'].unique())
+    model = post_sample_df['model'][0]
+    num_agents = len(post_sample_df['ag_idx'].unique())
     
     print(f"Model fit of model {model} for {num_agents} agents after %d inference steps."%len(loss))
+    
     '''
         Plot ELBO
     '''
@@ -3155,137 +3365,212 @@ def load_data():
     import matplotlib.colors as mcolors
     import matplotlib.cm as cm
     
-    # plt.style.use("seaborn-v0_8-dark")
-    
-    complete_df_day2 = create_complete_df(inf_mean_df_day2, sociopsy_df, expdata_df_day2, post_sample_df_day2, param_names)
-    complete_df_day2['day'] == 2
-    
-    '''
-        Simulate from means
-    '''
-    '''
-    er:
-        0 : STT
-        1 : Random
-        2 : Congruent
-        3 : incongruent
-    '''
-    er_day2 = torch.zeros((4, num_agents))
-    er_day2[0, :] = torch.tensor(complete_df_day2['ER_stt']) # stt
-    er_day2[1, :] = torch.tensor(complete_df_day2['ER_randomdtt']) # random
-    er_day2[2, :] = torch.tensor(complete_df_day2['ER_congruent']) # congruent
-    er_day2[3, :] = torch.tensor(complete_df_day2['ER_incongruent']) # incongruent
-    
-    if day == 2:
-        seq_counter_day2 = extra_storage_day2[6]
-        _, sim_group_behav_df_day2, _, _ = simulate_data(model, 
-                                                        num_agents,
-                                                        group = list(inf_mean_df_day2['group']),
-                                                        day = day,
-                                                        STT = 0,
-                                                        Q_init = Q_init_day2,
-                                                        seq_init = seq_counter_day2,
-                                                        params = inf_mean_df_day2.loc[:, [*param_names]],
-                                                        errorrates = er_day2)
+    if inftype == 'bothdays':
         
-        plot_grouplevel(expdata_df_day2, sim_group_behav_df_day2, plot_single = False)
-        sim_group_behav_df_day2['day'] = 2
+        complete_df = create_complete_df(inf_mean_df, 
+                                              sociopsy_df, 
+                                              expdata_df, 
+                                              post_sample_df, 
+                                              param_names,
+                                              day = 'both')
         
-        print("\n\nCreating and appending dataframe for day 1.")
-        filename_day1 = extra_storage_day2[7]
-        
-        file_directory = '/'.join(filepath.split('/')[0:-1]) + '/'
-        if extra_storage_day2[10] == 'recovery':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
-            
-        elif extra_storage_day2[10] == 'behav_fit':
-            post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
-            
-        else:
-            raise Exception('Error')
-    
         '''
-            Plot ELBO
+            Simulate from means
         '''
-        fig, ax = plt.subplots()
-        plt.plot(loss_day1)
-        plt.title(f"ELBO for model {model} ({num_agents} agents)")
-        ax.set_xlabel("Number of iterations")
-        ax.set_ylabel("ELBO")
-        plt.show()
+        '''
+        er:
+            0 : STT
+            1 : Random
+            2 : Congruent
+            3 : incongruent
+        '''
+        er_df = complete_df.loc[:, ['ID', 
+                                 'day', 
+                                 'ER_stt',
+                                 'ER_randomdtt',
+                                 'ER_congruent',
+                                 'ER_incongruent']]
+        # er[0, :] = torch.tensor(complete_df['ER_stt']) # stt
+        # er[1, :] = torch.tensor(complete_df['ER_randomdtt']) # random
+        # er[2, :] = torch.tensor(complete_df['ER_congruent']) # congruent
+        # er[3, :] = torch.tensor(complete_df['ER_incongruent']) # incongruent
         
-        fig, ax = plt.subplots()
-        plt.plot(loss_day1[-500:])
-        plt.title(f"ELBO for model {model} ({num_agents} agents)")
-        ax.set_xlabel("Number of iterations")
-        ax.set_ylabel("ELBO")
-        plt.show()
-    
-        post_sample_df_day1['day'] = 1
-        # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
-        param_names_day1 = extra_storage_day1[9]
-        # if extra_storage_day1[11] >= 1e-03:
-        #     print("rhalt too large for IC computation.")
+        seqlength = 3
         
-        if 'handedness' in post_sample_df_day1.columns:
-            inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
-                                                               'ag_idx', 
-                                                               'group', 
-                                                               'ID', 
-                                                               'handedness'], as_index = False).mean())
+        # _, sim_group_behav_df, _, _ = simulate_data(model, 
+        #                                             num_agents,
+        #                                             group = list(inf_mean_df['group']),
+        #                                             day = 'both',
+        #                                             STT = 0,
+        #                                             params = inf_mean_df.loc[:, [*param_names]],
+        #                                             errorrates = er,
+        #                                             seqlength = seqlength)
         
-        else:
-            inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
-                                                               'ag_idx', 
-                                                               'group', 
-                                                               'ID'], as_index = False).mean())  
+        return complete_df, inf_mean_df, expdata_df, \
+            post_sample_df, None, param_names, None, \
+            None, er_df, extra_storage, None, \
+            agent_elbo_tuple, None
         
-        inf_mean_df_day1 = inf_mean_df_day1.sort_values(by=['ag_idx'])
+    elif inftype != 'bothdays':
+        assert inftype is None
         
-        model_day1 = post_sample_df_day1['model'][0]
+        complete_df = create_complete_df(inf_mean_df, sociopsy_df, expdata_df, post_sample_df, param_names, day)
         
-        complete_df_day1 = create_complete_df(inf_mean_df_day1, 
-                                                    sociopsy_df_day1,
-                                                    expdata_df_day1,
-                                                    post_sample_df_day1, 
-                                                    param_names_day1)
+        '''
+            Simulate from means
+        '''
+        '''
+        er:
+            0 : STT
+            1 : Random
+            2 : Congruent
+            3 : incongruent
+        '''
+        er = torch.zeros((4, num_agents))
+        er[0, :] = torch.tensor(complete_df['ER_stt']) # stt
+        er[1, :] = torch.tensor(complete_df['ER_randomdtt']) # random
+        er[2, :] = torch.tensor(complete_df['ER_congruent']) # congruent
+        er[3, :] = torch.tensor(complete_df['ER_incongruent']) # incongruent
         
-        # rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
-        # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
-        complete_df_day1['day'] = 1
-        complete_df_all = pd.concat([complete_df_day1, complete_df_day2], ignore_index=True)
+        complete_df_day2 = complete_df
+        inf_mean_df_day2 = inf_mean_df
+        expdata_df_day2 = expdata_df
+        post_sample_df_day2 = post_sample_df
+        er_day2 = er
+        extra_storage_day2 = extra_storage
+        agent_elbo_tuple_day2 = agent_elbo_tuple
+        Q_init_day2 = Q_init
         
-        expdata_df_day1['day'] = 1
-        expdata_df_day2['day'] = 2
-        expdata_df_all = pd.concat([expdata_df_day1, expdata_df_day2], ignore_index=True)
+        complete_df_day2['day'] = 2
+        post_sample_df_day2['day'] = 2
+        inf_mean_df_day2['day'] = 2
         
-        inf_mean_df_day1['day'] = 1
-        inf_mean_df_all = pd.concat([inf_mean_df_day1, inf_mean_df_day2], ignore_index=True)
+        if day == 2:
+            seq_counter_day2 = extra_storage_day2[6]
+            filename_day1 = extra_storage_day2[7]
+            
+            if 'SeqLength' in filename_day1:
+                seqlength = int(filename_day1[-1])
+                
+            else:
+                seqlength = 4
+            
+            print(f"Setting seqlength to {seqlength}.")
+            
+            _, sim_group_behav_df_day2, _, _ = simulate_data(model, 
+                                                            num_agents,
+                                                            group = list(inf_mean_df_day2['group']),
+                                                            day = day,
+                                                            STT = 0,
+                                                            Q_init = Q_init_day2,
+                                                            seq_init = seq_counter_day2,
+                                                            params = inf_mean_df_day2.loc[:, [*param_names]],
+                                                            errorrates = er_day2,
+                                                            seqlength = seqlength)
+            
+            plot_grouplevel(expdata_df_day2, sim_group_behav_df_day2, plot_single = False)
+            sim_group_behav_df_day2['day'] = 2
+            
+            print("\n\nCreating and appending dataframe for day 1.")
+            
+            file_directory = '/'.join(filepath.split('/')[0:-1]) + '/'
+            if extra_storage_day2[10] == 'recovery':
+                post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
+                
+            elif extra_storage_day2[10] == 'behav_fit':
+                post_sample_df_day1, expdata_df_day1, loss_day1, params_df_day1, num_params_day1, sociopsy_df_day1, agent_elbo_tuple_day1, BIC_day1, AIC_day1, extra_storage_day1, _ = get_data_from_file(file_directory+filename_day1+'.p')    
+                
+            else:
+                raise Exception('Error')
         
-        post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df_day2], ignore_index=True)
+            '''
+                Plot ELBO
+            '''
+            fig, ax = plt.subplots()
+            plt.plot(loss_day1)
+            plt.title(f"ELBO for model {model} ({num_agents} agents)")
+            ax.set_xlabel("Number of iterations")
+            ax.set_ylabel("ELBO")
+            plt.show()
+            
+            fig, ax = plt.subplots()
+            plt.plot(loss_day1[-500:])
+            plt.title(f"ELBO for model {model} ({num_agents} agents)")
+            ax.set_xlabel("Number of iterations")
+            ax.set_ylabel("ELBO")
+            plt.show()
         
-        er_day1 = torch.zeros((4, num_agents))
-        er_day1[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
-        er_day1[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
-        er_day1[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
-        er_day1[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
-        groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = simulate_data(model_day1, 
-                                                                                num_agents,
-                                                                                group = list(inf_mean_df_day1['group']),
-                                                                                day = 1,
-                                                                                STT = 0,
-                                                                                params = inf_mean_df_day1.loc[:, [*param_names_day1]],
-                                                                                errorrates = er_day1)
+            post_sample_df_day1['day'] = 1
+            # param_names_day1 = params_df_day1.iloc[:, 0:-3].columns
+            param_names_day1 = extra_storage_day1[9]
+            # if extra_storage_day1[11] >= 1e-03:
+            #     print("rhalt too large for IC computation.")
+            
+            if 'handedness' in post_sample_df_day1.columns:
+                inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                                   'ag_idx', 
+                                                                   'group', 
+                                                                   'ID', 
+                                                                   'handedness'], as_index = False).mean())
+            
+            else:
+                inf_mean_df_day1 = pd.DataFrame(post_sample_df_day1.groupby(['model', 
+                                                                   'ag_idx', 
+                                                                   'group', 
+                                                                   'ID'], as_index = False).mean())  
+            
+            inf_mean_df_day1 = inf_mean_df_day1.sort_values(by=['ag_idx'])
+            
+            model_day1 = post_sample_df_day1['model'][0]
+            
+            complete_df_day1 = create_complete_df(inf_mean_df_day1, 
+                                                        sociopsy_df_day1,
+                                                        expdata_df_day1,
+                                                        post_sample_df_day1, 
+                                                        param_names_day1,
+                                                        day = 1)
+            
+            # rename_dict = {col: col+'_day1' if (col != 'ID') and (col != 'ag_idx') and (col != 'group') else col for col in complete_df_day1.columns}
+            # complete_df_day1 = complete_df_day1.rename(columns=rename_dict)
+            complete_df_day1['day'] = 1
+            complete_df_all = pd.concat([complete_df_day1, complete_df_day2], ignore_index=True)
+            
+            expdata_df_day1['day'] = 1
+            expdata_df_day2['day'] = 2
+            expdata_df_all = pd.concat([expdata_df_day1, expdata_df_day2], ignore_index=True)
+            
+            inf_mean_df_day1['day'] = 1
+            inf_mean_df_all = pd.concat([inf_mean_df_day1, inf_mean_df_day2], ignore_index=True)
+            
+            post_sample_df_all = pd.concat([post_sample_df_day1, post_sample_df_day2], ignore_index=True)
+            
+            er_day1 = torch.zeros((4, num_agents))
+            er_day1[0, :] = torch.tensor(complete_df_day1['ER_stt']) # stt
+            er_day1[1, :] = torch.tensor(complete_df_day1['ER_randomdtt']) # random
+            er_day1[2, :] = torch.tensor(complete_df_day1['ER_congruent']) # congruent
+            er_day1[3, :] = torch.tensor(complete_df_day1['ER_incongruent']) # incongruent
+            groupdata_dict_day1, sim_group_behav_df_day1, params_sim_df_day1, _ = simulate_data(model_day1, 
+                                                                                    num_agents,
+                                                                                    group = list(inf_mean_df_day1['group']),
+                                                                                    day = 1,
+                                                                                    STT = 0,
+                                                                                    params = inf_mean_df_day1.loc[:, [*param_names_day1]],
+                                                                                    errorrates = er_day1,
+                                                                                    seqlength=seqlength)
+            
+            sim_group_behav_df_day1['day'] = 1
+            
+            sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
         
-        sim_group_behav_df_day1['day'] = 1
+            print("Violin plots.")
+            anal.violin(inf_mean_df_day1, param_names, model)
+            anal.violin(inf_mean_df_day2, param_names, model)
+            
+            return complete_df_all, inf_mean_df_all, expdata_df_all, \
+                post_sample_df_all, sim_df, param_names, Q_init_day2, \
+                seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1, \
+                agent_elbo_tuple_day2, agent_elbo_tuple_day1
         
-        sim_df = pd.concat((sim_group_behav_df_day1, sim_group_behav_df_day2), ignore_index = True)
-    
-        print("Violin plots.")
-        anal.violin(inf_mean_df_day1, param_names, model)
-        anal.violin(inf_mean_df_day2, param_names, model)
-        return complete_df_all, inf_mean_df_all, expdata_df_all, post_sample_df_all, sim_df, param_names, Q_init_day2, seq_counter_day2, er_day2, extra_storage_day2, extra_storage_day1, agent_elbo_tuple_day2, agent_elbo_tuple_day1
-    
 def longest_common_substring(A, B):
     # Start by checking the longer substrings of B
     for length in range(len(B), 0, -1):
@@ -3399,3 +3684,43 @@ def display_top(snapshot, key_type='lineno', limit=3):
         print("%s other: %.1f KiB" % (len(other), size / 1024))
     total = sum(stat.size for stat in top_stats)
     print("Total allocated size: %.1f KiB" % (total / 1024))
+    
+def correlation_difference_test(r1, n1, r2, n2, comptype = "Two-Tailed"):
+    '''
+    Test whether two Pearson correlations are different for two independent correlations.
+
+    Parameters
+    ----------
+    r1 : float
+        Pearson r of first correlation.
+        
+    n1 : int
+        Size of observation pairs in first correlation.
+        
+    r2 : float
+        Pearson r of second correlation.
+        
+    n2 : int
+        Size of observation pairs in second correlation.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
+    from scipy.stats import norm
+    
+    "1) fisher z-tranformation on correlation coefficients"
+    z1 = 0.5 * np.log((1+r1)/(1-r1))
+    z2 = 0.5 * np.log((1+r2)/(1-r2))
+
+    "2) Standard error of the difference"
+    SEdiff = np.sqrt(1/(n1-3) + 1/(n2-3))
+    
+    Z_observed = (z1 - z2) / SEdiff
+    
+    if comptype == "Two-Tailed":
+        p_value = (1-norm.cdf(np.abs(Z_observed)))*2
+        
+        print(f"Two-tailed p-value %.4f at Z = %.4f"%(p_value, Z_observed))
