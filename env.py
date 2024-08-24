@@ -227,10 +227,10 @@ class Env():
             blocktype = torch.tensor(data["blocktype"][tau])
             jtype = torch.tensor(data["jokertypes"][tau])
             
-            if data['blockidx'][0][0] <= 5:
+            if data['blockidx'][tau][0] <= 5:
                 day = 1
                 
-            elif data['blockidx'][0][0] > 5:
+            elif data['blockidx'][tau][0] > 5:
                 day = 2
                 
             else:
@@ -238,10 +238,10 @@ class Env():
 
             if all(trial == -1):
                 "Beginning of new block"
-                agent.update(torch.tensor([-1]*agent.num_agents), 
-                                torch.tensor([-1]*agent.num_agents), 
-                                torch.tensor([-1]*agent.num_agents), 
-                                day = day, 
+                agent.update(torch.tensor([-1]*agent.num_agents),
+                                torch.tensor([-1]*agent.num_agents),
+                                torch.tensor([-1]*agent.num_agents),
+                                day = day,
                                 trialstimulus = trial,
                                 jokertype = jtype)
                 
@@ -266,11 +266,12 @@ class Env():
                         outcome = torch.tensor(data["outcomes"][tau]).type(torch.int)
             
                 elif infer == 0:
-                    "Simulation"
+                    '''Simulation'''
                     if STT:
                         current_RT = agent.stt_action(trial, 
                                                       blocktype = blocktype, 
                                                       jokertype = jtype)
+                        
                         self.RTs.append(current_RT)
                         
                     else:
@@ -278,7 +279,10 @@ class Env():
                                                              blocktype = blocktype, 
                                                              jokertype = jtype, 
                                                              day = day)
-                        outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), current_choice])
+                        
+                        outcome = torch.bernoulli(data['rewprobs'][range(agent.num_agents), 
+                                                                   current_choice])
+                        
                         self.choices_GD.append((data['rewprobs'][range(agent.num_agents), 
                                                                  current_choice]==data['rewprobs'].max()).type(torch.int).tolist())
                         self.choices.append(current_choice.tolist())
